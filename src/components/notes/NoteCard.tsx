@@ -9,12 +9,14 @@ import {
   Eye, 
   Bookmark, 
   Bot,
-  MoreVertical
+  MoreVertical,
+  Expand
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { toast } from "@/hooks/use-toast";
 
 interface NoteCardProps {
   note: {
@@ -32,6 +34,7 @@ interface NoteCardProps {
     topic?: string;
   };
   onAskAI?: () => void;
+  onExpand?: () => void;
 }
 
 const fileTypeIcons = {
@@ -48,16 +51,22 @@ const fileTypeColors = {
   link: "bg-secondary/20 text-secondary",
 };
 
-export function NoteCard({ note, onAskAI }: NoteCardProps) {
+export function NoteCard({ note, onAskAI, onExpand }: NoteCardProps) {
   const [liked, setLiked] = useState(false);
   const [disliked, setDisliked] = useState(false);
   const [saved, setSaved] = useState(false);
   const [likes, setLikes] = useState(note.likes);
   const [dislikes, setDislikes] = useState(note.dislikes);
+  const [likeAnimating, setLikeAnimating] = useState(false);
+  const [dislikeAnimating, setDislikeAnimating] = useState(false);
+  const [saveAnimating, setSaveAnimating] = useState(false);
 
   const FileIcon = fileTypeIcons[note.fileType];
 
   const handleLike = () => {
+    setLikeAnimating(true);
+    setTimeout(() => setLikeAnimating(false), 300);
+    
     if (liked) {
       setLiked(false);
       setLikes(likes - 1);
@@ -68,10 +77,17 @@ export function NoteCard({ note, onAskAI }: NoteCardProps) {
         setDisliked(false);
         setDislikes(dislikes - 1);
       }
+      toast({
+        title: "Liked!",
+        description: "You liked this note",
+      });
     }
   };
 
   const handleDislike = () => {
+    setDislikeAnimating(true);
+    setTimeout(() => setDislikeAnimating(false), 300);
+    
     if (disliked) {
       setDisliked(false);
       setDislikes(dislikes - 1);
@@ -85,16 +101,27 @@ export function NoteCard({ note, onAskAI }: NoteCardProps) {
     }
   };
 
+  const handleSave = () => {
+    setSaveAnimating(true);
+    setTimeout(() => setSaveAnimating(false), 300);
+    
+    setSaved(!saved);
+    toast({
+      title: saved ? "Removed from saved" : "Saved!",
+      description: saved ? "Note removed from your collection" : "Note added to your collection",
+    });
+  };
+
   return (
     <Card className="bg-card border-border hover:shadow-lg transition-all duration-200 group">
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-3">
-          <div className="flex items-start gap-3">
-            <div className={cn("p-2.5 rounded-xl", fileTypeColors[note.fileType])}>
+          <div className="flex items-start gap-3 flex-1 min-w-0">
+            <div className={cn("p-2.5 rounded-xl flex-shrink-0", fileTypeColors[note.fileType])}>
               <FileIcon className="w-5 h-5" />
             </div>
-            <div className="min-w-0">
-              <h3 className="font-semibold text-foreground line-clamp-2 group-hover:text-primary transition-colors">
+            <div className="min-w-0 flex-1">
+              <h3 className="font-semibold text-foreground line-clamp-2 group-hover:text-primary transition-colors cursor-pointer" onClick={onExpand}>
                 {note.title}
               </h3>
               <p className="text-sm text-muted-foreground mt-1">
@@ -102,9 +129,14 @@ export function NoteCard({ note, onAskAI }: NoteCardProps) {
               </p>
             </div>
           </div>
-          <Button variant="ghost" size="icon" className="flex-shrink-0">
-            <MoreVertical className="w-4 h-4" />
-          </Button>
+          <div className="flex items-center gap-1 flex-shrink-0">
+            <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity" onClick={onExpand}>
+              <Expand className="w-4 h-4" />
+            </Button>
+            <Button variant="ghost" size="icon" className="h-8 w-8">
+              <MoreVertical className="w-4 h-4" />
+            </Button>
+          </div>
         </div>
       </CardHeader>
 
@@ -134,11 +166,12 @@ export function NoteCard({ note, onAskAI }: NoteCardProps) {
             size="sm"
             onClick={handleLike}
             className={cn(
-              "h-8 px-2 gap-1",
-              liked && "text-primary bg-primary/10"
+              "h-8 px-2 gap-1 transition-all",
+              liked && "text-primary bg-primary/10",
+              likeAnimating && "scale-125"
             )}
           >
-            <ThumbsUp className="w-4 h-4" />
+            <ThumbsUp className={cn("w-4 h-4 transition-transform", likeAnimating && "animate-bounce")} />
             <span className="text-xs">{likes}</span>
           </Button>
           <Button
@@ -146,11 +179,12 @@ export function NoteCard({ note, onAskAI }: NoteCardProps) {
             size="sm"
             onClick={handleDislike}
             className={cn(
-              "h-8 px-2 gap-1",
-              disliked && "text-destructive bg-destructive/10"
+              "h-8 px-2 gap-1 transition-all",
+              disliked && "text-destructive bg-destructive/10",
+              dislikeAnimating && "scale-125"
             )}
           >
-            <ThumbsDown className="w-4 h-4" />
+            <ThumbsDown className={cn("w-4 h-4 transition-transform", dislikeAnimating && "animate-bounce")} />
             <span className="text-xs">{dislikes}</span>
           </Button>
           <div className="flex items-center gap-1 text-muted-foreground px-2">
@@ -163,13 +197,14 @@ export function NoteCard({ note, onAskAI }: NoteCardProps) {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => setSaved(!saved)}
+            onClick={handleSave}
             className={cn(
-              "h-8 px-2",
-              saved && "text-primary bg-primary/10"
+              "h-8 px-2 transition-all",
+              saved && "text-primary bg-primary/10",
+              saveAnimating && "scale-125"
             )}
           >
-            <Bookmark className={cn("w-4 h-4", saved && "fill-current")} />
+            <Bookmark className={cn("w-4 h-4 transition-transform", saved && "fill-current", saveAnimating && "animate-bounce")} />
           </Button>
           <Button
             variant="outline"

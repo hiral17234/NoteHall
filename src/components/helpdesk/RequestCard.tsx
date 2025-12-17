@@ -1,8 +1,9 @@
-import { FileText, Image, Video, Upload, CheckCircle2, Clock, User } from "lucide-react";
+import { FileText, Image, Video, Upload, CheckCircle2, Clock, User, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { toast } from "@/hooks/use-toast";
 
 interface RequestCardProps {
   request: {
@@ -13,7 +14,7 @@ interface RequestCardProps {
     branch: string;
     year: string;
     requestType: "pdf" | "image" | "video";
-    status: "open" | "fulfilled";
+    status: "open" | "fulfilled" | "urgent";
     requestedBy: string;
     timestamp: string;
     helpersCount: number;
@@ -27,9 +28,37 @@ const fileTypeIcons = {
   video: Video,
 };
 
+const statusConfig = {
+  open: {
+    icon: Clock,
+    label: "Open",
+    className: "bg-primary text-primary-foreground",
+  },
+  fulfilled: {
+    icon: CheckCircle2,
+    label: "Fulfilled",
+    className: "bg-muted text-muted-foreground",
+  },
+  urgent: {
+    icon: AlertCircle,
+    label: "Urgent",
+    className: "bg-destructive text-destructive-foreground animate-pulse",
+  },
+};
+
 export function RequestCard({ request, onHelp }: RequestCardProps) {
   const FileIcon = fileTypeIcons[request.requestType];
-  const isOpen = request.status === "open";
+  const status = statusConfig[request.status];
+  const StatusIcon = status.icon;
+  const isOpen = request.status !== "fulfilled";
+
+  const handleHelp = () => {
+    onHelp?.();
+    toast({
+      title: "Thank you!",
+      description: "Your contribution helps the community",
+    });
+  };
 
   return (
     <Card className={cn(
@@ -46,30 +75,15 @@ export function RequestCard({ request, onHelp }: RequestCardProps) {
               <FileIcon className="w-5 h-5" />
             </div>
             <div className="min-w-0">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="font-semibold text-foreground line-clamp-1">
                   {request.title}
                 </h3>
                 <Badge
-                  variant={isOpen ? "default" : "secondary"}
-                  className={cn(
-                    "flex-shrink-0",
-                    isOpen 
-                      ? "bg-primary text-primary-foreground" 
-                      : "bg-muted text-muted-foreground"
-                  )}
+                  className={cn("flex-shrink-0", status.className)}
                 >
-                  {isOpen ? (
-                    <>
-                      <Clock className="w-3 h-3 mr-1" />
-                      Open
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle2 className="w-3 h-3 mr-1" />
-                      Fulfilled
-                    </>
-                  )}
+                  <StatusIcon className="w-3 h-3 mr-1" />
+                  {status.label}
                 </Badge>
               </div>
               <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
@@ -105,14 +119,14 @@ export function RequestCard({ request, onHelp }: RequestCardProps) {
           {request.helpersCount > 0 && (
             <>
               <span>•</span>
-              <span>{request.helpersCount} helpers</span>
+              <span className="text-primary font-medium">{request.helpersCount} helpers</span>
             </>
           )}
         </div>
 
         {isOpen && (
           <Button
-            onClick={onHelp}
+            onClick={handleHelp}
             className="bg-primary hover:bg-primary/90 text-primary-foreground gap-2"
           >
             <Upload className="w-4 h-4" />

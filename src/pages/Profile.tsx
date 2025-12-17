@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { NoteCard } from "@/components/notes/NoteCard";
+import { NoteCardSkeleton, ProfileStatsSkeleton } from "@/components/ui/skeleton-card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -16,7 +18,8 @@ import {
   BarChart3,
   ThumbsUp,
   Eye,
-  Users
+  Users,
+  TrendingUp
 } from "lucide-react";
 
 const mockProfile = {
@@ -98,6 +101,28 @@ const mockHelpedRequests = [
 ];
 
 export default function Profile() {
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState(mockProfile.stats);
+
+  // Simulate loading and auto-update stats
+  useEffect(() => {
+    const loadTimer = setTimeout(() => setLoading(false), 1000);
+    
+    // Mock auto-updating stats
+    const statsInterval = setInterval(() => {
+      setStats(prev => ({
+        ...prev,
+        totalViews: prev.totalViews + Math.floor(Math.random() * 5),
+        totalLikes: prev.totalLikes + (Math.random() > 0.7 ? 1 : 0),
+      }));
+    }, 5000);
+
+    return () => {
+      clearTimeout(loadTimer);
+      clearInterval(statsInterval);
+    };
+  }, []);
+
   return (
     <MainLayout>
       <div className="max-w-4xl mx-auto">
@@ -154,34 +179,51 @@ export default function Profile() {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <Card className="bg-card border-border">
-            <CardContent className="pt-4 text-center">
-              <FileText className="w-6 h-6 mx-auto text-primary mb-2" />
-              <p className="text-2xl font-bold text-foreground">{mockProfile.stats.uploads}</p>
-              <p className="text-sm text-muted-foreground">Uploads</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-card border-border">
-            <CardContent className="pt-4 text-center">
-              <ThumbsUp className="w-6 h-6 mx-auto text-primary mb-2" />
-              <p className="text-2xl font-bold text-foreground">{mockProfile.stats.totalLikes}</p>
-              <p className="text-sm text-muted-foreground">Total Likes</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-card border-border">
-            <CardContent className="pt-4 text-center">
-              <Eye className="w-6 h-6 mx-auto text-primary mb-2" />
-              <p className="text-2xl font-bold text-foreground">{mockProfile.stats.totalViews}</p>
-              <p className="text-sm text-muted-foreground">Total Views</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-card border-border">
-            <CardContent className="pt-4 text-center">
-              <Users className="w-6 h-6 mx-auto text-primary mb-2" />
-              <p className="text-2xl font-bold text-foreground">{mockProfile.stats.helpedRequests}</p>
-              <p className="text-sm text-muted-foreground">Helped</p>
-            </CardContent>
-          </Card>
+          {loading ? (
+            <>
+              <ProfileStatsSkeleton />
+              <ProfileStatsSkeleton />
+              <ProfileStatsSkeleton />
+              <ProfileStatsSkeleton />
+            </>
+          ) : (
+            <>
+              <Card className="bg-card border-border group hover:border-primary/30 transition-colors">
+                <CardContent className="pt-4 text-center">
+                  <FileText className="w-6 h-6 mx-auto text-primary mb-2" />
+                  <p className="text-2xl font-bold text-foreground">{stats.uploads}</p>
+                  <p className="text-sm text-muted-foreground">Uploads</p>
+                </CardContent>
+              </Card>
+              <Card className="bg-card border-border group hover:border-primary/30 transition-colors">
+                <CardContent className="pt-4 text-center">
+                  <ThumbsUp className="w-6 h-6 mx-auto text-primary mb-2" />
+                  <div className="flex items-center justify-center gap-1">
+                    <p className="text-2xl font-bold text-foreground">{stats.totalLikes.toLocaleString()}</p>
+                    <TrendingUp className="w-4 h-4 text-chart-1" />
+                  </div>
+                  <p className="text-sm text-muted-foreground">Total Likes</p>
+                </CardContent>
+              </Card>
+              <Card className="bg-card border-border group hover:border-primary/30 transition-colors">
+                <CardContent className="pt-4 text-center">
+                  <Eye className="w-6 h-6 mx-auto text-primary mb-2" />
+                  <div className="flex items-center justify-center gap-1">
+                    <p className="text-2xl font-bold text-foreground">{stats.totalViews.toLocaleString()}</p>
+                    <TrendingUp className="w-4 h-4 text-chart-1" />
+                  </div>
+                  <p className="text-sm text-muted-foreground">Total Views</p>
+                </CardContent>
+              </Card>
+              <Card className="bg-card border-border group hover:border-primary/30 transition-colors">
+                <CardContent className="pt-4 text-center">
+                  <Users className="w-6 h-6 mx-auto text-primary mb-2" />
+                  <p className="text-2xl font-bold text-foreground">{stats.helpedRequests}</p>
+                  <p className="text-sm text-muted-foreground">Helped</p>
+                </CardContent>
+              </Card>
+            </>
+          )}
         </div>
 
         {/* Tabs */}
@@ -206,47 +248,62 @@ export default function Profile() {
           </TabsList>
 
           <TabsContent value="uploaded" className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              {mockUploadedNotes.map((note) => (
-                <NoteCard key={note.id} note={note} />
-              ))}
-            </div>
-            {mockUploadedNotes.length === 0 && (
-              <div className="text-center py-12">
-                <p className="text-muted-foreground">No uploaded notes yet.</p>
+            {loading ? (
+              <div className="grid gap-4 md:grid-cols-2">
+                <NoteCardSkeleton />
+                <NoteCardSkeleton />
               </div>
+            ) : mockUploadedNotes.length > 0 ? (
+              <div className="grid gap-4 md:grid-cols-2">
+                {mockUploadedNotes.map((note) => (
+                  <NoteCard key={note.id} note={note} />
+                ))}
+              </div>
+            ) : (
+              <EmptyState type="notes" title="No uploads yet" description="Upload your first note to help others!" />
             )}
           </TabsContent>
 
           <TabsContent value="saved" className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              {mockSavedNotes.map((note) => (
-                <NoteCard key={note.id} note={note} />
-              ))}
-            </div>
-            {mockSavedNotes.length === 0 && (
-              <div className="text-center py-12">
-                <p className="text-muted-foreground">No saved notes yet.</p>
+            {loading ? (
+              <div className="grid gap-4 md:grid-cols-2">
+                <NoteCardSkeleton />
               </div>
+            ) : mockSavedNotes.length > 0 ? (
+              <div className="grid gap-4 md:grid-cols-2">
+                {mockSavedNotes.map((note) => (
+                  <NoteCard key={note.id} note={note} />
+                ))}
+              </div>
+            ) : (
+              <EmptyState type="saved" />
             )}
           </TabsContent>
 
           <TabsContent value="helped" className="space-y-4">
-            {mockHelpedRequests.map((request) => (
-              <Card key={request.id} className="bg-card border-border">
-                <CardContent className="py-4 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                      <HandHelping className="w-5 h-5 text-primary" />
+            {loading ? (
+              <div className="space-y-4">
+                <NoteCardSkeleton />
+              </div>
+            ) : mockHelpedRequests.length > 0 ? (
+              mockHelpedRequests.map((request) => (
+                <Card key={request.id} className="bg-card border-border hover:border-primary/30 transition-colors">
+                  <CardContent className="py-4 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                        <HandHelping className="w-5 h-5 text-primary" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-foreground">{request.title}</p>
+                        <p className="text-sm text-muted-foreground">{request.subject} • {request.timestamp}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-medium text-foreground">{request.title}</p>
-                      <p className="text-sm text-muted-foreground">{request.subject} • {request.timestamp}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                  </CardContent>
+                </Card>
+              ))
+            ) : (
+              <EmptyState type="helped" />
+            )}
           </TabsContent>
 
           <TabsContent value="stats" className="space-y-4">
@@ -256,10 +313,10 @@ export default function Profile() {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Notes Uploaded</span>
-                    <span className="font-medium text-foreground">{mockProfile.stats.uploads}</span>
+                    <span className="font-medium text-foreground">{stats.uploads}</span>
                   </div>
                   <div className="w-full bg-muted rounded-full h-2">
-                    <div className="bg-primary h-2 rounded-full" style={{ width: "60%" }} />
+                    <div className="bg-primary h-2 rounded-full transition-all duration-500" style={{ width: "60%" }} />
                   </div>
                   
                   <div className="flex items-center justify-between mt-4">
@@ -267,7 +324,7 @@ export default function Profile() {
                     <span className="font-medium text-foreground">85%</span>
                   </div>
                   <div className="w-full bg-muted rounded-full h-2">
-                    <div className="bg-primary h-2 rounded-full" style={{ width: "85%" }} />
+                    <div className="bg-primary h-2 rounded-full transition-all duration-500" style={{ width: "85%" }} />
                   </div>
                   
                   <div className="flex items-center justify-between mt-4">
@@ -275,7 +332,7 @@ export default function Profile() {
                     <span className="font-medium text-foreground">92/100</span>
                   </div>
                   <div className="w-full bg-muted rounded-full h-2">
-                    <div className="bg-primary h-2 rounded-full" style={{ width: "92%" }} />
+                    <div className="bg-primary h-2 rounded-full transition-all duration-500" style={{ width: "92%" }} />
                   </div>
                 </div>
               </CardContent>

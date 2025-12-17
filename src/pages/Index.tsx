@@ -1,6 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { NoteCard } from "@/components/notes/NoteCard";
+import { NoteCardSkeleton } from "@/components/ui/skeleton-card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { NotePreviewModal } from "@/components/notes/NotePreviewModal";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -96,12 +99,26 @@ const mockNotes = [
 export default function Index() {
   const [selectedBranch, setSelectedBranch] = useState<string>("all");
   const [selectedYear, setSelectedYear] = useState<string>("all");
+  const [loading, setLoading] = useState(true);
+  const [selectedNote, setSelectedNote] = useState<typeof mockNotes[0] | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
+
+  // Simulate loading
+  useEffect(() => {
+    const timer = setTimeout(() => setLoading(false), 1200);
+    return () => clearTimeout(timer);
+  }, []);
 
   const filteredNotes = mockNotes.filter((note) => {
     if (selectedBranch !== "all" && note.branch !== selectedBranch) return false;
     if (selectedYear !== "all" && note.year !== selectedYear) return false;
     return true;
   });
+
+  const handleExpand = (note: typeof mockNotes[0]) => {
+    setSelectedNote(note);
+    setPreviewOpen(true);
+  };
 
   return (
     <MainLayout>
@@ -170,18 +187,33 @@ export default function Index() {
         </div>
 
         {/* Notes Grid */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
-          {filteredNotes.map((note) => (
-            <NoteCard key={note.id} note={note} />
-          ))}
-        </div>
-
-        {filteredNotes.length === 0 && (
-          <div className="text-center py-12">
-            <p className="text-muted-foreground">No notes found matching your filters.</p>
+        {loading ? (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <NoteCardSkeleton key={i} />
+            ))}
           </div>
+        ) : filteredNotes.length > 0 ? (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
+            {filteredNotes.map((note) => (
+              <NoteCard 
+                key={note.id} 
+                note={note} 
+                onExpand={() => handleExpand(note)}
+              />
+            ))}
+          </div>
+        ) : (
+          <EmptyState type="notes" />
         )}
       </div>
+
+      {/* Note Preview Modal */}
+      <NotePreviewModal
+        note={selectedNote}
+        open={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+      />
     </MainLayout>
   );
 }

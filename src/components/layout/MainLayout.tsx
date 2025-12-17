@@ -1,9 +1,11 @@
 import { ReactNode, useState } from "react";
 import { Sidebar } from "./Sidebar";
 import { AIAssistantPanel } from "@/components/ai/AIAssistantPanel";
+import { FloatingAIButton } from "@/components/ai/FloatingAIButton";
 import { Bot, Search, Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Toaster } from "@/components/ui/toaster";
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -55,6 +57,12 @@ export function MainLayout({ children }: MainLayoutProps) {
 
       {/* AI Assistant Panel */}
       <AIAssistantPanel open={aiPanelOpen} onClose={() => setAiPanelOpen(false)} />
+      
+      {/* Floating AI Button */}
+      <FloatingAIButton onClick={() => setAiPanelOpen(!aiPanelOpen)} isOpen={aiPanelOpen} />
+      
+      {/* Toast notifications */}
+      <Toaster />
     </div>
   );
 }
