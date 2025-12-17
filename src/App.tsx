@@ -3,6 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { ProfileProvider } from "@/contexts/ProfileContext";
 import Index from "./pages/Index";
 import Upload from "./pages/Upload";
 import HelpDesk from "./pages/HelpDesk";
@@ -16,29 +17,32 @@ const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/upload" element={<Upload />} />
-          <Route path="/helpdesk" element={<HelpDesk />} />
-          <Route path="/profile" element={<Profile />} />
-          <Route path="/settings" element={<Settings />} />
-          <Route path="/ai-assistant" element={<AIAssistant />} />
-          <Route 
-            path="/campusvoice" 
-            element={<Placeholder title="CampusVoice" description="Share your campus experiences and feedback. Coming soon!" />} 
-          />
-          <Route 
-            path="/campusbuzz" 
-            element={<Placeholder title="CampusBuzz" description="Stay updated with the latest campus news and events. Coming soon!" />} 
-          />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
+    <ProfileProvider>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/upload" element={<Upload />} />
+            <Route path="/helpdesk" element={<HelpDesk />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/profile/:userId" element={<Profile />} />
+            <Route path="/settings" element={<Settings />} />
+            <Route path="/ai-assistant" element={<AIAssistant />} />
+            <Route 
+              path="/campusvoice" 
+              element={<Placeholder title="CampusVoice" description="Share your campus experiences and feedback. Coming soon!" />} 
+            />
+            <Route 
+              path="/campusbuzz" 
+              element={<Placeholder title="CampusBuzz" description="Stay updated with the latest campus news and events. Coming soon!" />} 
+            />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
+      </TooltipProvider>
+    </ProfileProvider>
   </QueryClientProvider>
 );
 

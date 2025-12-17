@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { 
   FileText, 
   Image, 
@@ -11,7 +12,10 @@ import {
   ThumbsUp,
   MessageCircle,
   Link,
-  X
+  X,
+  Eye,
+  ChevronDown,
+  ChevronUp
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
@@ -20,8 +24,10 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
+import { ContributionCard, Contribution } from "./ContributionCard";
 
 interface RequestCardProps {
   request: {
@@ -34,10 +40,12 @@ interface RequestCardProps {
     requestType: "pdf" | "image" | "video";
     status: "open" | "fulfilled" | "urgent" | "closed";
     requestedBy: string;
+    requestedById?: string;
     timestamp: string;
     helpersCount: number;
     likes?: number;
     comments?: number;
+    contributions?: Contribution[];
   };
   onHelp?: () => void;
 }
@@ -71,11 +79,37 @@ const statusConfig = {
   },
 };
 
+// Mock contributions data
+const mockContributions: Contribution[] = [
+  {
+    id: "c1",
+    type: "pdf",
+    fileName: "DBMS_ER_Diagram_Notes.pdf",
+    message: "Complete notes with examples!",
+    contributorId: "user-2",
+    contributorName: "Priya Sharma",
+    timestamp: "2 hours ago",
+    likes: 8,
+  },
+  {
+    id: "c2",
+    type: "link",
+    link: "https://drive.google.com/file/example",
+    message: "Google Drive link with additional resources",
+    contributorId: "user-3",
+    contributorName: "Amit Kumar",
+    timestamp: "1 hour ago",
+    likes: 5,
+  },
+];
+
 export function RequestCard({ request, onHelp }: RequestCardProps) {
+  const navigate = useNavigate();
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(request.likes || 0);
   const [showHelpDialog, setShowHelpDialog] = useState(false);
   const [showCommentsDialog, setShowCommentsDialog] = useState(false);
+  const [showContributions, setShowContributions] = useState(false);
   const [helpData, setHelpData] = useState({
     file: null as File | null,
     link: "",
@@ -86,6 +120,8 @@ export function RequestCard({ request, onHelp }: RequestCardProps) {
     { id: "1", author: "Amit K.", text: "I have these notes, will upload soon!", time: "2h ago" },
     { id: "2", author: "Priya S.", text: "Check Google Drive, there's a good PDF", time: "1h ago" },
   ]);
+
+  const contributions = request.contributions || (request.helpersCount > 0 ? mockContributions : []);
 
   const FileIcon = fileTypeIcons[request.requestType];
   const status = statusConfig[request.status];
@@ -122,6 +158,10 @@ export function RequestCard({ request, onHelp }: RequestCardProps) {
     ]);
     setNewComment("");
     toast({ title: "Comment added!" });
+  };
+
+  const handleViewProfile = (userId: string) => {
+    navigate(`/profile/${userId}`);
   };
 
   return (
@@ -169,14 +209,45 @@ export function RequestCard({ request, onHelp }: RequestCardProps) {
               {request.year}
             </Badge>
           </div>
+
+          {/* Contributions Section */}
+          {contributions.length > 0 && (
+            <Collapsible open={showContributions} onOpenChange={setShowContributions} className="mt-4">
+              <CollapsibleTrigger asChild>
+                <Button variant="outline" size="sm" className="w-full justify-between gap-2">
+                  <span className="flex items-center gap-2">
+                    <Eye className="w-4 h-4" />
+                    View Contributions ({contributions.length})
+                  </span>
+                  {showContributions ? (
+                    <ChevronUp className="w-4 h-4" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4" />
+                  )}
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="mt-3 space-y-2">
+                {contributions.map((contribution) => (
+                  <ContributionCard
+                    key={contribution.id}
+                    contribution={contribution}
+                    onViewProfile={handleViewProfile}
+                  />
+                ))}
+              </CollapsibleContent>
+            </Collapsible>
+          )}
         </CardContent>
 
         <CardFooter className="pt-3 border-t border-border flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-4 text-sm text-muted-foreground">
-            <div className="flex items-center gap-1">
+            <button 
+              onClick={() => handleViewProfile(request.requestedById || "user-1")}
+              className="flex items-center gap-1 hover:text-primary transition-colors"
+            >
               <User className="w-4 h-4" />
               <span>{request.requestedBy}</span>
-            </div>
+            </button>
             <span className="hidden sm:inline">•</span>
             <span className="hidden sm:inline">{request.timestamp}</span>
             {request.helpersCount > 0 && (
