@@ -10,7 +10,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, FileText, Image, Video, Clock, CheckCircle2, AlertCircle } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Plus, FileText, Image, Video, Clock, CheckCircle2, AlertCircle, TrendingUp, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
@@ -27,6 +28,8 @@ const mockRequests = [
     requestedBy: "Amit Sharma",
     timestamp: "3 hours ago",
     helpersCount: 2,
+    likes: 15,
+    comments: 4,
   },
   {
     id: "2",
@@ -40,6 +43,8 @@ const mockRequests = [
     requestedBy: "Priya Patel",
     timestamp: "5 hours ago",
     helpersCount: 0,
+    likes: 8,
+    comments: 2,
   },
   {
     id: "3",
@@ -53,6 +58,8 @@ const mockRequests = [
     requestedBy: "Rahul Verma",
     timestamp: "1 day ago",
     helpersCount: 3,
+    likes: 24,
+    comments: 7,
   },
   {
     id: "4",
@@ -66,6 +73,23 @@ const mockRequests = [
     requestedBy: "Sneha Gupta",
     timestamp: "2 days ago",
     helpersCount: 1,
+    likes: 12,
+    comments: 3,
+  },
+  {
+    id: "5",
+    title: "Machine Learning - Neural Network Basics",
+    description: "Need simple notes explaining neural networks for beginners with diagrams.",
+    subject: "ML",
+    branch: "CSE",
+    year: "4th Year",
+    requestType: "pdf" as const,
+    status: "open" as const,
+    requestedBy: "Vikash Kumar",
+    timestamp: "3 days ago",
+    helpersCount: 0,
+    likes: 18,
+    comments: 5,
   },
 ];
 
@@ -133,7 +157,7 @@ export default function HelpDesk() {
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4 mt-4">
                 <div className="space-y-2">
-                  <Label>Request Type</Label>
+                  <Label>What do you need?</Label>
                   <div className="flex gap-2">
                     {requestTypes.map((type) => (
                       <button
@@ -158,7 +182,7 @@ export default function HelpDesk() {
                   <Label htmlFor="req-title">Title *</Label>
                   <Input
                     id="req-title"
-                    placeholder="What are you looking for?"
+                    placeholder="e.g., Need OS Unit-3 PDF"
                     value={formData.title}
                     onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                     required
@@ -230,6 +254,38 @@ export default function HelpDesk() {
               </form>
             </DialogContent>
           </Dialog>
+        </div>
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <Card className="bg-card border-border">
+            <CardContent className="pt-4 text-center">
+              <TrendingUp className="w-6 h-6 mx-auto text-primary mb-2" />
+              <p className="text-2xl font-bold text-foreground">{mockRequests.length}</p>
+              <p className="text-xs text-muted-foreground">Total Requests</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-card border-border">
+            <CardContent className="pt-4 text-center">
+              <Clock className="w-6 h-6 mx-auto text-primary mb-2" />
+              <p className="text-2xl font-bold text-foreground">{openRequests.length}</p>
+              <p className="text-xs text-muted-foreground">Open</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-card border-border">
+            <CardContent className="pt-4 text-center">
+              <CheckCircle2 className="w-6 h-6 mx-auto text-chart-1 mb-2" />
+              <p className="text-2xl font-bold text-foreground">{fulfilledRequests.length}</p>
+              <p className="text-xs text-muted-foreground">Fulfilled</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-card border-border">
+            <CardContent className="pt-4 text-center">
+              <Users className="w-6 h-6 mx-auto text-chart-2 mb-2" />
+              <p className="text-2xl font-bold text-foreground">156</p>
+              <p className="text-xs text-muted-foreground">Helpers</p>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Tabs */}
