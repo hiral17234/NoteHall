@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { RequestCard } from "@/components/helpdesk/RequestCard";
+import { RequestCardSkeleton } from "@/components/ui/skeleton-card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, FileText, Image, Video, Clock, CheckCircle2 } from "lucide-react";
+import { Plus, FileText, Image, Video, Clock, CheckCircle2, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
@@ -21,7 +23,7 @@ const mockRequests = [
     branch: "CSE",
     year: "2nd Year",
     requestType: "pdf" as const,
-    status: "open" as const,
+    status: "urgent" as const,
     requestedBy: "Amit Sharma",
     timestamp: "3 hours ago",
     helpersCount: 2,
@@ -77,6 +79,7 @@ export default function HelpDesk() {
   const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedType, setSelectedType] = useState("pdf");
+  const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -85,8 +88,15 @@ export default function HelpDesk() {
     year: "",
   });
 
-  const openRequests = mockRequests.filter((r) => r.status === "open");
+  // Simulate loading
+  useEffect(() => {
+    const timer = setTimeout(() => setLoading(false), 1000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const openRequests = mockRequests.filter((r) => r.status === "open" || r.status === "urgent");
   const fulfilledRequests = mockRequests.filter((r) => r.status === "fulfilled");
+  const urgentCount = mockRequests.filter((r) => r.status === "urgent").length;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -96,13 +106,6 @@ export default function HelpDesk() {
     });
     setDialogOpen(false);
     setFormData({ title: "", description: "", subject: "", branch: "", year: "" });
-  };
-
-  const handleHelp = () => {
-    toast({
-      title: "Thank you for helping!",
-      description: "Upload your file to fulfill this request.",
-    });
   };
 
   return (
@@ -235,6 +238,11 @@ export default function HelpDesk() {
             <TabsTrigger value="open" className="gap-1.5 data-[state=active]:bg-card">
               <Clock className="w-4 h-4" />
               Open ({openRequests.length})
+              {urgentCount > 0 && (
+                <span className="ml-1 w-5 h-5 rounded-full bg-destructive text-destructive-foreground text-xs flex items-center justify-center">
+                  {urgentCount}
+                </span>
+              )}
             </TabsTrigger>
             <TabsTrigger value="fulfilled" className="gap-1.5 data-[state=active]:bg-card">
               <CheckCircle2 className="w-4 h-4" />
@@ -243,24 +251,37 @@ export default function HelpDesk() {
           </TabsList>
 
           <TabsContent value="open" className="space-y-4">
-            {openRequests.map((request) => (
-              <RequestCard key={request.id} request={request} onHelp={handleHelp} />
-            ))}
-            {openRequests.length === 0 && (
-              <div className="text-center py-12">
-                <p className="text-muted-foreground">No open requests at the moment.</p>
-              </div>
+            {loading ? (
+              <>
+                <RequestCardSkeleton />
+                <RequestCardSkeleton />
+                <RequestCardSkeleton />
+              </>
+            ) : openRequests.length > 0 ? (
+              openRequests.map((request) => (
+                <RequestCard key={request.id} request={request} />
+              ))
+            ) : (
+              <EmptyState type="requests" />
             )}
           </TabsContent>
 
           <TabsContent value="fulfilled" className="space-y-4">
-            {fulfilledRequests.map((request) => (
-              <RequestCard key={request.id} request={request} />
-            ))}
-            {fulfilledRequests.length === 0 && (
-              <div className="text-center py-12">
-                <p className="text-muted-foreground">No fulfilled requests yet.</p>
-              </div>
+            {loading ? (
+              <>
+                <RequestCardSkeleton />
+                <RequestCardSkeleton />
+              </>
+            ) : fulfilledRequests.length > 0 ? (
+              fulfilledRequests.map((request) => (
+                <RequestCard key={request.id} request={request} />
+              ))
+            ) : (
+              <EmptyState 
+                type="requests" 
+                title="No fulfilled requests" 
+                description="Requests that have been fulfilled will appear here." 
+              />
             )}
           </TabsContent>
         </Tabs>

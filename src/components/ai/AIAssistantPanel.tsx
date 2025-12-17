@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { X, Send, Bot, Sparkles } from "lucide-react";
+import { X, Send, Bot, Sparkles, FileText, Brain, ListChecks, HelpCircle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -8,6 +8,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 interface AIAssistantPanelProps {
   open: boolean;
   onClose: () => void;
+  initialPrompt?: string;
+  noteContext?: string;
 }
 
 interface Message {
@@ -17,57 +19,158 @@ interface Message {
   timestamp: Date;
 }
 
-const suggestedPrompts = [
-  "Explain this topic in simple terms",
-  "Create a summary of this note",
-  "Generate practice questions",
-  "Help me understand the key concepts",
+const aiActions = [
+  { id: "summarize", label: "Summarize", icon: FileText, color: "bg-chart-1/20 text-chart-1" },
+  { id: "explain", label: "Explain Topic", icon: Brain, color: "bg-chart-2/20 text-chart-2" },
+  { id: "revision", label: "Revision Points", icon: ListChecks, color: "bg-chart-3/20 text-chart-3" },
+  { id: "mcq", label: "Generate MCQs", icon: HelpCircle, color: "bg-chart-4/20 text-chart-4" },
 ];
 
-const mockResponses = [
-  "I'd be happy to help you understand this topic better! Let me break it down into simpler concepts...",
-  "Based on the note you shared, here are the key points summarized...",
-  "Here are some practice questions to test your understanding...",
-];
+const mockResponses: Record<string, string> = {
+  summarize: `📝 **Summary**
 
-export function AIAssistantPanel({ open, onClose }: AIAssistantPanelProps) {
+This note covers the fundamental concepts with the following key points:
+
+• **Introduction**: Basic definitions and terminology
+• **Core Concepts**: Main theories and principles explained
+• **Applications**: Real-world use cases and examples
+• **Important Formulas**: Key equations to remember
+
+The content is well-structured and covers approximately 80% of the syllabus for this topic.`,
+  explain: `🧠 **Explanation**
+
+Let me break this down in simple terms:
+
+**What is it?**
+This concept refers to the fundamental principle that governs how systems interact and process information.
+
+**How does it work?**
+Think of it like a pipeline where data flows through different stages, each performing a specific transformation.
+
+**Why is it important?**
+Understanding this helps you grasp more advanced topics and solve real-world problems efficiently.
+
+**Example:**
+Imagine you're organizing a library - this concept is like the system that determines which shelf each book goes to.`,
+  revision: `📋 **Revision Points**
+
+Here are the key points to remember:
+
+1. **Definition**: Memorize the exact technical definition
+2. **Types**: There are 4 main types - A, B, C, and D
+3. **Properties**: 
+   - Property 1: Always true for type A
+   - Property 2: Conditionally applies
+   - Property 3: Exception cases
+4. **Formulas**:
+   - Main formula: X = Y + Z
+   - Derived formula: A = B × C
+5. **Applications**: Used in networking, databases, and AI
+6. **Common Mistakes**: Don't confuse Type A with Type B
+7. **Exam Tips**: Focus on numerical problems and diagrams`,
+  mcq: `❓ **Practice MCQs**
+
+**Q1.** What is the primary purpose of this concept?
+a) Data storage
+b) Data processing ✓
+c) Data deletion
+d) Data encryption
+
+**Q2.** Which type is most commonly used in real applications?
+a) Type A
+b) Type B ✓
+c) Type C
+d) Type D
+
+**Q3.** The time complexity of the main algorithm is:
+a) O(1)
+b) O(n) ✓
+c) O(n²)
+d) O(log n)
+
+**Q4.** Which of the following is NOT a characteristic?
+a) Scalability
+b) Reliability
+c) Immutability ✓
+d) Efficiency
+
+**Q5.** In the worst case scenario, the space complexity is:
+a) O(1)
+b) O(n)
+c) O(n²) ✓
+d) O(2ⁿ)`,
+  default: `I'd be happy to help you understand this topic better! Based on what you've shared, here are some key insights:
+
+1. **Main Concept**: The fundamental idea revolves around efficient data organization
+2. **Key Takeaway**: Focus on understanding the relationships between components
+3. **Study Tip**: Practice with examples to solidify your understanding
+
+Would you like me to elaborate on any specific aspect?`,
+};
+
+export function AIAssistantPanel({ open, onClose, initialPrompt, noteContext }: AIAssistantPanelProps) {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
-      content: "Hello! I'm your AI study assistant. I can help you understand notes, create summaries, generate practice questions, and more. How can I help you today?",
+      content: noteContext 
+        ? `I'm ready to help you with "${noteContext}". Choose an action below or ask me anything!`
+        : "Hello! I'm your AI study assistant. I can help you summarize notes, explain topics, generate revision points, and create practice MCQs. How can I help you today?",
       role: "assistant",
       timestamp: new Date(),
     },
   ]);
-  const [input, setInput] = useState("");
+  const [input, setInput] = useState(initialPrompt || "");
+  const [isTyping, setIsTyping] = useState(false);
 
-  const handleSend = () => {
-    if (!input.trim()) return;
+  const handleSend = (text?: string) => {
+    const messageText = text || input;
+    if (!messageText.trim()) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
-      content: input,
+      content: messageText,
       role: "user",
       timestamp: new Date(),
     };
 
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
+    setIsTyping(true);
 
-    // Mock AI response
+    // Determine response type
+    const lowerText = messageText.toLowerCase();
+    let responseKey = "default";
+    if (lowerText.includes("summarize") || lowerText.includes("summary")) {
+      responseKey = "summarize";
+    } else if (lowerText.includes("explain") || lowerText.includes("what is")) {
+      responseKey = "explain";
+    } else if (lowerText.includes("revision") || lowerText.includes("points") || lowerText.includes("remember")) {
+      responseKey = "revision";
+    } else if (lowerText.includes("mcq") || lowerText.includes("question") || lowerText.includes("quiz")) {
+      responseKey = "mcq";
+    }
+
+    // Mock AI response with typing delay
     setTimeout(() => {
+      setIsTyping(false);
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: mockResponses[Math.floor(Math.random() * mockResponses.length)],
+        content: mockResponses[responseKey],
         role: "assistant",
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, aiMessage]);
-    }, 1000);
+    }, 1500);
   };
 
-  const handlePromptClick = (prompt: string) => {
-    setInput(prompt);
+  const handleActionClick = (actionId: string) => {
+    const actionMessages: Record<string, string> = {
+      summarize: "Summarize this note for me",
+      explain: "Explain this topic in simple terms",
+      revision: "Generate revision points from this note",
+      mcq: "Create practice MCQs from this content",
+    };
+    handleSend(actionMessages[actionId]);
   };
 
   return (
@@ -91,6 +194,25 @@ export function AIAssistantPanel({ open, onClose }: AIAssistantPanelProps) {
         <Button variant="ghost" size="icon" onClick={onClose}>
           <X className="w-5 h-5" />
         </Button>
+      </div>
+
+      {/* AI Actions */}
+      <div className="p-4 border-b border-border">
+        <div className="grid grid-cols-2 gap-2">
+          {aiActions.map((action) => (
+            <button
+              key={action.id}
+              onClick={() => handleActionClick(action.id)}
+              className={cn(
+                "flex items-center gap-2 p-3 rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98]",
+                action.color
+              )}
+            >
+              <action.icon className="w-4 h-4" />
+              <span className="text-sm font-medium">{action.label}</span>
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Messages */}
@@ -126,31 +248,26 @@ export function AIAssistantPanel({ open, onClose }: AIAssistantPanelProps) {
                     : "bg-primary text-primary-foreground"
                 )}
               >
-                <p className="text-sm">{message.content}</p>
+                <p className="text-sm whitespace-pre-wrap">{message.content}</p>
               </div>
             </div>
           ))}
+          
+          {isTyping && (
+            <div className="flex gap-3">
+              <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 bg-primary">
+                <Bot className="w-4 h-4 text-primary-foreground" />
+              </div>
+              <div className="bg-muted rounded-xl px-4 py-3">
+                <div className="flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground">Thinking...</span>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </ScrollArea>
-
-      {/* Suggested Prompts */}
-      <div className="px-4 py-3 border-t border-border">
-        <div className="flex items-center gap-2 mb-2">
-          <Sparkles className="w-4 h-4 text-primary" />
-          <span className="text-xs font-medium text-muted-foreground">Suggestions</span>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {suggestedPrompts.map((prompt, index) => (
-            <button
-              key={index}
-              onClick={() => handlePromptClick(prompt)}
-              className="text-xs px-3 py-1.5 rounded-full bg-muted hover:bg-muted/80 text-foreground transition-colors"
-            >
-              {prompt}
-            </button>
-          ))}
-        </div>
-      </div>
 
       {/* Input */}
       <div className="p-4 border-t border-border">
@@ -160,9 +277,14 @@ export function AIAssistantPanel({ open, onClose }: AIAssistantPanelProps) {
             onChange={(e) => setInput(e.target.value)}
             placeholder="Ask me anything..."
             className="flex-1"
-            onKeyDown={(e) => e.key === "Enter" && handleSend()}
+            onKeyDown={(e) => e.key === "Enter" && !isTyping && handleSend()}
+            disabled={isTyping}
           />
-          <Button onClick={handleSend} className="bg-primary hover:bg-primary/90">
+          <Button 
+            onClick={() => handleSend()} 
+            className="bg-primary hover:bg-primary/90"
+            disabled={isTyping || !input.trim()}
+          >
             <Send className="w-4 h-4" />
           </Button>
         </div>
