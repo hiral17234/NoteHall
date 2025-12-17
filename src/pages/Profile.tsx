@@ -1,15 +1,18 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { useParams } from "react-router-dom";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { NoteCard } from "@/components/notes/NoteCard";
 import { NoteCardSkeleton, ProfileStatsSkeleton } from "@/components/ui/skeleton-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { EditProfileDialog } from "@/components/profile/EditProfileDialog";
+import { ContributionCard, Contribution } from "@/components/helpdesk/ContributionCard";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { useProfile } from "@/contexts/ProfileContext";
 import { 
   Edit2, 
   Github, 
@@ -30,34 +33,69 @@ import {
   Twitter,
   Clock,
   Target,
-  BookOpen
+  BookOpen,
+  Flame,
+  Share2,
+  Lock
 } from "lucide-react";
 
-const initialProfile = {
-  name: "John Doe",
-  bio: "CSE student passionate about coding and sharing knowledge 🚀🔥 Love to help others learn! 📚",
-  college: "MITS Gwalior",
-  branch: "Computer Science",
-  year: "3rd Year",
-  degree: "btech",
-  avatar: "",
-  github: "johndoe",
-  linkedin: "johndoe",
-  portfolio: "johndoe.dev",
-  instagram: "johndoe",
-  twitter: "johndoe",
-  stats: {
-    uploads: 24,
-    totalLikes: 1250,
-    totalViews: 8500,
-    helpedRequests: 15,
-    contributionScore: 92,
+// Mock data for other users
+const otherUsersData: Record<string, any> = {
+  "user-2": {
+    id: "user-2",
+    name: "Priya Sharma",
+    bio: "Sharing knowledge is caring! 📚✨ Always ready to help fellow students.",
+    college: "MITS Gwalior",
+    branch: "Computer Science",
+    year: "3rd Year",
+    degree: "btech",
+    avatar: "",
+    github: "priyasharma",
+    linkedin: "priyasharma",
+    portfolio: "",
+    instagram: "priya.sharma",
+    twitter: "",
+    streak: 21,
+    stats: {
+      uploads: 45,
+      totalLikes: 2150,
+      totalViews: 12500,
+      helpedRequests: 32,
+      contributionScore: 98,
+    },
+    badges: [
+      { id: "top", label: "Top Contributor", icon: "Award", color: "bg-primary/20 text-primary" },
+      { id: "helpful", label: "Helpful", icon: "Star", color: "bg-chart-1/20 text-chart-1" },
+      { id: "streak-14", label: "14 Day Streak", icon: "Flame", color: "bg-red-500/20 text-red-500" },
+    ],
   },
-  badges: [
-    { id: "top", label: "Top Contributor", icon: Award, color: "bg-primary/20 text-primary" },
-    { id: "helpful", label: "Helpful", icon: Star, color: "bg-chart-1/20 text-chart-1" },
-    { id: "mentor", label: "Mentor", icon: Zap, color: "bg-chart-2/20 text-chart-2" },
-  ],
+  "user-3": {
+    id: "user-3",
+    name: "Amit Kumar",
+    bio: "ECE student | Tech enthusiast | Notes collector 🎯",
+    college: "MITS Gwalior",
+    branch: "ECE",
+    year: "2nd Year",
+    degree: "btech",
+    avatar: "",
+    github: "amitkumar",
+    linkedin: "amitkumar",
+    portfolio: "",
+    instagram: "",
+    twitter: "amitkumar",
+    streak: 14,
+    stats: {
+      uploads: 18,
+      totalLikes: 890,
+      totalViews: 5200,
+      helpedRequests: 12,
+      contributionScore: 78,
+    },
+    badges: [
+      { id: "helpful", label: "Helpful", icon: "Star", color: "bg-chart-1/20 text-chart-1" },
+      { id: "streak-7", label: "7 Day Streak", icon: "Flame", color: "bg-orange-500/20 text-orange-500" },
+    ],
+  },
 };
 
 const mockUploadedNotes = [
@@ -110,11 +148,37 @@ const mockHelpRequests = [
   { id: "2", title: "OS Process Synchronization", status: "open", timestamp: "3 days ago", subject: "OS" },
 ];
 
-const mockContributions = [
-  { id: "1", title: "Helped with Computer Networks Notes", subject: "CN", timestamp: "1 week ago", type: "help" },
-  { id: "2", title: "Shared DBMS ER Diagram Materials", subject: "DBMS", timestamp: "2 weeks ago", type: "help" },
-  { id: "3", title: "Uploaded DSA Complete Notes", subject: "DSA", timestamp: "3 weeks ago", type: "upload" },
-  { id: "4", title: "Answered 5 doubts in OS", subject: "OS", timestamp: "1 month ago", type: "ai_help" },
+const mockSharedContributions: Contribution[] = [
+  {
+    id: "sc1",
+    type: "pdf",
+    fileName: "CN_Unit3_Complete.pdf",
+    message: "Complete notes with diagrams",
+    contributorId: "current-user",
+    contributorName: "John Doe",
+    timestamp: "3 days ago",
+    likes: 15,
+  },
+  {
+    id: "sc2",
+    type: "link",
+    link: "https://drive.google.com/file/dbms-notes",
+    message: "DBMS ER Diagram materials",
+    contributorId: "current-user",
+    contributorName: "John Doe",
+    timestamp: "1 week ago",
+    likes: 23,
+  },
+  {
+    id: "sc3",
+    type: "image",
+    fileName: "OS_Process_Diagram.png",
+    message: "Visual explanation of process states",
+    contributorId: "current-user",
+    contributorName: "John Doe",
+    timestamp: "2 weeks ago",
+    likes: 18,
+  },
 ];
 
 const studyInsights = {
@@ -127,32 +191,68 @@ const studyInsights = {
   weakAreas: ["Computer Networks", "Machine Learning"],
 };
 
+const streakBadges = [
+  { days: 7, label: "7 Day Streak", color: "bg-orange-500/20 text-orange-500" },
+  { days: 14, label: "14 Day Streak", color: "bg-red-500/20 text-red-500" },
+  { days: 30, label: "30 Day Streak", color: "bg-purple-500/20 text-purple-500" },
+  { days: 50, label: "50 Day Streak", color: "bg-primary/20 text-primary" },
+  { days: 100, label: "100 Day Legend", color: "bg-chart-1/20 text-chart-1" },
+];
+
+const getBadgeIcon = (iconName: string) => {
+  const icons: Record<string, any> = { Award, Star, Zap, Flame };
+  return icons[iconName] || Award;
+};
+
 export default function Profile() {
+  const { userId } = useParams();
+  const { profile: currentUserProfile, updateProfile, isOwner } = useProfile();
+  
   const [loading, setLoading] = useState(true);
-  const [profile, setProfile] = useState(initialProfile);
-  const [stats, setStats] = useState(initialProfile.stats);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
 
+  // Determine if viewing own profile or someone else's
+  const isOwnProfile = !userId || isOwner(userId);
+  
+  // Get the profile data to display
+  const profileData = useMemo(() => {
+    if (isOwnProfile) return currentUserProfile;
+    return otherUsersData[userId!] || currentUserProfile;
+  }, [userId, isOwnProfile, currentUserProfile]);
+
+  const [stats, setStats] = useState(profileData.stats);
+
   useEffect(() => {
+    setLoading(true);
     const loadTimer = setTimeout(() => setLoading(false), 1000);
     
-    const statsInterval = setInterval(() => {
-      setStats(prev => ({
-        ...prev,
-        totalViews: prev.totalViews + Math.floor(Math.random() * 5),
-        totalLikes: prev.totalLikes + (Math.random() > 0.7 ? 1 : 0),
-      }));
-    }, 5000);
+    // Only auto-update stats for own profile
+    let statsInterval: NodeJS.Timeout | undefined;
+    if (isOwnProfile) {
+      statsInterval = setInterval(() => {
+        setStats(prev => ({
+          ...prev,
+          totalViews: prev.totalViews + Math.floor(Math.random() * 5),
+          totalLikes: prev.totalLikes + (Math.random() > 0.7 ? 1 : 0),
+        }));
+      }, 5000);
+    }
 
     return () => {
       clearTimeout(loadTimer);
-      clearInterval(statsInterval);
+      if (statsInterval) clearInterval(statsInterval);
     };
-  }, []);
+  }, [userId, isOwnProfile]);
 
-  const handleProfileSave = (updatedProfile: typeof profile) => {
-    setProfile({ ...profile, ...updatedProfile });
+  useEffect(() => {
+    setStats(profileData.stats);
+  }, [profileData]);
+
+  const handleProfileSave = (updatedProfile: any) => {
+    updateProfile(updatedProfile);
   };
+
+  const currentStreakBadge = streakBadges.filter(b => profileData.streak >= b.days).pop();
 
   return (
     <MainLayout>
@@ -164,79 +264,107 @@ export default function Profile() {
               {/* Avatar */}
               <div className="flex flex-col items-center sm:items-start">
                 <Avatar className="w-24 h-24 border-4 border-primary/20">
-                  <AvatarImage src={profile.avatar} />
+                  <AvatarImage src={profileData.avatar} />
                   <AvatarFallback className="bg-primary text-primary-foreground text-2xl">
-                    {profile.name.split(" ").map(n => n[0]).join("")}
+                    {profileData.name.split(" ").map((n: string) => n[0]).join("")}
                   </AvatarFallback>
                 </Avatar>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="mt-3 gap-1"
-                  onClick={() => setEditDialogOpen(true)}
-                >
-                  <Edit2 className="w-3 h-3" />
-                  Edit Profile
-                </Button>
+                {isOwnProfile ? (
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="mt-3 gap-1"
+                    onClick={() => setEditDialogOpen(true)}
+                  >
+                    <Edit2 className="w-3 h-3" />
+                    Edit Profile
+                  </Button>
+                ) : (
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="mt-3 gap-1"
+                  >
+                    <Share2 className="w-3 h-3" />
+                    Share Profile
+                  </Button>
+                )}
               </div>
 
               {/* Info */}
               <div className="flex-1 text-center sm:text-left">
                 <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
-                  <h1 className="text-2xl font-bold text-foreground">{profile.name}</h1>
-                  {profile.badges.map(badge => (
-                    <Badge key={badge.id} className={badge.color}>
-                      <badge.icon className="w-3 h-3 mr-1" />
-                      {badge.label}
+                  <h1 className="text-2xl font-bold text-foreground">{profileData.name}</h1>
+                  {profileData.badges.map((badge: any) => {
+                    const IconComponent = getBadgeIcon(badge.icon);
+                    return (
+                      <Badge key={badge.id} className={badge.color}>
+                        <IconComponent className="w-3 h-3 mr-1" />
+                        {badge.label}
+                      </Badge>
+                    );
+                  })}
+                  {currentStreakBadge && !profileData.badges.some((b: any) => b.id.includes("streak")) && (
+                    <Badge className={currentStreakBadge.color}>
+                      <Flame className="w-3 h-3 mr-1" />
+                      {currentStreakBadge.label}
                     </Badge>
-                  ))}
+                  )}
                 </div>
-                <p className="text-muted-foreground mt-1">{profile.bio}</p>
+                <p className="text-muted-foreground mt-1">{profileData.bio}</p>
+                
+                {/* Streak Display */}
+                {profileData.streak > 0 && (
+                  <div className="flex items-center justify-center sm:justify-start gap-2 mt-2">
+                    <Flame className="w-4 h-4 text-orange-500" />
+                    <span className="text-sm font-medium text-foreground">{profileData.streak} day streak!</span>
+                  </div>
+                )}
                 
                 <div className="flex flex-wrap justify-center sm:justify-start gap-4 mt-4 text-sm text-muted-foreground">
-                  <span className="font-medium text-foreground">{profile.college}</span>
+                  <span className="font-medium text-foreground">{profileData.college}</span>
                   <span>•</span>
-                  <span>{profile.branch}</span>
+                  <span>{profileData.branch}</span>
                   <span>•</span>
-                  <span>{profile.year}</span>
+                  <span>{profileData.year}</span>
                 </div>
 
                 {/* Social Links */}
                 <div className="flex flex-wrap justify-center sm:justify-start gap-2 mt-4">
-                  {profile.github && (
+                  {profileData.github && (
                     <Button variant="outline" size="sm" className="gap-1.5" asChild>
-                      <a href={`https://github.com/${profile.github}`} target="_blank" rel="noopener noreferrer">
+                      <a href={`https://github.com/${profileData.github}`} target="_blank" rel="noopener noreferrer">
                         <Github className="w-4 h-4" />
                         GitHub
                       </a>
                     </Button>
                   )}
-                  {profile.linkedin && (
+                  {profileData.linkedin && (
                     <Button variant="outline" size="sm" className="gap-1.5" asChild>
-                      <a href={`https://linkedin.com/in/${profile.linkedin}`} target="_blank" rel="noopener noreferrer">
+                      <a href={`https://linkedin.com/in/${profileData.linkedin}`} target="_blank" rel="noopener noreferrer">
                         <Linkedin className="w-4 h-4" />
                         LinkedIn
                       </a>
                     </Button>
                   )}
-                  {profile.portfolio && (
+                  {profileData.portfolio && (
                     <Button variant="outline" size="sm" className="gap-1.5" asChild>
-                      <a href={`https://${profile.portfolio}`} target="_blank" rel="noopener noreferrer">
+                      <a href={`https://${profileData.portfolio}`} target="_blank" rel="noopener noreferrer">
                         <Globe className="w-4 h-4" />
                         Portfolio
                       </a>
                     </Button>
                   )}
-                  {profile.instagram && (
+                  {profileData.instagram && (
                     <Button variant="outline" size="sm" className="gap-1.5" asChild>
-                      <a href={`https://instagram.com/${profile.instagram}`} target="_blank" rel="noopener noreferrer">
+                      <a href={`https://instagram.com/${profileData.instagram}`} target="_blank" rel="noopener noreferrer">
                         <Instagram className="w-4 h-4" />
                       </a>
                     </Button>
                   )}
-                  {profile.twitter && (
+                  {profileData.twitter && (
                     <Button variant="outline" size="sm" className="gap-1.5" asChild>
-                      <a href={`https://x.com/${profile.twitter}`} target="_blank" rel="noopener noreferrer">
+                      <a href={`https://x.com/${profileData.twitter}`} target="_blank" rel="noopener noreferrer">
                         <Twitter className="w-4 h-4" />
                       </a>
                     </Button>
@@ -271,7 +399,7 @@ export default function Profile() {
                   <ThumbsUp className="w-6 h-6 mx-auto text-primary mb-2" />
                   <div className="flex items-center justify-center gap-1">
                     <p className="text-2xl font-bold text-foreground">{stats.totalLikes.toLocaleString()}</p>
-                    <TrendingUp className="w-4 h-4 text-chart-1" />
+                    {isOwnProfile && <TrendingUp className="w-4 h-4 text-chart-1" />}
                   </div>
                   <p className="text-xs text-muted-foreground">Likes</p>
                 </CardContent>
@@ -281,7 +409,7 @@ export default function Profile() {
                   <Eye className="w-6 h-6 mx-auto text-primary mb-2" />
                   <div className="flex items-center justify-center gap-1">
                     <p className="text-2xl font-bold text-foreground">{stats.totalViews.toLocaleString()}</p>
-                    <TrendingUp className="w-4 h-4 text-chart-1" />
+                    {isOwnProfile && <TrendingUp className="w-4 h-4 text-chart-1" />}
                   </div>
                   <p className="text-xs text-muted-foreground">Views</p>
                 </CardContent>
@@ -304,29 +432,39 @@ export default function Profile() {
           )}
         </div>
 
-        {/* Tabs */}
+        {/* Tabs - Different for own profile vs others */}
         <Tabs defaultValue="uploaded" className="space-y-4">
           <TabsList className="bg-muted w-full justify-start overflow-x-auto">
             <TabsTrigger value="uploaded" className="gap-1.5 data-[state=active]:bg-card">
               <FileText className="w-4 h-4" />
               Uploaded
             </TabsTrigger>
-            <TabsTrigger value="saved" className="gap-1.5 data-[state=active]:bg-card">
-              <Bookmark className="w-4 h-4" />
-              Saved
+            {isOwnProfile && (
+              <TabsTrigger value="saved" className="gap-1.5 data-[state=active]:bg-card">
+                <Bookmark className="w-4 h-4" />
+                Saved
+              </TabsTrigger>
+            )}
+            <TabsTrigger value="shared" className="gap-1.5 data-[state=active]:bg-card">
+              <Share2 className="w-4 h-4" />
+              Shared
             </TabsTrigger>
-            <TabsTrigger value="requests" className="gap-1.5 data-[state=active]:bg-card">
-              <HandHelping className="w-4 h-4" />
-              Requests
-            </TabsTrigger>
+            {isOwnProfile && (
+              <TabsTrigger value="requests" className="gap-1.5 data-[state=active]:bg-card">
+                <HandHelping className="w-4 h-4" />
+                Requests
+              </TabsTrigger>
+            )}
             <TabsTrigger value="contributions" className="gap-1.5 data-[state=active]:bg-card">
               <Award className="w-4 h-4" />
               Contributions
             </TabsTrigger>
-            <TabsTrigger value="stats" className="gap-1.5 data-[state=active]:bg-card">
-              <BarChart3 className="w-4 h-4" />
-              Stats
-            </TabsTrigger>
+            {isOwnProfile && (
+              <TabsTrigger value="stats" className="gap-1.5 data-[state=active]:bg-card">
+                <BarChart3 className="w-4 h-4" />
+                Stats
+              </TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent value="uploaded" className="space-y-4">
@@ -346,169 +484,207 @@ export default function Profile() {
             )}
           </TabsContent>
 
-          <TabsContent value="saved" className="space-y-4">
+          {isOwnProfile && (
+            <TabsContent value="saved" className="space-y-4">
+              {loading ? (
+                <div className="grid gap-4 md:grid-cols-2">
+                  <NoteCardSkeleton />
+                </div>
+              ) : mockSavedNotes.length > 0 ? (
+                <div className="grid gap-4 md:grid-cols-2">
+                  {mockSavedNotes.map((note) => (
+                    <NoteCard key={note.id} note={note} />
+                  ))}
+                </div>
+              ) : (
+                <EmptyState type="saved" />
+              )}
+            </TabsContent>
+          )}
+
+          <TabsContent value="shared" className="space-y-4">
+            {!isOwnProfile && (
+              <p className="text-sm text-muted-foreground mb-4">
+                Files and links shared by {profileData.name} to help others
+              </p>
+            )}
             {loading ? (
-              <div className="grid gap-4 md:grid-cols-2">
-                <NoteCardSkeleton />
-              </div>
-            ) : mockSavedNotes.length > 0 ? (
-              <div className="grid gap-4 md:grid-cols-2">
-                {mockSavedNotes.map((note) => (
-                  <NoteCard key={note.id} note={note} />
+              <NoteCardSkeleton />
+            ) : mockSharedContributions.length > 0 ? (
+              <div className="space-y-3">
+                {mockSharedContributions.map((contribution) => (
+                  <ContributionCard
+                    key={contribution.id}
+                    contribution={contribution}
+                  />
                 ))}
               </div>
             ) : (
-              <EmptyState type="saved" />
+              <EmptyState type="helped" title="No shared content yet" description="Files and links shared will appear here." />
             )}
           </TabsContent>
 
-          <TabsContent value="requests" className="space-y-4">
+          {isOwnProfile && (
+            <TabsContent value="requests" className="space-y-4">
+              {loading ? (
+                <NoteCardSkeleton />
+              ) : mockHelpRequests.length > 0 ? (
+                mockHelpRequests.map((request) => (
+                  <Card key={request.id} className="bg-card border-border hover:border-primary/30 transition-colors">
+                    <CardContent className="py-4 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                          <HandHelping className="w-5 h-5 text-primary" />
+                        </div>
+                        <div>
+                          <p className="font-medium text-foreground">{request.title}</p>
+                          <p className="text-sm text-muted-foreground">{request.subject} • {request.timestamp}</p>
+                        </div>
+                      </div>
+                      <Badge className={request.status === "fulfilled" ? "bg-chart-1 text-primary-foreground" : "bg-primary text-primary-foreground"}>
+                        {request.status === "fulfilled" ? "Fulfilled" : "Open"}
+                      </Badge>
+                    </CardContent>
+                  </Card>
+                ))
+              ) : (
+                <EmptyState type="requests" title="No requests yet" description="Create a request to get help from others!" />
+              )}
+            </TabsContent>
+          )}
+
+          <TabsContent value="contributions" className="space-y-4">
             {loading ? (
               <NoteCardSkeleton />
-            ) : mockHelpRequests.length > 0 ? (
-              mockHelpRequests.map((request) => (
-                <Card key={request.id} className="bg-card border-border hover:border-primary/30 transition-colors">
+            ) : (
+              <>
+                <Card className="bg-card border-border hover:border-primary/30 transition-colors">
                   <CardContent className="py-4 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                         <HandHelping className="w-5 h-5 text-primary" />
                       </div>
                       <div>
-                        <p className="font-medium text-foreground">{request.title}</p>
-                        <p className="text-sm text-muted-foreground">{request.subject} • {request.timestamp}</p>
+                        <p className="font-medium text-foreground">Helped with Computer Networks Notes</p>
+                        <p className="text-sm text-muted-foreground">CN • 1 week ago</p>
                       </div>
                     </div>
-                    <Badge className={request.status === "fulfilled" ? "bg-chart-1 text-primary-foreground" : "bg-primary text-primary-foreground"}>
-                      {request.status === "fulfilled" ? "Fulfilled" : "Open"}
-                    </Badge>
+                    <Badge variant="outline" className="border-primary/30 text-primary">Helped</Badge>
                   </CardContent>
                 </Card>
-              ))
-            ) : (
-              <EmptyState type="requests" title="No requests yet" description="Create a request to get help from others!" />
-            )}
-          </TabsContent>
-
-          <TabsContent value="contributions" className="space-y-4">
-            {loading ? (
-              <NoteCardSkeleton />
-            ) : mockContributions.length > 0 ? (
-              mockContributions.map((contribution) => (
-                <Card key={contribution.id} className="bg-card border-border hover:border-primary/30 transition-colors">
+                <Card className="bg-card border-border hover:border-primary/30 transition-colors">
                   <CardContent className="py-4 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                        {contribution.type === "help" && <HandHelping className="w-5 h-5 text-primary" />}
-                        {contribution.type === "upload" && <FileText className="w-5 h-5 text-primary" />}
-                        {contribution.type === "ai_help" && <BookOpen className="w-5 h-5 text-primary" />}
+                        <FileText className="w-5 h-5 text-primary" />
                       </div>
                       <div>
-                        <p className="font-medium text-foreground">{contribution.title}</p>
-                        <p className="text-sm text-muted-foreground">{contribution.subject} • {contribution.timestamp}</p>
+                        <p className="font-medium text-foreground">Uploaded DSA Complete Notes</p>
+                        <p className="text-sm text-muted-foreground">DSA • 3 weeks ago</p>
                       </div>
                     </div>
-                    <Badge variant="outline" className="border-primary/30 text-primary">
-                      {contribution.type === "help" ? "Helped" : contribution.type === "upload" ? "Uploaded" : "AI Help"}
-                    </Badge>
+                    <Badge variant="outline" className="border-primary/30 text-primary">Uploaded</Badge>
                   </CardContent>
                 </Card>
-              ))
-            ) : (
-              <EmptyState type="helped" />
+              </>
             )}
           </TabsContent>
 
-          <TabsContent value="stats" className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              {/* Activity Overview */}
-              <Card className="bg-card border-border">
-                <CardContent className="py-6">
-                  <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2">
-                    <BarChart3 className="w-5 h-5 text-primary" />
-                    Activity Overview
-                  </h3>
-                  <div className="space-y-4">
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm text-muted-foreground">Notes Uploaded</span>
-                        <span className="text-sm font-medium text-foreground">{stats.uploads}</span>
+          {isOwnProfile && (
+            <TabsContent value="stats" className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-2">
+                {/* Activity Overview */}
+                <Card className="bg-card border-border">
+                  <CardContent className="py-6">
+                    <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2">
+                      <BarChart3 className="w-5 h-5 text-primary" />
+                      Activity Overview
+                    </h3>
+                    <div className="space-y-4">
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-sm text-muted-foreground">Notes Uploaded</span>
+                          <span className="text-sm font-medium text-foreground">{stats.uploads}</span>
+                        </div>
+                        <Progress value={60} className="h-2" />
                       </div>
-                      <Progress value={60} className="h-2" />
-                    </div>
-                    
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm text-muted-foreground">Engagement Rate</span>
-                        <span className="text-sm font-medium text-foreground">85%</span>
+                      
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-sm text-muted-foreground">Engagement Rate</span>
+                          <span className="text-sm font-medium text-foreground">85%</span>
+                        </div>
+                        <Progress value={85} className="h-2" />
                       </div>
-                      <Progress value={85} className="h-2" />
-                    </div>
-                    
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm text-muted-foreground">Help Score</span>
-                        <span className="text-sm font-medium text-foreground">{stats.contributionScore}/100</span>
+                      
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-sm text-muted-foreground">Help Score</span>
+                          <span className="text-sm font-medium text-foreground">{stats.contributionScore}/100</span>
+                        </div>
+                        <Progress value={stats.contributionScore} className="h-2" />
                       </div>
-                      <Progress value={stats.contributionScore} className="h-2" />
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
 
-              {/* Study Insights */}
-              <Card className="bg-card border-border">
-                <CardContent className="py-6">
-                  <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2">
-                    <BookOpen className="w-5 h-5 text-primary" />
-                    Study Insights
-                  </h3>
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-2 text-sm">
-                      <Clock className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-muted-foreground">Time spent:</span>
-                      <span className="font-medium text-foreground">{studyInsights.timeSpent}</span>
-                    </div>
-                    
-                    <div>
-                      <p className="text-sm text-muted-foreground mb-2">Most studied subjects:</p>
-                      <div className="space-y-2">
-                        {studyInsights.mostStudied.map(item => (
-                          <div key={item.subject}>
-                            <div className="flex items-center justify-between mb-1">
-                              <span className="text-sm text-foreground">{item.subject}</span>
-                              <span className="text-xs text-muted-foreground">{item.percentage}%</span>
+                {/* Study Insights */}
+                <Card className="bg-card border-border">
+                  <CardContent className="py-6">
+                    <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2">
+                      <BookOpen className="w-5 h-5 text-primary" />
+                      Study Insights
+                    </h3>
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-2 text-sm">
+                        <Clock className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-muted-foreground">Time spent:</span>
+                        <span className="font-medium text-foreground">{studyInsights.timeSpent}</span>
+                      </div>
+                      
+                      <div>
+                        <p className="text-sm text-muted-foreground mb-2">Most studied subjects:</p>
+                        <div className="space-y-2">
+                          {studyInsights.mostStudied.map(item => (
+                            <div key={item.subject}>
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-sm text-foreground">{item.subject}</span>
+                                <span className="text-xs text-muted-foreground">{item.percentage}%</span>
+                              </div>
+                              <Progress value={item.percentage} className="h-1.5" />
                             </div>
-                            <Progress value={item.percentage} className="h-1.5" />
-                          </div>
-                        ))}
+                          ))}
+                        </div>
                       </div>
-                    </div>
 
-                    <div>
-                      <p className="text-sm text-muted-foreground mb-2">Areas to improve:</p>
-                      <div className="flex flex-wrap gap-2">
-                        {studyInsights.weakAreas.map(area => (
-                          <Badge key={area} variant="outline" className="border-destructive/30 text-destructive">
-                            {area}
-                          </Badge>
-                        ))}
+                      <div>
+                        <p className="text-sm text-muted-foreground mb-2">Areas to improve:</p>
+                        <div className="flex flex-wrap gap-2">
+                          {studyInsights.weakAreas.map(area => (
+                            <Badge key={area} variant="outline" className="border-destructive/30 text-destructive">
+                              {area}
+                            </Badge>
+                          ))}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+          )}
         </Tabs>
       </div>
 
-      {/* Edit Profile Dialog */}
-      <EditProfileDialog
-        open={editDialogOpen}
-        onOpenChange={setEditDialogOpen}
-        profile={profile}
-        onSave={handleProfileSave}
-      />
+      {/* Edit Profile Dialog - Only for own profile */}
+      {isOwnProfile && (
+        <EditProfileDialog
+          open={editDialogOpen}
+          onOpenChange={setEditDialogOpen}
+          profile={currentUserProfile}
+          onSave={handleProfileSave}
+        />
+      )}
     </MainLayout>
   );
 }

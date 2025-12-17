@@ -10,11 +10,14 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
-  Award
+  Award,
+  Flame
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useProfile } from "@/contexts/ProfileContext";
 
 const ecosystemItems = [
   { title: "CampusVoice", path: "/campusvoice", icon: MessageSquare },
@@ -32,6 +35,9 @@ const mainNavItems = [
 export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
+  const { profile } = useProfile();
+
+  const streakBadge = profile.streak >= 7;
 
   return (
     <aside
@@ -129,30 +135,44 @@ export function Sidebar() {
         </div>
       </nav>
 
-      {/* User section */}
+      {/* User section - Now synced with profile */}
       <div className="p-2 border-t border-border">
-        <div
+        <NavLink
+          to="/profile"
           className={cn(
-            "flex items-center gap-3 p-2 rounded-lg",
+            "flex items-center gap-3 p-2 rounded-lg hover:bg-muted transition-colors",
             collapsed && "justify-center"
           )}
         >
-          <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
-            <User className="w-4 h-4 text-primary" />
-          </div>
+          <Avatar className="w-8 h-8 flex-shrink-0">
+            <AvatarImage src={profile.avatar} />
+            <AvatarFallback className="bg-primary/20 text-primary text-xs">
+              {profile.name.split(" ").map(n => n[0]).join("")}
+            </AvatarFallback>
+          </Avatar>
           {!collapsed && (
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-1">
-                <p className="text-sm font-medium text-foreground truncate">John Doe</p>
-                <Badge className="h-4 px-1 text-[10px] bg-primary/20 text-primary border-0">
-                  <Award className="w-2.5 h-2.5 mr-0.5" />
-                  Top
-                </Badge>
+                <p className="text-sm font-medium text-foreground truncate">{profile.name}</p>
+                {profile.badges.some(b => b.id === "top") && (
+                  <Badge className="h-4 px-1 text-[10px] bg-primary/20 text-primary border-0">
+                    <Award className="w-2.5 h-2.5 mr-0.5" />
+                    Top
+                  </Badge>
+                )}
               </div>
-              <p className="text-xs text-muted-foreground truncate">CSE • 3rd Year</p>
+              <div className="flex items-center gap-1">
+                <p className="text-xs text-muted-foreground truncate">{profile.branch} • {profile.year}</p>
+                {streakBadge && (
+                  <Badge className="h-4 px-1 text-[10px] bg-orange-500/20 text-orange-500 border-0">
+                    <Flame className="w-2.5 h-2.5" />
+                    {profile.streak}
+                  </Badge>
+                )}
+              </div>
             </div>
           )}
-        </div>
+        </NavLink>
       </div>
     </aside>
   );

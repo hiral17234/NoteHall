@@ -14,6 +14,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Plus, FileText, Image, Video, Clock, CheckCircle2, AlertCircle, TrendingUp, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { TopContributors } from "@/components/helpdesk/TopContributors";
+import { useNavigate } from "react-router-dom";
 
 const mockRequests = [
   {
@@ -101,6 +103,7 @@ const requestTypes = [
 
 export default function HelpDesk() {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedType, setSelectedType] = useState("pdf");
   const [loading, setLoading] = useState(true);
@@ -255,6 +258,9 @@ export default function HelpDesk() {
             </DialogContent>
           </Dialog>
         </div>
+
+        {/* Top Contributors of the Week */}
+        <TopContributors onViewProfile={(userId) => navigate(`/profile/${userId}`)} />
 
         {/* Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
