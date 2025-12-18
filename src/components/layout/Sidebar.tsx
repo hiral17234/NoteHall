@@ -17,7 +17,8 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useProfile } from "@/contexts/ProfileContext";
+import { useUser } from "@/contexts/UserContext";
+import logo from "@/assets/logo.png";
 
 const ecosystemItems = [
   { title: "CampusVoice", path: "/campusvoice", icon: MessageSquare },
@@ -27,7 +28,7 @@ const ecosystemItems = [
 
 const mainNavItems = [
   { title: "Help Desk", path: "/helpdesk", icon: HelpCircle },
-  { title: "AI Assistant", path: "/ai-assistant", icon: Bot },
+  { title: "Gemini", path: "/ai-assistant", icon: Bot },
   { title: "Profile", path: "/profile", icon: User },
   { title: "Settings", path: "/settings", icon: Settings },
 ];
@@ -35,9 +36,9 @@ const mainNavItems = [
 export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
-  const { profile } = useProfile();
+  const { user, privacy } = useUser();
 
-  const streakBadge = profile.streak >= 7;
+  const streakBadge = (user?.streak || 0) >= 7;
 
   return (
     <aside
@@ -50,25 +51,34 @@ export function Sidebar() {
       <div className="h-16 flex items-center justify-between px-4 border-b border-border">
         {!collapsed && (
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-              <BookOpen className="w-5 h-5 text-primary-foreground" />
-            </div>
-            <span className="font-bold text-lg text-foreground">NoteHall</span>
+            <img src={logo} alt="NoteHall" className="h-10 w-auto" />
           </div>
         )}
+        {collapsed && (
+          <img src={logo} alt="NoteHall" className="h-8 w-auto mx-auto" />
+        )}
+        {!collapsed && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setCollapsed(!collapsed)}
+            className="hover:bg-muted"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </Button>
+        )}
+      </div>
+
+      {collapsed && (
         <Button
           variant="ghost"
           size="icon"
           onClick={() => setCollapsed(!collapsed)}
-          className={cn("hover:bg-muted", collapsed && "mx-auto")}
+          className="mx-auto mt-2 hover:bg-muted"
         >
-          {collapsed ? (
-            <ChevronRight className="w-4 h-4" />
-          ) : (
-            <ChevronLeft className="w-4 h-4" />
-          )}
+          <ChevronRight className="w-4 h-4" />
         </Button>
-      </div>
+      )}
 
       {/* Navigation */}
       <nav className="flex-1 p-2 overflow-y-auto">
@@ -135,45 +145,54 @@ export function Sidebar() {
         </div>
       </nav>
 
-      {/* User section - Now synced with profile */}
-      <div className="p-2 border-t border-border">
-        <NavLink
-          to="/profile"
-          className={cn(
-            "flex items-center gap-3 p-2 rounded-lg hover:bg-muted transition-colors",
-            collapsed && "justify-center"
-          )}
-        >
-          <Avatar className="w-8 h-8 flex-shrink-0">
-            <AvatarImage src={profile.avatar} />
-            <AvatarFallback className="bg-primary/20 text-primary text-xs">
-              {profile.name.split(" ").map(n => n[0]).join("")}
-            </AvatarFallback>
-          </Avatar>
-          {!collapsed && (
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1">
-                <p className="text-sm font-medium text-foreground truncate">{profile.name}</p>
-                {profile.badges.some(b => b.id === "top") && (
-                  <Badge className="h-4 px-1 text-[10px] bg-primary/20 text-primary border-0">
-                    <Award className="w-2.5 h-2.5 mr-0.5" />
-                    Top
-                  </Badge>
-                )}
-              </div>
-              <div className="flex items-center gap-1">
-                <p className="text-xs text-muted-foreground truncate">{profile.branch} • {profile.year}</p>
-                {streakBadge && (
-                  <Badge className="h-4 px-1 text-[10px] bg-orange-500/20 text-orange-500 border-0">
-                    <Flame className="w-2.5 h-2.5" />
-                    {profile.streak}
-                  </Badge>
-                )}
-              </div>
+      {/* User section - Synced with user context */}
+      {user && (
+        <div className="p-2 border-t border-border">
+          <NavLink
+            to="/profile"
+            className={cn(
+              "flex items-center gap-3 p-2 rounded-lg hover:bg-muted transition-colors",
+              collapsed && "justify-center"
+            )}
+          >
+            <div className="relative">
+              <Avatar className="w-8 h-8 flex-shrink-0">
+                <AvatarImage src={user.avatar} />
+                <AvatarFallback className="bg-primary/20 text-primary text-xs">
+                  {user.name.split(" ").map(n => n[0]).join("")}
+                </AvatarFallback>
+              </Avatar>
+              {privacy.showOnlineStatus && (
+                <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-chart-1 rounded-full border-2 border-card" />
+              )}
             </div>
-          )}
-        </NavLink>
-      </div>
+            {!collapsed && (
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1">
+                  <p className="text-sm font-medium text-foreground truncate">{user.name}</p>
+                  {user.badges?.some(b => b.id === "top") && (
+                    <Badge className="h-4 px-1 text-[10px] bg-primary/20 text-primary border-0">
+                      <Award className="w-2.5 h-2.5 mr-0.5" />
+                      Top
+                    </Badge>
+                  )}
+                </div>
+                <div className="flex items-center gap-1">
+                  <p className="text-xs text-muted-foreground truncate">
+                    {user.branch ? `${user.branch} • ${user.year}` : user.username}
+                  </p>
+                  {streakBadge && (
+                    <Badge className="h-4 px-1 text-[10px] bg-orange-500/20 text-orange-500 border-0">
+                      <Flame className="w-2.5 h-2.5" />
+                      {user.streak}
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            )}
+          </NavLink>
+        </div>
+      )}
     </aside>
   );
 }

@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { X, Send, Bot, FileText, Brain, ListChecks, HelpCircle, Loader2, Lightbulb, GraduationCap, ClipboardList, Mic } from "lucide-react";
+import { X, Send, Bot, FileText, Brain, ListChecks, HelpCircle, Loader2, Lightbulb, GraduationCap, ClipboardList, Mic, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useUser } from "@/contexts/UserContext";
 
 interface AIAssistantPanelProps {
   open: boolean;
@@ -35,6 +36,15 @@ const advancedActions = [
 ];
 
 const mockResponses: Record<string, string> = {
+  greeting: `Hello! 👋 I'm Gemini, your AI study assistant. I can see you're interested in learning - that's great! 
+
+I can help you with:
+• **Summarizing** your notes
+• **Explaining** complex topics simply
+• **Creating** revision points and MCQs
+• **Preparing** for vivas
+
+What would you like to work on today?`,
   summarize: `📝 **Summary**
 
 This note covers the fundamental concepts with the following key points:
@@ -100,13 +110,7 @@ d) O(log n)
 a) Scalability
 b) Reliability
 c) Immutability ✓
-d) Efficiency
-
-**Q5.** In the worst case scenario, the space complexity is:
-a) O(1)
-b) O(n)
-c) O(n²) ✓
-d) O(2ⁿ)`,
+d) Efficiency`,
   viva: `🎤 **Viva Questions**
 
 Here are important viva questions you should prepare:
@@ -123,12 +127,6 @@ Here are important viva questions you should prepare:
 **Q4.** Can you give a real-world application?
 *Expected Answer: Mention 2-3 practical uses in industry.*
 
-**Q5.** What happens if we don't use this approach?
-*Expected Answer: Discuss the problems that would arise.*
-
-**Q6.** Explain the time and space complexity.
-*Expected Answer: Provide Big O notation with justification.*
-
 💡 **Tip**: Always explain with examples and diagrams when possible!`,
   cheatsheet: `📑 **Quick Cheat Sheet**
 
@@ -144,7 +142,6 @@ Here are important viva questions you should prepare:
 ━━━━━━━━━━━━━━━━━━━━━
 • Formula 1: X = A + B
 • Formula 2: Y = C × D
-• Formula 3: Z = E / F
 
 ━━━━━━━━━━━━━━━━━━━━━
 ⚡ **QUICK FACTS**
@@ -152,15 +149,6 @@ Here are important viva questions you should prepare:
 • 4 Types: A, B, C, D
 • Time Complexity: O(n)
 • Space Complexity: O(1)
-• Best Case: When sorted
-• Worst Case: Reverse sorted
-
-━━━━━━━━━━━━━━━━━━━━━
-🚫 **COMMON MISTAKES**
-━━━━━━━━━━━━━━━━━━━━━
-• Don't confuse X with Y
-• Remember edge cases
-• Check boundary conditions
 
 Print this and stick it on your desk! 📎`,
   examples: `💡 **Explained with Examples**
@@ -180,26 +168,6 @@ Think of a busy restaurant:
 - Chef processes them (algorithm)
 - Dishes go out (output)
 The "process" follows our concept's principles.
-
-**Example 3: Code Implementation**
-\`\`\`
-// Simple example
-function process(data) {
-  // Step 1: Initialize
-  let result = [];
-  
-  // Step 2: Process
-  for (let item of data) {
-    result.push(transform(item));
-  }
-  
-  // Step 3: Return
-  return result;
-}
-\`\`\`
-
-**Example 4: Visual Diagram**
-Input → [Process A] → [Process B] → Output
 
 Now you can visualize how it all connects! 🎯`,
   beginner: `👶 **Explain Like I'm in 1st Year**
@@ -221,14 +189,6 @@ Step 2: 🤔 Compare with others
 Step 3: 📦 Put it in the right place
 Step 4: 🔁 Repeat until done!
 
-**Real Life Example:**
-📱 When you search for a contact in your phone, this is what happens behind the scenes!
-
-**Simple Formula:**
-If items = 10, we need ~10 steps
-If items = 100, we need ~100 steps
-So: Steps ≈ Number of items
-
 **One-liner to remember:**
 "Organize once, find fast forever!" 🚀
 
@@ -243,12 +203,17 @@ Would you like me to elaborate on any specific aspect?`,
 };
 
 export function AIAssistantPanel({ open, onClose, initialPrompt, noteContext }: AIAssistantPanelProps) {
+  const { user } = useUser();
+  const userName = user?.name?.split(" ")[0] || "there";
+  const userBranch = user?.branch || "";
+  const userYear = user?.year || "";
+
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
       content: noteContext 
-        ? `I'm ready to help you with "${noteContext}". Choose an action below or ask me anything!`
-        : "Hello! I'm your AI study assistant. I can help you summarize notes, explain topics, generate revision points, create practice MCQs, prepare for vivas, and much more! How can I help you today?",
+        ? `Hi ${userName}! I'm ready to help you with "${noteContext}". Choose an action below or ask me anything!`
+        : `Hello ${userName}! 👋 I'm Gemini, your AI study assistant${userBranch ? ` for ${userBranch}` : ""}${userYear ? ` (${userYear})` : ""}. I can help you summarize notes, explain topics, generate MCQs, prepare for vivas, and much more! How can I help you today?`,
       role: "assistant",
       timestamp: new Date(),
     },
@@ -274,7 +239,11 @@ export function AIAssistantPanel({ open, onClose, initialPrompt, noteContext }: 
     // Determine response type
     const lowerText = messageText.toLowerCase();
     let responseKey = "default";
-    if (lowerText.includes("summarize") || lowerText.includes("summary")) {
+    
+    // Check for greetings
+    if (lowerText.match(/^(hi|hello|hey|howdy|how are you|what's up|sup)/)) {
+      responseKey = "greeting";
+    } else if (lowerText.includes("summarize") || lowerText.includes("summary")) {
       responseKey = "summarize";
     } else if (lowerText.includes("explain") || lowerText.includes("what is")) {
       responseKey = "explain";
@@ -292,12 +261,18 @@ export function AIAssistantPanel({ open, onClose, initialPrompt, noteContext }: 
       responseKey = "beginner";
     }
 
+    // Personalize responses
+    let response = mockResponses[responseKey];
+    if (user?.name) {
+      response = response.replace(/\{name\}/g, userName);
+    }
+
     // Mock AI response with typing delay
     setTimeout(() => {
       setIsTyping(false);
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: mockResponses[responseKey],
+        content: response,
         role: "assistant",
         timestamp: new Date(),
       };
@@ -329,12 +304,12 @@ export function AIAssistantPanel({ open, onClose, initialPrompt, noteContext }: 
       {/* Header */}
       <div className="h-16 px-4 flex items-center justify-between border-b border-border">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-            <Bot className="w-5 h-5 text-primary-foreground" />
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+            <Sparkles className="w-5 h-5 text-white" />
           </div>
           <div>
-            <h3 className="font-semibold text-foreground">AI Assistant</h3>
-            <p className="text-xs text-muted-foreground">Powered by NoteHall AI</p>
+            <h3 className="font-semibold text-foreground">Gemini</h3>
+            <p className="text-xs text-muted-foreground">AI Study Assistant</p>
           </div>
         </div>
         <Button variant="ghost" size="icon" onClick={onClose}>
@@ -401,14 +376,16 @@ export function AIAssistantPanel({ open, onClose, initialPrompt, noteContext }: 
                 className={cn(
                   "w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0",
                   message.role === "assistant"
-                    ? "bg-primary"
+                    ? "bg-gradient-to-br from-blue-500 to-purple-600"
                     : "bg-secondary"
                 )}
               >
                 {message.role === "assistant" ? (
-                  <Bot className="w-4 h-4 text-primary-foreground" />
+                  <Sparkles className="w-4 h-4 text-white" />
                 ) : (
-                  <span className="text-xs font-medium text-secondary-foreground">JD</span>
+                  <span className="text-xs font-medium text-secondary-foreground">
+                    {user?.name?.split(" ").map(n => n[0]).join("") || "U"}
+                  </span>
                 )}
               </div>
               <div
@@ -426,8 +403,8 @@ export function AIAssistantPanel({ open, onClose, initialPrompt, noteContext }: 
           
           {isTyping && (
             <div className="flex gap-3">
-              <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 bg-primary">
-                <Bot className="w-4 h-4 text-primary-foreground" />
+              <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-blue-500 to-purple-600">
+                <Sparkles className="w-4 h-4 text-white" />
               </div>
               <div className="bg-muted rounded-xl px-4 py-3">
                 <div className="flex items-center gap-2">

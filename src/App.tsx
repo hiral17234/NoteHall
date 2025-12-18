@@ -3,13 +3,15 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { ProfileProvider } from "@/contexts/ProfileContext";
+import { UserProvider } from "@/contexts/UserContext";
 import Index from "./pages/Index";
 import Upload from "./pages/Upload";
 import HelpDesk from "./pages/HelpDesk";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
 import AIAssistant from "./pages/AIAssistant";
+import Login from "./pages/Login";
+import Signup from "./pages/Signup";
 import Placeholder from "./pages/Placeholder";
 import NotFound from "./pages/NotFound";
 
@@ -17,7 +19,7 @@ const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <ProfileProvider>
+    <UserProvider>
       <TooltipProvider>
         <Toaster />
         <Sonner />
@@ -30,6 +32,8 @@ const App = () => (
             <Route path="/profile/:userId" element={<Profile />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/ai-assistant" element={<AIAssistant />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<Signup />} />
             <Route 
               path="/campusvoice" 
               element={<Placeholder title="CampusVoice" description="Share your campus experiences and feedback. Coming soon!" />} 
@@ -42,7 +46,7 @@ const App = () => (
           </Routes>
         </BrowserRouter>
       </TooltipProvider>
-    </ProfileProvider>
+    </UserProvider>
   </QueryClientProvider>
 );
 
