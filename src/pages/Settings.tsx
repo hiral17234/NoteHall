@@ -7,17 +7,103 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { User, Bell, Shield, Palette, LogOut } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { User, Bell, Shield, Palette, LogOut, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useUser } from "@/contexts/UserContext";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 export default function Settings() {
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const { user, updateUser, preferences, updatePreferences, privacy, updatePrivacy, softDeleteAccount } = useUser();
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  
+  // Form state
+  const [formData, setFormData] = useState({
+    name: user?.name || "",
+    email: user?.email || "",
+    phone: user?.phone || "",
+    college: user?.college || "MITS Gwalior",
+    branch: user?.branch || "",
+    year: user?.year || "",
+    github: user?.github || "",
+    linkedin: user?.linkedin || "",
+    portfolio: user?.portfolio || "",
+    instagram: user?.instagram || "",
+    twitter: user?.twitter || "",
+  });
 
-  const handleSave = () => {
+  const handleSaveAccount = () => {
+    updateUser({
+      name: formData.name,
+      email: formData.email,
+      phone: formData.phone,
+      college: formData.college,
+      branch: formData.branch,
+      year: formData.year,
+      github: formData.github,
+      linkedin: formData.linkedin,
+      portfolio: formData.portfolio,
+      instagram: formData.instagram,
+      twitter: formData.twitter,
+    });
     toast({
       title: "Settings saved",
-      description: "Your preferences have been updated.",
+      description: "Your profile has been updated everywhere.",
     });
+  };
+
+  const handleNotificationChange = (key: keyof typeof preferences.notifications, value: boolean) => {
+    updatePreferences({
+      notifications: { ...preferences.notifications, [key]: value },
+    });
+    toast({
+      title: "Notification preference updated",
+      description: `${key.charAt(0).toUpperCase() + key.slice(1)} notifications ${value ? "enabled" : "disabled"}.`,
+    });
+  };
+
+  const handlePrivacyChange = (key: keyof typeof privacy, value: boolean) => {
+    updatePrivacy({ [key]: value });
+    toast({
+      title: "Privacy setting updated",
+      description: "Your privacy preferences have been saved.",
+    });
+  };
+
+  const handleThemeChange = (theme: "light" | "dark" | "system") => {
+    updatePreferences({ theme });
+    toast({
+      title: "Theme changed",
+      description: `Theme set to ${theme}.`,
+    });
+  };
+
+  const handleFontSizeChange = (fontSize: "small" | "medium" | "large") => {
+    updatePreferences({ fontSize });
+    toast({
+      title: "Font size changed",
+      description: `Font size set to ${fontSize}.`,
+    });
+  };
+
+  const handleCompactModeChange = (compactMode: boolean) => {
+    updatePreferences({ compactMode });
+    toast({
+      title: "Compact mode " + (compactMode ? "enabled" : "disabled"),
+    });
+  };
+
+  const handleDeleteAccount = () => {
+    softDeleteAccount();
+    setDeleteDialogOpen(false);
+    toast({
+      title: "Account deactivated",
+      description: "Your account has been deactivated. You can log back in to reactivate.",
+    });
+    navigate("/login");
   };
 
   return (
@@ -52,56 +138,80 @@ export default function Settings() {
             <Card className="bg-card border-border">
               <CardHeader>
                 <CardTitle>Account Information</CardTitle>
-                <CardDescription>Update your personal details</CardDescription>
+                <CardDescription>Update your personal details - changes reflect everywhere</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="firstName">First Name</Label>
-                    <Input id="firstName" defaultValue="John" className="bg-background" />
+                    <Label htmlFor="name">Full Name</Label>
+                    <Input 
+                      id="name" 
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      className="bg-background" 
+                    />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="lastName">Last Name</Label>
-                    <Input id="lastName" defaultValue="Doe" className="bg-background" />
+                    <Label htmlFor="phone">Phone (Private)</Label>
+                    <Input 
+                      id="phone" 
+                      value={formData.phone}
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                      className="bg-background" 
+                      placeholder="+91 9876543210"
+                    />
                   </div>
                 </div>
                 
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input id="email" type="email" defaultValue="john@example.com" className="bg-background" />
+                  <Label htmlFor="email">Email (Private)</Label>
+                  <Input 
+                    id="email" 
+                    type="email" 
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    className="bg-background" 
+                  />
+                  <p className="text-xs text-muted-foreground">Your email is private and not visible to others</p>
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="college">College</Label>
-                  <Input id="college" defaultValue="IIT Delhi" className="bg-background" />
+                  <Input 
+                    id="college" 
+                    value={formData.college}
+                    onChange={(e) => setFormData({ ...formData, college: e.target.value })}
+                    className="bg-background" 
+                  />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Branch</Label>
-                    <Select defaultValue="cse">
+                    <Select value={formData.branch} onValueChange={(v) => setFormData({ ...formData, branch: v })}>
                       <SelectTrigger className="bg-background">
-                        <SelectValue />
+                        <SelectValue placeholder="Select branch" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="cse">CSE</SelectItem>
-                        <SelectItem value="ece">ECE</SelectItem>
-                        <SelectItem value="eee">EEE</SelectItem>
-                        <SelectItem value="me">ME</SelectItem>
+                        <SelectItem value="Computer Science">CSE</SelectItem>
+                        <SelectItem value="ECE">ECE</SelectItem>
+                        <SelectItem value="EEE">EEE</SelectItem>
+                        <SelectItem value="ME">ME</SelectItem>
+                        <SelectItem value="CE">CE</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-2">
                     <Label>Year</Label>
-                    <Select defaultValue="3">
+                    <Select value={formData.year} onValueChange={(v) => setFormData({ ...formData, year: v })}>
                       <SelectTrigger className="bg-background">
-                        <SelectValue />
+                        <SelectValue placeholder="Select year" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="1">1st Year</SelectItem>
-                        <SelectItem value="2">2nd Year</SelectItem>
-                        <SelectItem value="3">3rd Year</SelectItem>
-                        <SelectItem value="4">4th Year</SelectItem>
+                        <SelectItem value="1st Year">1st Year</SelectItem>
+                        <SelectItem value="2nd Year">2nd Year</SelectItem>
+                        <SelectItem value="3rd Year">3rd Year</SelectItem>
+                        <SelectItem value="4th Year">4th Year</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -111,21 +221,63 @@ export default function Settings() {
 
                 <div className="space-y-4">
                   <h4 className="font-medium text-foreground">Social Links</h4>
-                  <div className="space-y-2">
-                    <Label htmlFor="github">GitHub Username</Label>
-                    <Input id="github" defaultValue="johndoe" className="bg-background" />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="github">GitHub</Label>
+                      <Input 
+                        id="github" 
+                        value={formData.github}
+                        onChange={(e) => setFormData({ ...formData, github: e.target.value })}
+                        className="bg-background" 
+                        placeholder="username"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="linkedin">LinkedIn</Label>
+                      <Input 
+                        id="linkedin" 
+                        value={formData.linkedin}
+                        onChange={(e) => setFormData({ ...formData, linkedin: e.target.value })}
+                        className="bg-background" 
+                        placeholder="username"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="portfolio">Portfolio</Label>
+                      <Input 
+                        id="portfolio" 
+                        value={formData.portfolio}
+                        onChange={(e) => setFormData({ ...formData, portfolio: e.target.value })}
+                        className="bg-background" 
+                        placeholder="yoursite.dev"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="instagram">Instagram</Label>
+                      <Input 
+                        id="instagram" 
+                        value={formData.instagram}
+                        onChange={(e) => setFormData({ ...formData, instagram: e.target.value })}
+                        className="bg-background" 
+                        placeholder="username"
+                      />
+                    </div>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="linkedin">LinkedIn Username</Label>
-                    <Input id="linkedin" defaultValue="johndoe" className="bg-background" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="portfolio">Portfolio URL</Label>
-                    <Input id="portfolio" defaultValue="https://johndoe.dev" className="bg-background" />
+                    <Label htmlFor="twitter">X (Twitter)</Label>
+                    <Input 
+                      id="twitter" 
+                      value={formData.twitter}
+                      onChange={(e) => setFormData({ ...formData, twitter: e.target.value })}
+                      className="bg-background" 
+                      placeholder="username"
+                    />
                   </div>
                 </div>
 
-                <Button onClick={handleSave} className="bg-primary hover:bg-primary/90 text-primary-foreground">
+                <Button onClick={handleSaveAccount} className="bg-primary hover:bg-primary/90 text-primary-foreground">
                   Save Changes
                 </Button>
               </CardContent>
@@ -136,7 +288,7 @@ export default function Settings() {
             <Card className="bg-card border-border">
               <CardHeader>
                 <CardTitle>Notification Preferences</CardTitle>
-                <CardDescription>Choose what updates you receive</CardDescription>
+                <CardDescription>Choose what updates you receive in real-time</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="flex items-center justify-between">
@@ -144,7 +296,10 @@ export default function Settings() {
                     <p className="font-medium text-foreground">Note Likes</p>
                     <p className="text-sm text-muted-foreground">Get notified when someone likes your notes</p>
                   </div>
-                  <Switch defaultChecked />
+                  <Switch 
+                    checked={preferences.notifications.likes}
+                    onCheckedChange={(checked) => handleNotificationChange("likes", checked)}
+                  />
                 </div>
                 
                 <div className="flex items-center justify-between">
@@ -152,7 +307,10 @@ export default function Settings() {
                     <p className="font-medium text-foreground">Help Requests</p>
                     <p className="text-sm text-muted-foreground">Get notified about new help requests</p>
                   </div>
-                  <Switch defaultChecked />
+                  <Switch 
+                    checked={preferences.notifications.helpRequests}
+                    onCheckedChange={(checked) => handleNotificationChange("helpRequests", checked)}
+                  />
                 </div>
                 
                 <div className="flex items-center justify-between">
@@ -160,7 +318,10 @@ export default function Settings() {
                     <p className="font-medium text-foreground">Request Fulfilled</p>
                     <p className="text-sm text-muted-foreground">Get notified when your request is fulfilled</p>
                   </div>
-                  <Switch defaultChecked />
+                  <Switch 
+                    checked={preferences.notifications.requestFulfilled}
+                    onCheckedChange={(checked) => handleNotificationChange("requestFulfilled", checked)}
+                  />
                 </div>
                 
                 <div className="flex items-center justify-between">
@@ -168,12 +329,11 @@ export default function Settings() {
                     <p className="font-medium text-foreground">Weekly Digest</p>
                     <p className="text-sm text-muted-foreground">Receive weekly summary of activity</p>
                   </div>
-                  <Switch />
+                  <Switch 
+                    checked={preferences.notifications.weeklyDigest}
+                    onCheckedChange={(checked) => handleNotificationChange("weeklyDigest", checked)}
+                  />
                 </div>
-
-                <Button onClick={handleSave} className="bg-primary hover:bg-primary/90 text-primary-foreground">
-                  Save Preferences
-                </Button>
               </CardContent>
             </Card>
           </TabsContent>
@@ -190,33 +350,69 @@ export default function Settings() {
                     <p className="font-medium text-foreground">Public Profile</p>
                     <p className="text-sm text-muted-foreground">Allow others to view your profile</p>
                   </div>
-                  <Switch defaultChecked />
+                  <Switch 
+                    checked={privacy.publicProfile}
+                    onCheckedChange={(checked) => handlePrivacyChange("publicProfile", checked)}
+                  />
                 </div>
                 
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="font-medium text-foreground">Show Activity Status</p>
-                    <p className="text-sm text-muted-foreground">Display your online status</p>
+                    <p className="font-medium text-foreground">Show Online Status</p>
+                    <p className="text-sm text-muted-foreground">Display your online status to others</p>
                   </div>
-                  <Switch defaultChecked />
+                  <Switch 
+                    checked={privacy.showOnlineStatus}
+                    onCheckedChange={(checked) => handlePrivacyChange("showOnlineStatus", checked)}
+                  />
                 </div>
                 
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="font-medium text-foreground">Allow Messages</p>
+                    <p className="font-medium text-foreground">Allow Direct Messages</p>
                     <p className="text-sm text-muted-foreground">Let others send you direct messages</p>
                   </div>
-                  <Switch defaultChecked />
+                  <Switch 
+                    checked={privacy.allowDirectMessages}
+                    onCheckedChange={(checked) => handlePrivacyChange("allowDirectMessages", checked)}
+                  />
                 </div>
 
                 <Separator />
 
                 <div className="space-y-4">
-                  <h4 className="font-medium text-foreground">Danger Zone</h4>
-                  <Button variant="destructive" className="gap-2">
-                    <LogOut className="w-4 h-4" />
-                    Delete Account
-                  </Button>
+                  <h4 className="font-medium text-foreground flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-destructive" />
+                    Danger Zone
+                  </h4>
+                  <p className="text-sm text-muted-foreground">
+                    Deleting your account will deactivate it. You can log back in anytime to reactivate.
+                  </p>
+                  <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button variant="destructive" className="gap-2">
+                        <LogOut className="w-4 h-4" />
+                        Delete Account
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Deactivate Account?</DialogTitle>
+                        <DialogDescription>
+                          Your account will be deactivated but not permanently deleted. 
+                          You can log back in anytime to reactivate your account and access your data.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
+                          Cancel
+                        </Button>
+                        <Button variant="destructive" onClick={handleDeleteAccount}>
+                          Deactivate Account
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
                 </div>
               </CardContent>
             </Card>
@@ -231,7 +427,7 @@ export default function Settings() {
               <CardContent className="space-y-6">
                 <div className="space-y-2">
                   <Label>Theme</Label>
-                  <Select defaultValue="light">
+                  <Select value={preferences.theme} onValueChange={handleThemeChange}>
                     <SelectTrigger className="bg-background">
                       <SelectValue />
                     </SelectTrigger>
@@ -245,7 +441,7 @@ export default function Settings() {
 
                 <div className="space-y-2">
                   <Label>Font Size</Label>
-                  <Select defaultValue="medium">
+                  <Select value={preferences.fontSize} onValueChange={handleFontSizeChange}>
                     <SelectTrigger className="bg-background">
                       <SelectValue />
                     </SelectTrigger>
@@ -262,12 +458,11 @@ export default function Settings() {
                     <p className="font-medium text-foreground">Compact Mode</p>
                     <p className="text-sm text-muted-foreground">Reduce spacing between elements</p>
                   </div>
-                  <Switch />
+                  <Switch 
+                    checked={preferences.compactMode}
+                    onCheckedChange={handleCompactModeChange}
+                  />
                 </div>
-
-                <Button onClick={handleSave} className="bg-primary hover:bg-primary/90 text-primary-foreground">
-                  Save Preferences
-                </Button>
               </CardContent>
             </Card>
           </TabsContent>
