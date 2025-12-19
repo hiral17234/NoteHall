@@ -11,7 +11,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Award,
-  Flame
+  Flame,
+  ExternalLink
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -21,7 +22,13 @@ import { useUser } from "@/contexts/UserContext";
 import logo from "@/assets/logo.png";
 
 const ecosystemItems = [
-  { title: "CampusVoice", path: "/campusvoice", icon: MessageSquare },
+  { 
+    title: "CampusVoice", 
+    path: "https://campusvoice-git-main-hiral-goyals-projects.vercel.app/", 
+    icon: MessageSquare,
+    isExternal: true,
+    isLive: true 
+  },
   { title: "NoteHall", path: "/", icon: BookOpen },
   { title: "CampusBuzz", path: "/campusbuzz", icon: Zap },
 ];
@@ -47,11 +54,12 @@ export function Sidebar() {
         collapsed ? "w-16" : "w-64"
       )}
     >
-      {/* Logo */}
+      {/* Logo + NoteHall text */}
       <div className="h-16 flex items-center justify-between px-4 border-b border-border">
         {!collapsed && (
           <div className="flex items-center gap-2">
-            <img src={logo} alt="NoteHall" className="h-10 w-auto" />
+            <img src={logo} alt="NoteHall" className="h-8 w-auto" />
+            <span className="font-bold text-lg text-foreground">NoteHall</span>
           </div>
         )}
         {collapsed && (
@@ -91,7 +99,39 @@ export function Sidebar() {
           )}
           <div className="space-y-1">
             {ecosystemItems.map((item) => {
-              const isActive = location.pathname === item.path;
+              const isExternal = 'isExternal' in item && item.isExternal;
+              const isLive = 'isLive' in item && item.isLive;
+              const isActive = !isExternal && location.pathname === item.path;
+              
+              if (isExternal) {
+                return (
+                  <a
+                    key={item.path}
+                    href={item.path}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={cn(
+                      "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200",
+                      "hover:bg-muted",
+                      collapsed && "justify-center px-2"
+                    )}
+                  >
+                    <item.icon className="w-5 h-5 flex-shrink-0" />
+                    {!collapsed && (
+                      <span className="font-medium flex items-center gap-1.5">
+                        {item.title}
+                        {isLive && (
+                          <Badge className="h-4 px-1.5 text-[10px] bg-chart-1/20 text-chart-1 border-0">
+                            LIVE
+                          </Badge>
+                        )}
+                        <ExternalLink className="w-3 h-3 text-muted-foreground" />
+                      </span>
+                    )}
+                  </a>
+                );
+              }
+
               return (
                 <NavLink
                   key={item.path}
@@ -145,7 +185,7 @@ export function Sidebar() {
         </div>
       </nav>
 
-      {/* User section - Synced with user context */}
+      {/* User section */}
       {user && (
         <div className="p-2 border-t border-border">
           <NavLink

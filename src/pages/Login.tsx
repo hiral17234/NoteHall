@@ -171,8 +171,9 @@ export default function Login() {
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <Card className="w-full max-w-md bg-card border-border">
         <CardHeader className="text-center">
-          <div className="flex justify-center mb-4">
-            <img src={logo} alt="NoteHall" className="h-16 w-auto" />
+          <div className="flex justify-center items-center gap-2 mb-4">
+            <img src={logo} alt="NoteHall" className="h-12 w-auto" />
+            <span className="font-bold text-xl text-foreground">NoteHall</span>
           </div>
           <CardTitle className="text-2xl">Welcome back</CardTitle>
           <CardDescription>Sign in to your NoteHall account</CardDescription>

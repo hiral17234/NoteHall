@@ -285,7 +285,7 @@ export function NoteCard({ note, onAskAI, onExpand }: NoteCardProps) {
               className="h-8 gap-1 border-primary/30 text-primary hover:bg-primary hover:text-primary-foreground"
             >
               <Bot className="w-4 h-4" />
-              <span className="text-xs">Ask AI</span>
+              <span className="text-xs">Gemini</span>
             </Button>
           </div>
         </CardFooter>
