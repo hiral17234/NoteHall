@@ -1,11 +1,12 @@
-import { ReactNode, useState } from "react";
+import { ReactNode, useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { AIAssistantPanel } from "@/components/ai/AIAssistantPanel";
 import { FloatingAIButton } from "@/components/ai/FloatingAIButton";
 import { NotificationDropdown } from "@/components/notifications/NotificationDropdown";
-import { Search, Sparkles } from "lucide-react";
+import { SearchBar } from "@/components/search/SearchBar";
+import { Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Toaster } from "@/components/ui/toaster";
 import logo from "@/assets/logo.png";
 
@@ -13,8 +14,27 @@ interface MainLayoutProps {
   children: ReactNode;
 }
 
+// All notes for search - this would come from a central store in production
+const allNotes = [
+  { id: "1", title: "Data Structures and Algorithms - Complete Notes Unit 1-5", subject: "DSA", branch: "CSE", year: "2nd Year", author: "Priya Sharma", topic: "Unit 1-5" },
+  { id: "2", title: "Operating Systems - Process Scheduling Diagrams", subject: "OS", branch: "CSE", year: "3rd Year", author: "Rahul Verma", topic: "Process Scheduling" },
+  { id: "3", title: "DBMS - Normalization Explained Video Tutorial", subject: "DBMS", branch: "CSE", year: "2nd Year", author: "Ankit Kumar", topic: "Normalization" },
+  { id: "4", title: "Computer Networks - OSI Model Reference", subject: "CN", branch: "CSE", year: "3rd Year", author: "Sneha Patel", topic: "OSI Model" },
+  { id: "5", title: "Machine Learning - Linear Regression Notes", subject: "ML", branch: "CSE", year: "4th Year", author: "Vikash Singh", topic: "Linear Regression" },
+  { id: "6", title: "Digital Electronics - Logic Gates Diagrams", subject: "DE", branch: "ECE", year: "2nd Year", author: "Meera Gupta", topic: "Logic Gates" },
+  { id: "r1", title: "DSA - Quick Revision Notes for Exams", subject: "DSA", branch: "CSE", year: "2nd Year", author: "Top Contributor", topic: "Quick Revision" },
+  { id: "r2", title: "OS - Interview Questions Collection", subject: "OS", branch: "CSE", year: "3rd Year", author: "Placement Cell", topic: "Interviews" },
+];
+
 export function MainLayout({ children }: MainLayoutProps) {
   const [aiPanelOpen, setAiPanelOpen] = useState(false);
+  const navigate = useNavigate();
+
+  const handleNoteSelect = (note: { id: string }) => {
+    // Navigate to note or open preview
+    console.log("Selected note:", note.id);
+    // Could navigate to /note/:id when implemented
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -30,13 +50,11 @@ export function MainLayout({ children }: MainLayoutProps) {
               <img src={logo} alt="NoteHall" className="h-7 w-auto" />
               <span className="font-semibold text-foreground hidden sm:inline">NoteHall</span>
             </div>
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                placeholder="Search notes, subjects, topics..."
-                className="pl-10 bg-background border-border"
-              />
-            </div>
+            <SearchBar 
+              notes={allNotes}
+              onSelectNote={handleNoteSelect}
+              placeholder="Search notes, subjects, topics..."
+            />
           </div>
           
           <div className="flex items-center gap-2">
