@@ -10,90 +10,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, FileText, Image, Video, Clock, CheckCircle2, AlertCircle, TrendingUp, Users } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { Card, CardContent } from "@/components/ui/card";
+import { Plus, FileText, Image, Video, Clock, CheckCircle2, TrendingUp, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TopContributors } from "@/components/helpdesk/TopContributors";
 import { useNavigate } from "react-router-dom";
-
-const mockRequests = [
-  {
-    id: "1",
-    title: "DBMS ER Diagram Notes - Unit 2",
-    description: "Looking for detailed notes on Entity-Relationship diagrams with examples. Please include cardinality and participation constraints.",
-    subject: "DBMS",
-    branch: "CSE",
-    year: "2nd Year",
-    requestType: "pdf" as const,
-    status: "urgent" as const,
-    requestedBy: "Amit Sharma",
-    timestamp: "3 hours ago",
-    helpersCount: 2,
-    likes: 15,
-    comments: 4,
-  },
-  {
-    id: "2",
-    title: "Computer Networks - TCP/IP Diagrams",
-    description: "Need clear diagrams showing TCP/IP protocol stack and how data flows through each layer.",
-    subject: "CN",
-    branch: "CSE",
-    year: "3rd Year",
-    requestType: "image" as const,
-    status: "open" as const,
-    requestedBy: "Priya Patel",
-    timestamp: "5 hours ago",
-    helpersCount: 0,
-    likes: 8,
-    comments: 2,
-  },
-  {
-    id: "3",
-    title: "Operating Systems - Process Synchronization Video",
-    description: "Looking for a video explanation of semaphores and mutex with real-world examples.",
-    subject: "OS",
-    branch: "CSE",
-    year: "3rd Year",
-    requestType: "video" as const,
-    status: "fulfilled" as const,
-    requestedBy: "Rahul Verma",
-    timestamp: "1 day ago",
-    helpersCount: 3,
-    likes: 24,
-    comments: 7,
-  },
-  {
-    id: "4",
-    title: "Data Structures - AVL Tree Implementation",
-    description: "Need PDF with step-by-step AVL tree insertion and deletion with rotations explained.",
-    subject: "DSA",
-    branch: "CSE",
-    year: "2nd Year",
-    requestType: "pdf" as const,
-    status: "open" as const,
-    requestedBy: "Sneha Gupta",
-    timestamp: "2 days ago",
-    helpersCount: 1,
-    likes: 12,
-    comments: 3,
-  },
-  {
-    id: "5",
-    title: "Machine Learning - Neural Network Basics",
-    description: "Need simple notes explaining neural networks for beginners with diagrams.",
-    subject: "ML",
-    branch: "CSE",
-    year: "4th Year",
-    requestType: "pdf" as const,
-    status: "open" as const,
-    requestedBy: "Vikash Kumar",
-    timestamp: "3 days ago",
-    helpersCount: 0,
-    likes: 18,
-    comments: 5,
-  },
-];
+import { useHelpRequests } from "@/contexts/HelpRequestsContext";
 
 const requestTypes = [
   { id: "pdf", label: "PDF", icon: FileText },
@@ -102,10 +24,10 @@ const requestTypes = [
 ];
 
 export default function HelpDesk() {
-  const { toast } = useToast();
   const navigate = useNavigate();
+  const { requests, addRequest } = useHelpRequests();
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [selectedType, setSelectedType] = useState("pdf");
+  const [selectedType, setSelectedType] = useState<"pdf" | "image" | "video">("pdf");
   const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState({
     title: "",
@@ -121,16 +43,22 @@ export default function HelpDesk() {
     return () => clearTimeout(timer);
   }, []);
 
-  const openRequests = mockRequests.filter((r) => r.status === "open" || r.status === "urgent");
-  const fulfilledRequests = mockRequests.filter((r) => r.status === "fulfilled");
-  const urgentCount = mockRequests.filter((r) => r.status === "urgent").length;
+  const openRequests = requests.filter((r) => r.status === "open" || r.status === "urgent");
+  const fulfilledRequests = requests.filter((r) => r.status === "fulfilled");
+  const urgentCount = requests.filter((r) => r.status === "urgent").length;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    toast({
-      title: "Request created!",
-      description: "Your request has been posted. Others can now help you.",
+    
+    addRequest({
+      title: formData.title,
+      description: formData.description,
+      subject: formData.subject.toUpperCase(),
+      branch: formData.branch.toUpperCase(),
+      year: formData.year === "1" ? "1st Year" : formData.year === "2" ? "2nd Year" : formData.year === "3" ? "3rd Year" : "4th Year",
+      requestType: selectedType,
     });
+    
     setDialogOpen(false);
     setFormData({ title: "", description: "", subject: "", branch: "", year: "" });
   };
@@ -166,7 +94,7 @@ export default function HelpDesk() {
                       <button
                         key={type.id}
                         type="button"
-                        onClick={() => setSelectedType(type.id)}
+                        onClick={() => setSelectedType(type.id as "pdf" | "image" | "video")}
                         className={cn(
                           "flex items-center gap-2 px-4 py-2 rounded-lg border transition-all flex-1 justify-center",
                           selectedType === type.id
@@ -267,7 +195,7 @@ export default function HelpDesk() {
           <Card className="bg-card border-border">
             <CardContent className="pt-4 text-center">
               <TrendingUp className="w-6 h-6 mx-auto text-primary mb-2" />
-              <p className="text-2xl font-bold text-foreground">{mockRequests.length}</p>
+              <p className="text-2xl font-bold text-foreground">{requests.length}</p>
               <p className="text-xs text-muted-foreground">Total Requests</p>
             </CardContent>
           </Card>
