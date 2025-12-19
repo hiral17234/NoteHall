@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, forwardRef } from "react";
 import { 
   FileText, 
   Image, 
@@ -74,7 +74,8 @@ const reportReasons = [
   "Other",
 ];
 
-export function ContributionCard({ contribution, onViewProfile }: ContributionCardProps) {
+export const ContributionCard = forwardRef<HTMLDivElement, ContributionCardProps>(
+  function ContributionCard({ contribution, onViewProfile }, ref) {
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(contribution.likes);
   const [showReportDialog, setShowReportDialog] = useState(false);
@@ -247,5 +248,5 @@ export function ContributionCard({ contribution, onViewProfile }: ContributionCa
         </DialogContent>
       </Dialog>
     </>
-  );
-}
+  )
+});

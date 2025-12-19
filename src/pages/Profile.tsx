@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo } from "react";
-import { useParams } from "react-router-dom";
+import { useState, useEffect, useMemo, forwardRef } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { NoteCard } from "@/components/notes/NoteCard";
 import { NoteCardSkeleton, ProfileStatsSkeleton } from "@/components/ui/skeleton-card";
@@ -7,6 +7,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { EditProfileDialog } from "@/components/profile/EditProfileDialog";
 import { ContributionCard, Contribution } from "@/components/helpdesk/ContributionCard";
 import { StatDetailModal, AchievementsSection } from "@/components/profile/StatDetailModal";
+import { useSavedNotes } from "@/contexts/SavedNotesContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -38,7 +39,8 @@ import {
   Flame,
   Share2,
   Lock,
-  Trophy
+  Trophy,
+  ArrowLeft
 } from "lucide-react";
 
 // Mock data for other users
@@ -206,24 +208,32 @@ const getBadgeIcon = (iconName: string) => {
   return icons[iconName] || Award;
 };
 
-export default function Profile() {
+const Profile = forwardRef<HTMLDivElement>((_, ref) => {
   const { userId } = useParams();
+  const navigate = useNavigate();
   const { user: currentUserProfile, updateUser, isOwner } = useUser();
+  const { savedNotes } = useSavedNotes();
   
   const [loading, setLoading] = useState(true);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [statModalOpen, setStatModalOpen] = useState<"uploads" | "likes" | "views" | "helped" | "score" | null>(null);
 
   // Determine if viewing own profile or someone else's
-  const isOwnProfile = !userId || isOwner(userId);
+  const isOwnProfile = !userId || userId === "current-user" || userId === currentUserProfile?.id;
   
   // Get the profile data to display
   const profileData = useMemo(() => {
     if (isOwnProfile) return currentUserProfile;
-    return otherUsersData[userId!] || currentUserProfile;
+    // Look up other user's data
+    const otherUser = otherUsersData[userId!];
+    if (otherUser) return otherUser;
+    // Check if it's the current user by username match
+    if (currentUserProfile?.username === userId) return currentUserProfile;
+    // Return mock data for unknown users
+    return otherUsersData["user-2"] || currentUserProfile;
   }, [userId, isOwnProfile, currentUserProfile]);
 
-  const [stats, setStats] = useState(profileData.stats);
+  const [stats, setStats] = useState(profileData?.stats || currentUserProfile?.stats);
 
   useEffect(() => {
     setLoading(true);
@@ -248,18 +258,46 @@ export default function Profile() {
   }, [userId, isOwnProfile]);
 
   useEffect(() => {
-    setStats(profileData.stats);
+    if (profileData?.stats) {
+      setStats(profileData.stats);
+    }
   }, [profileData]);
 
   const handleProfileSave = (updatedProfile: any) => {
     updateUser(updatedProfile);
   };
 
-  const currentStreakBadge = streakBadges.filter(b => profileData.streak >= b.days).pop();
+  const handleViewProfile = (userId: string) => {
+    navigate(`/profile/${userId}`);
+  };
+
+  const currentStreakBadge = streakBadges.filter(b => (profileData?.streak || 0) >= b.days).pop();
+
+  if (!profileData) {
+    return (
+      <MainLayout>
+        <div className="flex items-center justify-center h-64">
+          <p className="text-muted-foreground">Profile not found</p>
+        </div>
+      </MainLayout>
+    );
+  }
 
   return (
     <MainLayout>
       <div className="max-w-4xl mx-auto">
+        {/* Back button for other profiles */}
+        {!isOwnProfile && (
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="mb-4 gap-2"
+            onClick={() => navigate(-1)}
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back
+          </Button>
+        )}
         {/* Profile Header */}
         <Card className="bg-card border-border mb-6">
           <CardContent className="pt-6">
@@ -722,4 +760,8 @@ export default function Profile() {
       )}
     </MainLayout>
   );
-}
+});
+
+Profile.displayName = "Profile";
+
+export default Profile;

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { 
   FileText, 
   Image, 
@@ -27,6 +27,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
+import { useSavedNotes } from "@/contexts/SavedNotesContext";
 
 interface NoteCardProps {
   note: {
@@ -79,9 +80,9 @@ const reportReasons = [
 ];
 
 export function NoteCard({ note, onAskAI, onExpand }: NoteCardProps) {
+  const { isNoteSaved, toggleSave } = useSavedNotes();
   const [liked, setLiked] = useState(false);
   const [disliked, setDisliked] = useState(false);
-  const [saved, setSaved] = useState(false);
   const [likes, setLikes] = useState(note.likes);
   const [dislikes, setDislikes] = useState(note.dislikes);
   const [likeAnimating, setLikeAnimating] = useState(false);
@@ -94,6 +95,8 @@ export function NoteCard({ note, onAskAI, onExpand }: NoteCardProps) {
   const [userRating, setUserRating] = useState(0);
   const [userDifficulty, setUserDifficulty] = useState<"easy" | "medium" | "hard" | "">("");
   const [currentRating, setCurrentRating] = useState(note.rating || 0);
+  
+  const saved = isNoteSaved(note.id);
 
   const FileIcon = fileTypeIcons[note.fileType];
 
@@ -138,26 +141,7 @@ export function NoteCard({ note, onAskAI, onExpand }: NoteCardProps) {
   const handleSave = () => {
     setSaveAnimating(true);
     setTimeout(() => setSaveAnimating(false), 300);
-    
-    const newSaved = !saved;
-    setSaved(newSaved);
-    
-    // Store in localStorage
-    const savedNotes = JSON.parse(localStorage.getItem("notehall_saved_notes") || "[]");
-    if (newSaved) {
-      if (!savedNotes.includes(note.id)) {
-        savedNotes.push(note.id);
-      }
-    } else {
-      const index = savedNotes.indexOf(note.id);
-      if (index > -1) savedNotes.splice(index, 1);
-    }
-    localStorage.setItem("notehall_saved_notes", JSON.stringify(savedNotes));
-    
-    toast({
-      title: newSaved ? "Saved!" : "Removed from saved",
-      description: newSaved ? "Note added to your collection" : "Note removed from your collection",
-    });
+    toggleSave({ id: note.id, title: note.title, subject: note.subject });
   };
 
   const handleShare = async () => {
