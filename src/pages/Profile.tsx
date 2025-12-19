@@ -6,6 +6,7 @@ import { NoteCardSkeleton, ProfileStatsSkeleton } from "@/components/ui/skeleton
 import { EmptyState } from "@/components/ui/empty-state";
 import { EditProfileDialog } from "@/components/profile/EditProfileDialog";
 import { ContributionCard, Contribution } from "@/components/helpdesk/ContributionCard";
+import { StatDetailModal, AchievementsSection } from "@/components/profile/StatDetailModal";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -36,7 +37,8 @@ import {
   BookOpen,
   Flame,
   Share2,
-  Lock
+  Lock,
+  Trophy
 } from "lucide-react";
 
 // Mock data for other users
@@ -210,6 +212,7 @@ export default function Profile() {
   
   const [loading, setLoading] = useState(true);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [statModalOpen, setStatModalOpen] = useState<"uploads" | "likes" | "views" | "helped" | "score" | null>(null);
 
   // Determine if viewing own profile or someone else's
   const isOwnProfile = !userId || isOwner(userId);
@@ -387,14 +390,20 @@ export default function Profile() {
             </>
           ) : (
             <>
-              <Card className="bg-card border-border group hover:border-primary/30 transition-colors">
+              <Card 
+                className="bg-card border-border group hover:border-primary/30 transition-colors cursor-pointer"
+                onClick={() => setStatModalOpen("uploads")}
+              >
                 <CardContent className="pt-4 text-center">
                   <FileText className="w-6 h-6 mx-auto text-primary mb-2" />
                   <p className="text-2xl font-bold text-foreground">{stats.uploads}</p>
                   <p className="text-xs text-muted-foreground">Uploads</p>
                 </CardContent>
               </Card>
-              <Card className="bg-card border-border group hover:border-primary/30 transition-colors">
+              <Card 
+                className="bg-card border-border group hover:border-primary/30 transition-colors cursor-pointer"
+                onClick={() => setStatModalOpen("likes")}
+              >
                 <CardContent className="pt-4 text-center">
                   <ThumbsUp className="w-6 h-6 mx-auto text-primary mb-2" />
                   <div className="flex items-center justify-center gap-1">
@@ -404,7 +413,10 @@ export default function Profile() {
                   <p className="text-xs text-muted-foreground">Likes</p>
                 </CardContent>
               </Card>
-              <Card className="bg-card border-border group hover:border-primary/30 transition-colors">
+              <Card 
+                className="bg-card border-border group hover:border-primary/30 transition-colors cursor-pointer"
+                onClick={() => setStatModalOpen("views")}
+              >
                 <CardContent className="pt-4 text-center">
                   <Eye className="w-6 h-6 mx-auto text-primary mb-2" />
                   <div className="flex items-center justify-center gap-1">
@@ -414,14 +426,20 @@ export default function Profile() {
                   <p className="text-xs text-muted-foreground">Views</p>
                 </CardContent>
               </Card>
-              <Card className="bg-card border-border group hover:border-primary/30 transition-colors">
+              <Card 
+                className="bg-card border-border group hover:border-primary/30 transition-colors cursor-pointer"
+                onClick={() => setStatModalOpen("helped")}
+              >
                 <CardContent className="pt-4 text-center">
                   <Users className="w-6 h-6 mx-auto text-primary mb-2" />
                   <p className="text-2xl font-bold text-foreground">{stats.helpedRequests}</p>
                   <p className="text-xs text-muted-foreground">Helped</p>
                 </CardContent>
               </Card>
-              <Card className="bg-card border-border group hover:border-primary/30 transition-colors">
+              <Card 
+                className="bg-card border-border group hover:border-primary/30 transition-colors cursor-pointer"
+                onClick={() => setStatModalOpen("score")}
+              >
                 <CardContent className="pt-4 text-center">
                   <Target className="w-6 h-6 mx-auto text-primary mb-2" />
                   <p className="text-2xl font-bold text-foreground">{stats.contributionScore}</p>
@@ -683,6 +701,23 @@ export default function Profile() {
           onOpenChange={setEditDialogOpen}
           profile={currentUserProfile}
           onSave={handleProfileSave}
+        />
+      )}
+
+      {/* Stat Detail Modal */}
+      {statModalOpen && (
+        <StatDetailModal
+          open={!!statModalOpen}
+          onClose={() => setStatModalOpen(null)}
+          statType={statModalOpen}
+          value={
+            statModalOpen === "uploads" ? stats.uploads :
+            statModalOpen === "likes" ? stats.totalLikes :
+            statModalOpen === "views" ? stats.totalViews :
+            statModalOpen === "helped" ? stats.helpedRequests :
+            stats.contributionScore
+          }
+          isOwner={isOwnProfile}
         />
       )}
     </MainLayout>
