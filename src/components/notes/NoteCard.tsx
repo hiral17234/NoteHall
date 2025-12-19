@@ -13,7 +13,9 @@ import {
   Expand,
   Flag,
   Share2,
-  Download
+  Download,
+  Star,
+  AlertCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
@@ -40,6 +42,8 @@ interface NoteCardProps {
     author: string;
     timestamp: string;
     topic?: string;
+    difficulty?: "easy" | "medium" | "hard";
+    rating?: number;
   };
   onAskAI?: () => void;
   onExpand?: () => void;
@@ -57,6 +61,12 @@ const fileTypeColors = {
   image: "bg-chart-1/20 text-chart-4",
   video: "bg-primary/10 text-primary",
   link: "bg-secondary/20 text-secondary-foreground",
+};
+
+const difficultyColors = {
+  easy: "bg-chart-1/20 text-chart-1",
+  medium: "bg-chart-4/20 text-chart-4",
+  hard: "bg-destructive/20 text-destructive",
 };
 
 const reportReasons = [
@@ -78,8 +88,12 @@ export function NoteCard({ note, onAskAI, onExpand }: NoteCardProps) {
   const [dislikeAnimating, setDislikeAnimating] = useState(false);
   const [saveAnimating, setSaveAnimating] = useState(false);
   const [reportDialogOpen, setReportDialogOpen] = useState(false);
+  const [ratingDialogOpen, setRatingDialogOpen] = useState(false);
   const [reportReason, setReportReason] = useState("");
   const [reportDetails, setReportDetails] = useState("");
+  const [userRating, setUserRating] = useState(0);
+  const [userDifficulty, setUserDifficulty] = useState<"easy" | "medium" | "hard" | "">("");
+  const [currentRating, setCurrentRating] = useState(note.rating || 0);
 
   const FileIcon = fileTypeIcons[note.fileType];
 
@@ -125,25 +139,75 @@ export function NoteCard({ note, onAskAI, onExpand }: NoteCardProps) {
     setSaveAnimating(true);
     setTimeout(() => setSaveAnimating(false), 300);
     
-    setSaved(!saved);
+    const newSaved = !saved;
+    setSaved(newSaved);
+    
+    // Store in localStorage
+    const savedNotes = JSON.parse(localStorage.getItem("notehall_saved_notes") || "[]");
+    if (newSaved) {
+      if (!savedNotes.includes(note.id)) {
+        savedNotes.push(note.id);
+      }
+    } else {
+      const index = savedNotes.indexOf(note.id);
+      if (index > -1) savedNotes.splice(index, 1);
+    }
+    localStorage.setItem("notehall_saved_notes", JSON.stringify(savedNotes));
+    
     toast({
-      title: saved ? "Removed from saved" : "Saved!",
-      description: saved ? "Note removed from your collection" : "Note added to your collection",
+      title: newSaved ? "Saved!" : "Removed from saved",
+      description: newSaved ? "Note added to your collection" : "Note removed from your collection",
     });
   };
 
-  const handleShare = () => {
-    navigator.clipboard.writeText(`https://notehall.app/note/${note.id}`);
-    toast({
-      title: "Link copied!",
-      description: "Note link copied to clipboard",
-    });
+  const handleShare = async () => {
+    const shareUrl = `${window.location.origin}/note/${note.id}`;
+    const shareData = {
+      title: note.title,
+      text: `Check out "${note.title}" on NoteHall`,
+      url: shareUrl,
+    };
+
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData);
+        toast({
+          title: "Shared!",
+          description: "Note shared successfully",
+        });
+      } else {
+        await navigator.clipboard.writeText(shareUrl);
+        toast({
+          title: "Link copied!",
+          description: "Note link copied to clipboard",
+        });
+      }
+    } catch (err) {
+      // User cancelled or error
+      await navigator.clipboard.writeText(shareUrl);
+      toast({
+        title: "Link copied!",
+        description: "Note link copied to clipboard",
+      });
+    }
   };
 
   const handleDownload = () => {
+    // Store in downloaded notes
+    const downloadedNotes = JSON.parse(localStorage.getItem("notehall_downloaded_notes") || "[]");
+    if (!downloadedNotes.some((n: any) => n.id === note.id)) {
+      downloadedNotes.push({
+        id: note.id,
+        title: note.title,
+        subject: note.subject,
+        downloadedAt: new Date().toISOString(),
+      });
+      localStorage.setItem("notehall_downloaded_notes", JSON.stringify(downloadedNotes));
+    }
+    
     toast({
       title: "Download started",
-      description: "Your file will be downloaded shortly",
+      description: "Your file will be downloaded shortly. Check 'Downloaded Content' in your profile.",
     });
   };
 
@@ -162,6 +226,54 @@ export function NoteCard({ note, onAskAI, onExpand }: NoteCardProps) {
     setReportDialogOpen(false);
     setReportReason("");
     setReportDetails("");
+  };
+
+  const handleRatingSubmit = () => {
+    if (userRating === 0) {
+      toast({
+        title: "Please select a rating",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Store rating
+    const ratings = JSON.parse(localStorage.getItem("notehall_ratings") || "{}");
+    ratings[note.id] = { rating: userRating, difficulty: userDifficulty };
+    localStorage.setItem("notehall_ratings", JSON.stringify(ratings));
+    
+    setCurrentRating(userRating);
+    setRatingDialogOpen(false);
+    toast({
+      title: "Rating submitted!",
+      description: "Thanks for helping others find quality content.",
+    });
+  };
+
+  const renderStars = (rating: number, interactive = false, onRate?: (r: number) => void) => {
+    return (
+      <div className="flex items-center gap-0.5">
+        {[1, 2, 3, 4, 5].map((star) => (
+          <button
+            key={star}
+            type="button"
+            disabled={!interactive}
+            onClick={() => onRate?.(star)}
+            className={cn(
+              "transition-colors",
+              interactive && "cursor-pointer hover:scale-110"
+            )}
+          >
+            <Star
+              className={cn(
+                "w-4 h-4",
+                star <= rating ? "fill-chart-1 text-chart-1" : "text-muted-foreground"
+              )}
+            />
+          </button>
+        ))}
+      </div>
+    );
   };
 
   return (
@@ -192,7 +304,7 @@ export function NoteCard({ note, onAskAI, onExpand }: NoteCardProps) {
                     <MoreVertical className="w-4 h-4" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
+                <DropdownMenuContent align="end" className="bg-popover border-border">
                   <DropdownMenuItem onClick={handleShare}>
                     <Share2 className="w-4 h-4 mr-2" />
                     Share
@@ -200,6 +312,10 @@ export function NoteCard({ note, onAskAI, onExpand }: NoteCardProps) {
                   <DropdownMenuItem onClick={handleDownload}>
                     <Download className="w-4 h-4 mr-2" />
                     Download
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setRatingDialogOpen(true)}>
+                    <Star className="w-4 h-4 mr-2" />
+                    Rate
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => setReportDialogOpen(true)} className="text-destructive focus:text-destructive">
@@ -228,7 +344,20 @@ export function NoteCard({ note, onAskAI, onExpand }: NoteCardProps) {
                 {note.topic}
               </Badge>
             )}
+            {note.difficulty && (
+              <Badge className={difficultyColors[note.difficulty]}>
+                {note.difficulty.charAt(0).toUpperCase() + note.difficulty.slice(1)}
+              </Badge>
+            )}
           </div>
+          
+          {/* Rating display */}
+          {currentRating > 0 && (
+            <div className="flex items-center gap-2 mt-2">
+              {renderStars(currentRating)}
+              <span className="text-xs text-muted-foreground">({currentRating.toFixed(1)})</span>
+            </div>
+          )}
         </CardContent>
 
         <CardFooter className="pt-3 border-t border-border flex items-center justify-between flex-wrap gap-2">
@@ -329,6 +458,83 @@ export function NoteCard({ note, onAskAI, onExpand }: NoteCardProps) {
             <Button onClick={handleReport} className="w-full bg-destructive hover:bg-destructive/90 text-destructive-foreground">
               <Flag className="w-4 h-4 mr-2" />
               Submit Report
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Rating Dialog */}
+      <Dialog open={ratingDialogOpen} onOpenChange={setRatingDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Rate this Note</DialogTitle>
+            <DialogDescription>
+              Help others find quality content by rating this note
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-6 mt-4">
+            {/* Quality Rating */}
+            <div className="space-y-3">
+              <Label>Quality Rating</Label>
+              <div className="flex items-center gap-2">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <button
+                    key={star}
+                    type="button"
+                    onClick={() => setUserRating(star)}
+                    className="transition-transform hover:scale-110"
+                  >
+                    <Star
+                      className={cn(
+                        "w-8 h-8 transition-colors",
+                        star <= userRating ? "fill-chart-1 text-chart-1" : "text-muted-foreground hover:text-chart-1/50"
+                      )}
+                    />
+                  </button>
+                ))}
+                {userRating > 0 && (
+                  <span className="ml-2 text-sm text-muted-foreground">
+                    {userRating === 1 && "Poor"}
+                    {userRating === 2 && "Below Average"}
+                    {userRating === 3 && "Average"}
+                    {userRating === 4 && "Good"}
+                    {userRating === 5 && "Excellent"}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Difficulty Rating */}
+            <div className="space-y-3">
+              <Label>Difficulty Level</Label>
+              <div className="flex gap-2">
+                {(["easy", "medium", "hard"] as const).map((level) => (
+                  <Button
+                    key={level}
+                    type="button"
+                    variant={userDifficulty === level ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setUserDifficulty(level)}
+                    className={cn(
+                      userDifficulty === level && difficultyColors[level],
+                      "capitalize"
+                    )}
+                  >
+                    {level === "easy" && "😊 Easy"}
+                    {level === "medium" && "🤔 Medium"}
+                    {level === "hard" && "😰 Hard"}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            <Button 
+              onClick={handleRatingSubmit} 
+              className="w-full bg-primary hover:bg-primary/90"
+              disabled={userRating === 0}
+            >
+              <Star className="w-4 h-4 mr-2" />
+              Submit Rating
             </Button>
           </div>
         </DialogContent>
