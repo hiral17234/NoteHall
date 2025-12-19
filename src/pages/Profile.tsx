@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { useProfile } from "@/contexts/ProfileContext";
+import { useUser } from "@/contexts/UserContext";
 import { 
   Edit2, 
   Github, 
@@ -206,7 +206,7 @@ const getBadgeIcon = (iconName: string) => {
 
 export default function Profile() {
   const { userId } = useParams();
-  const { profile: currentUserProfile, updateProfile, isOwner } = useProfile();
+  const { user: currentUserProfile, updateUser, isOwner } = useUser();
   
   const [loading, setLoading] = useState(true);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -249,7 +249,7 @@ export default function Profile() {
   }, [profileData]);
 
   const handleProfileSave = (updatedProfile: any) => {
-    updateProfile(updatedProfile);
+    updateUser(updatedProfile);
   };
 
   const currentStreakBadge = streakBadges.filter(b => profileData.streak >= b.days).pop();
