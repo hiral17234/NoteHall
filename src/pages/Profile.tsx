@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, forwardRef } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { NoteCard } from "@/components/notes/NoteCard";
@@ -208,7 +208,7 @@ const getBadgeIcon = (iconName: string) => {
   return icons[iconName] || Award;
 };
 
-const Profile = forwardRef<HTMLDivElement>((_, ref) => {
+export default function Profile() {
   const { userId } = useParams();
   const navigate = useNavigate();
   const { user: currentUserProfile, updateUser, isOwner } = useUser();
@@ -760,8 +760,4 @@ const Profile = forwardRef<HTMLDivElement>((_, ref) => {
       )}
     </MainLayout>
   );
-});
-
-Profile.displayName = "Profile";
-
-export default Profile;
+}
