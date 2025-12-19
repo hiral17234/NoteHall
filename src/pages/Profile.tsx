@@ -8,6 +8,7 @@ import { EditProfileDialog } from "@/components/profile/EditProfileDialog";
 import { ContributionCard, Contribution } from "@/components/helpdesk/ContributionCard";
 import { StatDetailModal, AchievementsSection } from "@/components/profile/StatDetailModal";
 import { useSavedNotes } from "@/contexts/SavedNotesContext";
+import { useHelpRequests } from "@/contexts/HelpRequestsContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -40,7 +41,8 @@ import {
   Share2,
   Lock,
   Trophy,
-  ArrowLeft
+  ArrowLeft,
+  Medal
 } from "lucide-react";
 
 // Mock data for other users
@@ -213,10 +215,14 @@ export default function Profile() {
   const navigate = useNavigate();
   const { user: currentUserProfile, updateUser, isOwner } = useUser();
   const { savedNotes } = useSavedNotes();
+  const { getUserRequests, closeRequest } = useHelpRequests();
   
   const [loading, setLoading] = useState(true);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [statModalOpen, setStatModalOpen] = useState<"uploads" | "likes" | "views" | "helped" | "score" | null>(null);
+  
+  // Get user's help requests
+  const userRequests = getUserRequests("current-user");
 
   // Determine if viewing own profile or someone else's
   const isOwnProfile = !userId || userId === "current-user" || userId === currentUserProfile?.id;
@@ -373,41 +379,56 @@ export default function Profile() {
                 {/* Social Links */}
                 <div className="flex flex-wrap justify-center sm:justify-start gap-2 mt-4">
                   {profileData.github && (
-                    <Button variant="outline" size="sm" className="gap-1.5" asChild>
-                      <a href={`https://github.com/${profileData.github}`} target="_blank" rel="noopener noreferrer">
-                        <Github className="w-4 h-4" />
-                        GitHub
-                      </a>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="gap-1.5"
+                      onClick={() => window.open(`https://github.com/${profileData.github}`, '_blank', 'noopener,noreferrer')}
+                    >
+                      <Github className="w-4 h-4" />
+                      GitHub
                     </Button>
                   )}
                   {profileData.linkedin && (
-                    <Button variant="outline" size="sm" className="gap-1.5" asChild>
-                      <a href={`https://linkedin.com/in/${profileData.linkedin}`} target="_blank" rel="noopener noreferrer">
-                        <Linkedin className="w-4 h-4" />
-                        LinkedIn
-                      </a>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="gap-1.5"
+                      onClick={() => window.open(`https://linkedin.com/in/${profileData.linkedin}`, '_blank', 'noopener,noreferrer')}
+                    >
+                      <Linkedin className="w-4 h-4" />
+                      LinkedIn
                     </Button>
                   )}
                   {profileData.portfolio && (
-                    <Button variant="outline" size="sm" className="gap-1.5" asChild>
-                      <a href={`https://${profileData.portfolio}`} target="_blank" rel="noopener noreferrer">
-                        <Globe className="w-4 h-4" />
-                        Portfolio
-                      </a>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="gap-1.5"
+                      onClick={() => window.open(`https://${profileData.portfolio}`, '_blank', 'noopener,noreferrer')}
+                    >
+                      <Globe className="w-4 h-4" />
+                      Portfolio
                     </Button>
                   )}
                   {profileData.instagram && (
-                    <Button variant="outline" size="sm" className="gap-1.5" asChild>
-                      <a href={`https://instagram.com/${profileData.instagram}`} target="_blank" rel="noopener noreferrer">
-                        <Instagram className="w-4 h-4" />
-                      </a>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="gap-1.5"
+                      onClick={() => window.open(`https://instagram.com/${profileData.instagram}`, '_blank', 'noopener,noreferrer')}
+                    >
+                      <Instagram className="w-4 h-4" />
                     </Button>
                   )}
                   {profileData.twitter && (
-                    <Button variant="outline" size="sm" className="gap-1.5" asChild>
-                      <a href={`https://x.com/${profileData.twitter}`} target="_blank" rel="noopener noreferrer">
-                        <Twitter className="w-4 h-4" />
-                      </a>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="gap-1.5"
+                      onClick={() => window.open(`https://x.com/${profileData.twitter}`, '_blank', 'noopener,noreferrer')}
+                    >
+                      <Twitter className="w-4 h-4" />
                     </Button>
                   )}
                 </div>
@@ -515,6 +536,10 @@ export default function Profile() {
               <Award className="w-4 h-4" />
               Contributions
             </TabsTrigger>
+            <TabsTrigger value="achievements" className="gap-1.5 data-[state=active]:bg-card">
+              <Medal className="w-4 h-4" />
+              Achievements
+            </TabsTrigger>
             {isOwnProfile && (
               <TabsTrigger value="stats" className="gap-1.5 data-[state=active]:bg-card">
                 <BarChart3 className="w-4 h-4" />
@@ -546,10 +571,22 @@ export default function Profile() {
                 <div className="grid gap-4 md:grid-cols-2">
                   <NoteCardSkeleton />
                 </div>
-              ) : mockSavedNotes.length > 0 ? (
+              ) : savedNotes.length > 0 ? (
                 <div className="grid gap-4 md:grid-cols-2">
-                  {mockSavedNotes.map((note) => (
-                    <NoteCard key={note.id} note={note} />
+                  {savedNotes.map((note) => (
+                    <NoteCard key={note.id} note={{
+                      id: note.id,
+                      title: note.title,
+                      subject: note.subject,
+                      branch: "CSE",
+                      year: "2nd Year",
+                      fileType: "pdf" as const,
+                      likes: 0,
+                      dislikes: 0,
+                      views: 0,
+                      author: "Saved",
+                      timestamp: new Date(note.savedAt).toLocaleDateString(),
+                    }} />
                   ))}
                 </div>
               ) : (
@@ -584,8 +621,8 @@ export default function Profile() {
             <TabsContent value="requests" className="space-y-4">
               {loading ? (
                 <NoteCardSkeleton />
-              ) : mockHelpRequests.length > 0 ? (
-                mockHelpRequests.map((request) => (
+              ) : userRequests.length > 0 ? (
+                userRequests.map((request) => (
                   <Card key={request.id} className="bg-card border-border hover:border-primary/30 transition-colors">
                     <CardContent className="py-4 flex items-center justify-between">
                       <div className="flex items-center gap-3">
@@ -597,9 +634,20 @@ export default function Profile() {
                           <p className="text-sm text-muted-foreground">{request.subject} • {request.timestamp}</p>
                         </div>
                       </div>
-                      <Badge className={request.status === "fulfilled" ? "bg-chart-1 text-primary-foreground" : "bg-primary text-primary-foreground"}>
-                        {request.status === "fulfilled" ? "Fulfilled" : "Open"}
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        {request.status !== "fulfilled" && (
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => closeRequest(request.id)}
+                          >
+                            Close
+                          </Button>
+                        )}
+                        <Badge className={request.status === "fulfilled" ? "bg-chart-1 text-primary-foreground" : "bg-primary text-primary-foreground"}>
+                          {request.status === "fulfilled" ? "Fulfilled" : "Open"}
+                        </Badge>
+                      </div>
                     </CardContent>
                   </Card>
                 ))
@@ -608,6 +656,10 @@ export default function Profile() {
               )}
             </TabsContent>
           )}
+
+          <TabsContent value="achievements" className="space-y-4">
+            <AchievementsSection achievements={[]} isOwner={isOwnProfile} />
+          </TabsContent>
 
           <TabsContent value="contributions" className="space-y-4">
             {loading ? (

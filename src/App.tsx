@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { UserProvider } from "@/contexts/UserContext";
 import { SavedNotesProvider } from "@/contexts/SavedNotesContext";
 import { SearchProvider } from "@/contexts/SearchContext";
+import { HelpRequestsProvider } from "@/contexts/HelpRequestsContext";
 import Index from "./pages/Index";
 import Upload from "./pages/Upload";
 import HelpDesk from "./pages/HelpDesk";
@@ -23,34 +24,36 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <UserProvider>
       <SavedNotesProvider>
-        <SearchProvider>
-          <TooltipProvider>
-            <Toaster />
-            <Sonner />
-            <BrowserRouter>
-              <Routes>
-                <Route path="/" element={<Index />} />
-                <Route path="/upload" element={<Upload />} />
-                <Route path="/helpdesk" element={<HelpDesk />} />
-                <Route path="/profile" element={<Profile />} />
-                <Route path="/profile/:userId" element={<Profile />} />
-                <Route path="/settings" element={<Settings />} />
-                <Route path="/ai-assistant" element={<AIAssistant />} />
-                <Route path="/login" element={<Login />} />
-                <Route path="/signup" element={<Signup />} />
-                <Route 
-                  path="/campusvoice" 
-                  element={<Placeholder title="CampusVoice" description="Share your campus experiences and feedback. Coming soon!" />} 
-                />
-                <Route 
-                  path="/campusbuzz" 
-                  element={<Placeholder title="CampusBuzz" description="Stay updated with the latest campus news and events. Coming soon!" />} 
-                />
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </BrowserRouter>
-          </TooltipProvider>
-        </SearchProvider>
+        <HelpRequestsProvider>
+          <SearchProvider>
+            <TooltipProvider>
+              <Toaster />
+              <Sonner />
+              <BrowserRouter>
+                <Routes>
+                  <Route path="/" element={<Index />} />
+                  <Route path="/upload" element={<Upload />} />
+                  <Route path="/helpdesk" element={<HelpDesk />} />
+                  <Route path="/profile" element={<Profile />} />
+                  <Route path="/profile/:userId" element={<Profile />} />
+                  <Route path="/settings" element={<Settings />} />
+                  <Route path="/ai-assistant" element={<AIAssistant />} />
+                  <Route path="/login" element={<Login />} />
+                  <Route path="/signup" element={<Signup />} />
+                  <Route 
+                    path="/campusvoice" 
+                    element={<Placeholder title="CampusVoice" description="Share your campus experiences and feedback. Coming soon!" />} 
+                  />
+                  <Route 
+                    path="/campusbuzz" 
+                    element={<Placeholder title="CampusBuzz" description="Stay updated with the latest campus news and events. Coming soon!" />} 
+                  />
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </BrowserRouter>
+            </TooltipProvider>
+          </SearchProvider>
+        </HelpRequestsProvider>
       </SavedNotesProvider>
     </UserProvider>
   </QueryClientProvider>

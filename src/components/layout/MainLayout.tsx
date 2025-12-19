@@ -1,4 +1,4 @@
-import { ReactNode, useState, useMemo } from "react";
+import { ReactNode, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { AIAssistantPanel } from "@/components/ai/AIAssistantPanel";
@@ -31,9 +31,8 @@ export function MainLayout({ children }: MainLayoutProps) {
   const navigate = useNavigate();
 
   const handleNoteSelect = (note: { id: string }) => {
-    // Navigate to note or open preview
-    console.log("Selected note:", note.id);
-    // Could navigate to /note/:id when implemented
+    // Navigate to the home page and scroll to note section, or could open modal
+    navigate(`/?noteId=${note.id}`);
   };
 
   return (
