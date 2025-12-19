@@ -24,7 +24,7 @@ import logo from "@/assets/logo.png";
 const ecosystemItems = [
   { 
     title: "CampusVoice", 
-    path: "https://campusvoice-git-main-hiral-goyals-projects.vercel.app/", 
+    path: "https://campusvoice-chi.vercel.app", 
     icon: MessageSquare,
     isExternal: true,
     isLive: true 
