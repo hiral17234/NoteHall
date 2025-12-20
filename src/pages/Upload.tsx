@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,9 +7,13 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { FileText, Image, Video, Link, Upload as UploadIcon, X, CheckCircle } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { FileText, Image, Video, Link, Upload as UploadIcon, X, CheckCircle, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+import { cloudinaryService } from "@/services/cloudinaryService";
+import { notesService } from "@/services/firestoreService";
 
 const uploadTypes = [
   { id: "pdf", label: "PDF Document", icon: FileText, accept: ".pdf" },
@@ -19,6 +24,9 @@ const uploadTypes = [
 
 export default function Upload() {
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const { userProfile } = useAuth();
+  
   const [selectedType, setSelectedType] = useState<string>("pdf");
   const [formData, setFormData] = useState({
     title: "",
@@ -29,21 +37,118 @@ export default function Upload() {
     topic: "",
     link: "",
   });
-  const [fileName, setFileName] = useState<string>("");
+  const [file, setFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setFileName(file.name);
+    const selectedFile = e.target.files?.[0];
+    if (selectedFile) {
+      // Validate file
+      const validation = cloudinaryService.validateFile(selectedFile);
+      if (!validation.valid) {
+        toast({
+          title: "Invalid file",
+          description: validation.error,
+          variant: "destructive",
+        });
+        return;
+      }
+      setFile(selectedFile);
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast({
-      title: "Note uploaded successfully!",
-      description: "Your note has been submitted for review.",
-    });
+
+    if (!userProfile) {
+      toast({
+        title: "Not logged in",
+        description: "Please login to upload notes",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!formData.title || !formData.subject || !formData.branch || !formData.year) {
+      toast({
+        title: "Missing fields",
+        description: "Please fill in all required fields",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (selectedType !== "link" && !file) {
+      toast({
+        title: "No file selected",
+        description: "Please select a file to upload",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (selectedType === "link" && !formData.link) {
+      toast({
+        title: "Missing link",
+        description: "Please enter a valid URL",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsUploading(true);
+    setUploadProgress(0);
+
+    try {
+      let fileUrl = formData.link;
+
+      // Upload file to Cloudinary if not a link
+      if (selectedType !== "link" && file) {
+        const result = await cloudinaryService.uploadFile(file, (progress) => {
+          setUploadProgress(progress);
+        });
+        fileUrl = result.secure_url;
+      }
+
+      // Create note in Firestore
+      await notesService.create({
+        title: formData.title,
+        description: formData.description,
+        subject: formData.subject,
+        branch: formData.branch,
+        year: formData.year,
+        topic: formData.topic,
+        fileType: selectedType as 'pdf' | 'image' | 'video' | 'link',
+        fileUrl: fileUrl,
+        authorId: userProfile.id,
+        authorName: userProfile.name,
+        authorUsername: userProfile.username,
+        isTrusted: false,
+      });
+
+      toast({
+        title: "Note uploaded successfully!",
+        description: "Your note has been shared with the community.",
+      });
+
+      // Reset form
+      setFormData({ title: "", description: "", subject: "", branch: "", year: "", topic: "", link: "" });
+      setFile(null);
+      setUploadProgress(0);
+      
+      // Navigate to home
+      navigate("/");
+    } catch (error) {
+      console.error("Upload error:", error);
+      toast({
+        title: "Upload failed",
+        description: error instanceof Error ? error.message : "Something went wrong",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const handleInputChange = (field: string, value: string) => {
@@ -71,7 +176,10 @@ export default function Upload() {
                   <button
                     key={type.id}
                     type="button"
-                    onClick={() => setSelectedType(type.id)}
+                    onClick={() => {
+                      setSelectedType(type.id);
+                      setFile(null);
+                    }}
                     className={cn(
                       "flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all",
                       selectedType === type.id
@@ -120,17 +228,19 @@ export default function Upload() {
                     htmlFor="file-upload"
                     className={cn(
                       "flex flex-col items-center justify-center w-full h-40 border-2 border-dashed rounded-xl cursor-pointer transition-colors",
-                      fileName
+                      file
                         ? "border-primary bg-primary/5"
                         : "border-border hover:border-primary/50 hover:bg-muted/50"
                     )}
                   >
-                    {fileName ? (
+                    {file ? (
                       <div className="flex items-center gap-3">
                         <CheckCircle className="w-8 h-8 text-primary" />
                         <div>
-                          <p className="font-medium text-foreground">{fileName}</p>
-                          <p className="text-sm text-muted-foreground">Click to change file</p>
+                          <p className="font-medium text-foreground">{file.name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {(file.size / 1024 / 1024).toFixed(2)} MB • Click to change
+                          </p>
                         </div>
                       </div>
                     ) : (
@@ -140,7 +250,7 @@ export default function Upload() {
                           Click to upload or drag and drop
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {uploadTypes.find((t) => t.id === selectedType)?.accept || "Any file"}
+                          Max size: 50MB for videos, 10MB for others
                         </p>
                       </div>
                     )}
@@ -150,14 +260,27 @@ export default function Upload() {
                       className="hidden"
                       accept={uploadTypes.find((t) => t.id === selectedType)?.accept}
                       onChange={handleFileChange}
+                      disabled={isUploading}
                     />
                   </label>
-                  {fileName && (
+                  
+                  {/* Upload Progress */}
+                  {isUploading && uploadProgress > 0 && (
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Uploading...</span>
+                        <span className="text-foreground">{uploadProgress}%</span>
+                      </div>
+                      <Progress value={uploadProgress} className="h-2" />
+                    </div>
+                  )}
+
+                  {file && !isUploading && (
                     <Button
                       type="button"
                       variant="ghost"
                       size="sm"
-                      onClick={() => setFileName("")}
+                      onClick={() => setFile(null)}
                       className="text-muted-foreground"
                     >
                       <X className="w-4 h-4 mr-1" />
@@ -185,6 +308,7 @@ export default function Upload() {
                   onChange={(e) => handleInputChange("title", e.target.value)}
                   className="bg-background"
                   required
+                  disabled={isUploading}
                 />
               </div>
 
@@ -197,6 +321,7 @@ export default function Upload() {
                   onChange={(e) => handleInputChange("description", e.target.value)}
                   className="bg-background resize-none"
                   rows={3}
+                  disabled={isUploading}
                 />
               </div>
 
@@ -206,6 +331,7 @@ export default function Upload() {
                   <Select
                     value={formData.subject}
                     onValueChange={(value) => handleInputChange("subject", value)}
+                    disabled={isUploading}
                   >
                     <SelectTrigger className="bg-background">
                       <SelectValue placeholder="Select subject" />
@@ -227,6 +353,7 @@ export default function Upload() {
                   <Select
                     value={formData.branch}
                     onValueChange={(value) => handleInputChange("branch", value)}
+                    disabled={isUploading}
                   >
                     <SelectTrigger className="bg-background">
                       <SelectValue placeholder="Select branch" />
@@ -246,6 +373,7 @@ export default function Upload() {
                   <Select
                     value={formData.year}
                     onValueChange={(value) => handleInputChange("year", value)}
+                    disabled={isUploading}
                   >
                     <SelectTrigger className="bg-background">
                       <SelectValue placeholder="Select year" />
@@ -268,6 +396,7 @@ export default function Upload() {
                   value={formData.topic}
                   onChange={(e) => handleInputChange("topic", e.target.value)}
                   className="bg-background"
+                  disabled={isUploading}
                 />
               </div>
             </CardContent>
@@ -277,9 +406,19 @@ export default function Upload() {
           <Button
             type="submit"
             className="w-full bg-primary hover:bg-primary/90 text-primary-foreground h-12 text-base"
+            disabled={isUploading}
           >
-            <UploadIcon className="w-5 h-5 mr-2" />
-            Upload Note
+            {isUploading ? (
+              <>
+                <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                Uploading...
+              </>
+            ) : (
+              <>
+                <UploadIcon className="w-5 h-5 mr-2" />
+                Upload Note
+              </>
+            )}
           </Button>
         </form>
       </div>
