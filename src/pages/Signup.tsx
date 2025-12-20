@@ -7,11 +7,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
-import { authService } from "@/services/authService";
-import { useUser } from "@/contexts/UserContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { Eye, EyeOff, Loader2, Check, X } from "lucide-react";
 import { OnboardingDialog } from "@/components/onboarding/OnboardingDialog";
 import logo from "@/assets/logo.png";
+import { usersService } from "@/services/firestoreService";
 
 // Email validation regex
 const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
@@ -35,20 +35,18 @@ const getPasswordStrength = (password: string): { score: number; label: string; 
 export default function Signup() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { setUser } = useUser();
+  const { signUp, loginWithGoogle, loginWithGitHub, needsOnboarding } = useAuth();
   
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
   const [checkingUsername, setCheckingUsername] = useState(false);
-  const [newUserId, setNewUserId] = useState<string>("");
   
   const [formData, setFormData] = useState({
     name: "",
     username: "",
     email: "",
-    phone: "",
     password: "",
     confirmPassword: "",
   });
@@ -81,8 +79,12 @@ export default function Signup() {
       return;
     }
     setCheckingUsername(true);
-    const available = await authService.checkUsernameAvailable(username);
-    setUsernameAvailable(available);
+    try {
+      const existingUser = await usersService.getByUsername(username);
+      setUsernameAvailable(!existingUser);
+    } catch (error) {
+      setUsernameAvailable(null);
+    }
     setCheckingUsername(false);
   };
 
@@ -124,7 +126,7 @@ export default function Signup() {
       return;
     }
 
-    if (!usernameAvailable) {
+    if (usernameAvailable === false) {
       toast({
         title: "Username unavailable",
         description: "Please choose a different username",
@@ -136,13 +138,12 @@ export default function Signup() {
     setIsLoading(true);
 
     try {
-      const { user, error } = await authService.signUp({
-        name: formData.name,
-        username: formData.username,
-        email: formData.email,
-        phone: formData.phone,
-        password: formData.password,
-      });
+      const { error } = await signUp(
+        formData.email,
+        formData.password,
+        formData.name,
+        formData.username
+      );
 
       if (error) {
         toast({
@@ -153,41 +154,8 @@ export default function Signup() {
         return;
       }
 
-      if (user) {
-        setNewUserId(user.id);
-        setUser({
-          id: user.id,
-          name: user.name,
-          username: user.username,
-          email: user.email,
-          phone: user.phone || "",
-          bio: "New to NoteHall! 🚀",
-          college: "",
-          branch: "",
-          year: "",
-          degree: "btech",
-          avatar: "",
-          github: "",
-          linkedin: "",
-          portfolio: "",
-          instagram: "",
-          twitter: "",
-          streak: 0,
-          lastActiveDate: new Date().toISOString(),
-          isActive: true,
-          stats: {
-            uploads: 0,
-            totalLikes: 0,
-            totalViews: 0,
-            helpedRequests: 0,
-            contributionScore: 0,
-          },
-          badges: [],
-        });
-
-        // Show onboarding dialog
-        setShowOnboarding(true);
-      }
+      // Show onboarding dialog
+      setShowOnboarding(true);
     } catch (error) {
       toast({
         title: "Error",
@@ -207,32 +175,15 @@ export default function Signup() {
   const handleGoogleSignup = async () => {
     setIsLoading(true);
     try {
-      const { user } = await authService.loginWithGoogle();
-      if (user) {
-        setUser({
-          id: user.id,
-          name: user.name,
-          username: user.username,
-          email: user.email,
-          phone: "",
-          bio: "Signed up with Google 🚀",
-          college: "",
-          branch: "",
-          year: "",
-          degree: "btech",
-          avatar: "",
-          github: "",
-          linkedin: "",
-          portfolio: "",
-          instagram: "",
-          twitter: "",
-          streak: 0,
-          lastActiveDate: new Date().toISOString(),
-          isActive: true,
-          stats: { uploads: 0, totalLikes: 0, totalViews: 0, helpedRequests: 0, contributionScore: 0 },
-          badges: [],
-        });
+      const { error, needsOnboarding } = await loginWithGoogle();
+      if (error) {
+        toast({ title: "Error", description: error, variant: "destructive" });
+        return;
+      }
+      if (needsOnboarding) {
         setShowOnboarding(true);
+      } else {
+        navigate("/");
       }
     } catch (error) {
       toast({ title: "Error", description: "Google signup failed", variant: "destructive" });
@@ -244,32 +195,15 @@ export default function Signup() {
   const handleGitHubSignup = async () => {
     setIsLoading(true);
     try {
-      const { user } = await authService.loginWithGitHub();
-      if (user) {
-        setUser({
-          id: user.id,
-          name: user.name,
-          username: user.username,
-          email: user.email,
-          phone: "",
-          bio: "Signed up with GitHub 🚀",
-          college: "",
-          branch: "",
-          year: "",
-          degree: "btech",
-          avatar: "",
-          github: user.username,
-          linkedin: "",
-          portfolio: "",
-          instagram: "",
-          twitter: "",
-          streak: 0,
-          lastActiveDate: new Date().toISOString(),
-          isActive: true,
-          stats: { uploads: 0, totalLikes: 0, totalViews: 0, helpedRequests: 0, contributionScore: 0 },
-          badges: [],
-        });
+      const { error, needsOnboarding } = await loginWithGitHub();
+      if (error) {
+        toast({ title: "Error", description: error, variant: "destructive" });
+        return;
+      }
+      if (needsOnboarding) {
         setShowOnboarding(true);
+      } else {
+        navigate("/");
       }
     } catch (error) {
       toast({ title: "Error", description: "GitHub signup failed", variant: "destructive" });
@@ -350,17 +284,6 @@ export default function Signup() {
                 {errors.email && (
                   <p className="text-xs text-destructive">{errors.email}</p>
                 )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="phone">Phone Number</Label>
-                <Input
-                  id="phone"
-                  placeholder="+91 9876543210"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  disabled={isLoading}
-                />
               </div>
               
               <div className="space-y-2">
