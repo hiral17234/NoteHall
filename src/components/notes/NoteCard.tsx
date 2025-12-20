@@ -37,14 +37,17 @@ interface NoteCardProps {
     branch: string;
     year: string;
     fileType: "pdf" | "image" | "video" | "link";
+    fileUrl?: string;
     likes: number;
     dislikes: number;
     views: number;
     author: string;
+    authorId?: string;
     timestamp: string;
     topic?: string;
     difficulty?: "easy" | "medium" | "hard";
     rating?: number;
+    likedBy?: string[];
   };
   onAskAI?: () => void;
   onExpand?: () => void;
@@ -177,6 +180,17 @@ export function NoteCard({ note, onAskAI, onExpand }: NoteCardProps) {
   };
 
   const handleDownload = () => {
+    // Actually download the file if URL exists
+    if (note.fileUrl) {
+      const link = document.createElement('a');
+      link.href = note.fileUrl;
+      link.download = note.title || 'download';
+      link.target = '_blank';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+    
     // Store in downloaded notes
     const downloadedNotes = JSON.parse(localStorage.getItem("notehall_downloaded_notes") || "[]");
     if (!downloadedNotes.some((n: any) => n.id === note.id)) {
@@ -184,6 +198,7 @@ export function NoteCard({ note, onAskAI, onExpand }: NoteCardProps) {
         id: note.id,
         title: note.title,
         subject: note.subject,
+        fileUrl: note.fileUrl,
         downloadedAt: new Date().toISOString(),
       });
       localStorage.setItem("notehall_downloaded_notes", JSON.stringify(downloadedNotes));
@@ -191,7 +206,7 @@ export function NoteCard({ note, onAskAI, onExpand }: NoteCardProps) {
     
     toast({
       title: "Download started",
-      description: "Your file will be downloaded shortly. Check 'Downloaded Content' in your profile.",
+      description: note.fileUrl ? "Your file is downloading" : "No file URL available",
     });
   };
 
