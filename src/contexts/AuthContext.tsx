@@ -376,7 +376,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 export function useAuth() {
   const context = useContext(AuthContext);
   if (!context) {
-    throw new Error("useAuth must be used within an AuthProvider");
+    // Fallback to prevent a blank screen if something mounts outside the provider.
+    // This also helps us diagnose issues without crashing the whole app.
+    if (import.meta.env.DEV) {
+      console.error("useAuth was called outside of AuthProvider");
+    }
+
+    const fallback: AuthContextType = {
+      firebaseUser: null,
+      userProfile: null,
+      isAuthenticated: false,
+      isLoading: false,
+      needsOnboarding: false,
+      signUp: async () => ({ error: "Auth not ready" }),
+      login: async () => ({ error: "Auth not ready" }),
+      loginWithGoogle: async () => ({ error: "Auth not ready" }),
+      loginWithGitHub: async () => ({ error: "Auth not ready" }),
+      logout: async () => {},
+      resetPassword: async () => ({ error: "Auth not ready" }),
+      updateUserProfile: async () => {},
+      completeOnboarding: async () => {},
+      refreshUserProfile: async () => {},
+    };
+
+    return fallback;
   }
   return context;
 }
