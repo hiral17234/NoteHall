@@ -12,23 +12,14 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Plus, FileText, Image, Video, Clock, CheckCircle2, TrendingUp, Users } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { TopContributors } from "@/components/helpdesk/TopContributors";
 import { useNavigate } from "react-router-dom";
-import { useHelpRequests } from "@/contexts/HelpRequestsContext";
-
-const requestTypes = [
-  { id: "pdf", label: "PDF", icon: FileText },
-  { id: "image", label: "Image", icon: Image },
-  { id: "video", label: "Video", icon: Video },
-];
+import { useHelpRequests, HelpRequest } from "@/contexts/HelpRequestsContext";
 
 export default function HelpDesk() {
   const navigate = useNavigate();
-  const { requests, addRequest } = useHelpRequests();
+  const { requests, loading, addRequest } = useHelpRequests();
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [selectedType, setSelectedType] = useState<"pdf" | "image" | "video">("pdf");
-  const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -37,31 +28,43 @@ export default function HelpDesk() {
     year: "",
   });
 
-  // Simulate loading
-  useEffect(() => {
-    const timer = setTimeout(() => setLoading(false), 1000);
-    return () => clearTimeout(timer);
-  }, []);
+  const openRequests = requests.filter((r) => r.status === "open" || r.status === "in_progress");
+  const fulfilledRequests = requests.filter((r) => r.status === "fulfilled" || r.status === "closed");
 
-  const openRequests = requests.filter((r) => r.status === "open" || r.status === "urgent");
-  const fulfilledRequests = requests.filter((r) => r.status === "fulfilled");
-  const urgentCount = requests.filter((r) => r.status === "urgent").length;
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    addRequest({
+    await addRequest({
       title: formData.title,
       description: formData.description,
       subject: formData.subject.toUpperCase(),
       branch: formData.branch.toUpperCase(),
       year: formData.year === "1" ? "1st Year" : formData.year === "2" ? "2nd Year" : formData.year === "3" ? "3rd Year" : "4th Year",
-      requestType: selectedType,
     });
     
     setDialogOpen(false);
     setFormData({ title: "", description: "", subject: "", branch: "", year: "" });
   };
+
+  // Transform HelpRequest to RequestCard format
+  const transformRequest = (request: HelpRequest) => ({
+    id: request.id,
+    title: request.title,
+    description: request.description,
+    subject: request.subject,
+    branch: request.branch,
+    year: request.year,
+    requestType: "pdf" as const, // Default type since we removed it from the model
+    status: request.status === "in_progress" ? "open" as const : 
+            request.status === "closed" ? "fulfilled" as const : 
+            request.status as "open" | "fulfilled" | "urgent",
+    requestedBy: request.requesterName,
+    requestedById: request.requesterId,
+    timestamp: request.createdAt?.toDate?.()?.toLocaleDateString() || "Recently",
+    helpersCount: request.contributionsCount,
+    likes: 0,
+    comments: 0,
+  });
 
   return (
     <MainLayout>
@@ -87,28 +90,6 @@ export default function HelpDesk() {
                 </DialogDescription>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4 mt-4">
-                <div className="space-y-2">
-                  <Label>What do you need?</Label>
-                  <div className="flex gap-2">
-                    {requestTypes.map((type) => (
-                      <button
-                        key={type.id}
-                        type="button"
-                        onClick={() => setSelectedType(type.id as "pdf" | "image" | "video")}
-                        className={cn(
-                          "flex items-center gap-2 px-4 py-2 rounded-lg border transition-all flex-1 justify-center",
-                          selectedType === type.id
-                            ? "border-primary bg-primary/10 text-primary"
-                            : "border-border hover:border-primary/50"
-                        )}
-                      >
-                        <type.icon className="w-4 h-4" />
-                        <span className="text-sm font-medium">{type.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
                 <div className="space-y-2">
                   <Label htmlFor="req-title">Title *</Label>
                   <Input
@@ -216,8 +197,8 @@ export default function HelpDesk() {
           <Card className="bg-card border-border">
             <CardContent className="pt-4 text-center">
               <Users className="w-6 h-6 mx-auto text-chart-2 mb-2" />
-              <p className="text-2xl font-bold text-foreground">156</p>
-              <p className="text-xs text-muted-foreground">Helpers</p>
+              <p className="text-2xl font-bold text-foreground">{requests.reduce((acc, r) => acc + r.contributionsCount, 0)}</p>
+              <p className="text-xs text-muted-foreground">Contributions</p>
             </CardContent>
           </Card>
         </div>
@@ -228,11 +209,6 @@ export default function HelpDesk() {
             <TabsTrigger value="open" className="gap-1.5 data-[state=active]:bg-card">
               <Clock className="w-4 h-4" />
               Open ({openRequests.length})
-              {urgentCount > 0 && (
-                <span className="ml-1 w-5 h-5 rounded-full bg-destructive text-destructive-foreground text-xs flex items-center justify-center">
-                  {urgentCount}
-                </span>
-              )}
             </TabsTrigger>
             <TabsTrigger value="fulfilled" className="gap-1.5 data-[state=active]:bg-card">
               <CheckCircle2 className="w-4 h-4" />
@@ -249,10 +225,14 @@ export default function HelpDesk() {
               </>
             ) : openRequests.length > 0 ? (
               openRequests.map((request) => (
-                <RequestCard key={request.id} request={request} />
+                <RequestCard key={request.id} request={transformRequest(request)} />
               ))
             ) : (
-              <EmptyState type="requests" />
+              <EmptyState 
+                type="requests" 
+                title="No open requests"
+                description="Create a request to get help from your peers!"
+              />
             )}
           </TabsContent>
 
@@ -264,7 +244,7 @@ export default function HelpDesk() {
               </>
             ) : fulfilledRequests.length > 0 ? (
               fulfilledRequests.map((request) => (
-                <RequestCard key={request.id} request={request} />
+                <RequestCard key={request.id} request={transformRequest(request)} />
               ))
             ) : (
               <EmptyState 
