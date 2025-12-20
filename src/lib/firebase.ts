@@ -3,87 +3,66 @@ import { getAuth, GoogleAuthProvider, GithubAuthProvider, Auth } from 'firebase/
 import { getFirestore, serverTimestamp, Firestore } from 'firebase/firestore';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
 
-// Required environment variable keys
-const requiredEnvKeys = [
-  'VITE_FIREBASE_API_KEY',
-  'VITE_FIREBASE_AUTH_DOMAIN',
-  'VITE_FIREBASE_PROJECT_ID',
-  'VITE_FIREBASE_STORAGE_BUCKET',
-  'VITE_FIREBASE_MESSAGING_SENDER_ID',
-  'VITE_FIREBASE_APP_ID',
-] as const;
+/**
+ * 🔑 FALLBACK CONFIG (CampusVoice-style)
+ * Used when environment variables are NOT available (Lovable preview)
+ */
+const fallbackFirebaseConfig = {
+  apiKey: "AIzaSyAkALFSr--NzXKrnVXgQC0_O6tqYHl5-pw",
+  authDomain: "notehall-6ab8b.firebaseapp.com",
+  projectId: "notehall-6ab8b",
+  storageBucket: "notehall-6ab8b.firebasestorage.app",
+  messagingSenderId: "464597920358",
+  appId: "1:464597920358:web:e2fd6288ae868257b0dba7",
+};
 
-// Validate environment variables
-function validateFirebaseConfig(): { isValid: boolean; missingKeys: string[] } {
-  const missingKeys: string[] = [];
-  
-  for (const key of requiredEnvKeys) {
-    const value = import.meta.env[key];
-    if (!value || typeof value !== 'string' || value.trim() === '') {
-      missingKeys.push(key);
-    }
-  }
-  
-  return {
-    isValid: missingKeys.length === 0,
-    missingKeys,
-  };
-}
+/**
+ * 🧠 HYBRID CONFIG
+ * Uses env vars if present, otherwise falls back safely
+ */
+const firebaseConfig = {
+  apiKey:
+    import.meta.env.VITE_FIREBASE_API_KEY ||
+    fallbackFirebaseConfig.apiKey,
 
-// Check config validity
-const configValidation = validateFirebaseConfig();
+  authDomain:
+    import.meta.env.VITE_FIREBASE_AUTH_DOMAIN ||
+    fallbackFirebaseConfig.authDomain,
 
-// Log clear error if config is invalid
-if (!configValidation.isValid) {
-  console.error(
-    '🔥 Firebase Configuration Error:\n' +
-    'The following required environment variables are missing or empty:\n' +
-    configValidation.missingKeys.map(key => `  - ${key}`).join('\n') +
-    '\n\nTo fix this:\n' +
-    '1. Go to Lovable → Settings → Secrets\n' +
-    '2. Add each missing secret with values from your Firebase Console\n' +
-    '3. Redeploy the application'
-  );
-}
+  projectId:
+    import.meta.env.VITE_FIREBASE_PROJECT_ID ||
+    fallbackFirebaseConfig.projectId,
 
-// Export configuration status
-export const firebaseReady = configValidation.isValid;
-export const firebaseMissingKeys = configValidation.missingKeys;
+  storageBucket:
+    import.meta.env.VITE_FIREBASE_STORAGE_BUCKET ||
+    fallbackFirebaseConfig.storageBucket,
 
-// Initialize Firebase only if config is valid
-let app: FirebaseApp | null = null;
-let auth: Auth | null = null;
-let db: Firestore | null = null;
-let storage: FirebaseStorage | null = null;
-let googleProvider: GoogleAuthProvider | null = null;
-let githubProvider: GithubAuthProvider | null = null;
+  messagingSenderId:
+    import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID ||
+    fallbackFirebaseConfig.messagingSenderId,
 
-if (firebaseReady) {
-  const firebaseConfig = {
-    apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-    appId: import.meta.env.VITE_FIREBASE_APP_ID,
-  };
+  appId:
+    import.meta.env.VITE_FIREBASE_APP_ID ||
+    fallbackFirebaseConfig.appId,
+};
 
-  // Initialize Firebase
-  app = initializeApp(firebaseConfig);
+/**
+ * 🚀 INITIALIZE FIREBASE (NO CRASH, NO BLOCK)
+ */
+const app: FirebaseApp = initializeApp(firebaseConfig);
 
-  // Initialize services
-  auth = getAuth(app);
-  db = getFirestore(app);
-  storage = getStorage(app);
+// Services
+const auth: Auth = getAuth(app);
+const db: Firestore = getFirestore(app);
+const storage: FirebaseStorage = getStorage(app);
 
-  // Auth providers
-  googleProvider = new GoogleAuthProvider();
-  githubProvider = new GithubAuthProvider();
-}
+// Auth providers
+const googleProvider = new GoogleAuthProvider();
+const githubProvider = new GithubAuthProvider();
 
-// Helper for server timestamp
+// Timestamp helper
 export const getServerTimestamp = () => serverTimestamp();
 
-// Export with type assertions for when Firebase is ready
+// Exports
 export { app, auth, db, storage, googleProvider, githubProvider };
 export default app;
