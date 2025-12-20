@@ -46,12 +46,15 @@ export default function Index() {
     branch: note.branch,
     year: note.year,
     fileType: note.fileType,
+    fileUrl: note.fileUrl,
     likes: note.likes,
     dislikes: note.dislikes,
     views: note.views,
     author: note.authorName,
+    authorId: note.authorId,
     timestamp: note.createdAt?.toDate?.()?.toLocaleDateString() || "Recently",
     topic: note.topic,
+    likedBy: note.likedBy || [],
   });
 
   const filteredNotes = notes.filter((note) => {

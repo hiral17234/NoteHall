@@ -81,9 +81,12 @@ export default function Signup() {
     setCheckingUsername(true);
     try {
       const existingUser = await usersService.getByUsername(username);
-      setUsernameAvailable(!existingUser);
+      // null means no user found, so username is available
+      setUsernameAvailable(existingUser === null);
     } catch (error) {
-      setUsernameAvailable(null);
+      // On error, assume username is available to not block signup
+      console.error('Username check error:', error);
+      setUsernameAvailable(true);
     }
     setCheckingUsername(false);
   };

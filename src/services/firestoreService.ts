@@ -14,9 +14,9 @@ import {
   increment,
   arrayUnion,
   arrayRemove,
-  Timestamp
 } from 'firebase/firestore';
 import { db, getServerTimestamp } from '@/lib/firebase';
+import { createNotification } from '@/services/notificationService';
 
 // ==================== NOTES ====================
 export interface Note {
@@ -92,26 +92,49 @@ export const notesService = {
     await updateDoc(docRef, { views: increment(1) });
   },
 
-  async toggleLike(noteId: string, userId: string, isLiked: boolean): Promise<void> {
-    const docRef = doc(db, 'notes', noteId);
-    if (isLiked) {
-      await updateDoc(docRef, {
+  async toggleLike(noteId: string, userId: string, userName: string, isCurrentlyLiked: boolean): Promise<void> {
+    const noteRef = doc(db, 'notes', noteId);
+    const noteSnap = await getDoc(noteRef);
+    
+    if (!noteSnap.exists()) return;
+    
+    const note = noteSnap.data() as Note;
+    
+    if (isCurrentlyLiked) {
+      await updateDoc(noteRef, {
         likes: increment(-1),
         likedBy: arrayRemove(userId),
       });
     } else {
-      await updateDoc(docRef, {
+      await updateDoc(noteRef, {
         likes: increment(1),
         likedBy: arrayUnion(userId),
       });
+      
+      // Send notification to note author
+      if (note.authorId !== userId) {
+        await createNotification.like(note.authorId, userId, userName, note.title, noteId);
+      }
+      
+      // Update author's total likes
+      await updateDoc(doc(db, 'users', note.authorId), {
+        'stats.totalLikes': increment(1),
+      });
     }
+  },
+
+  async isLikedByUser(noteId: string, userId: string): Promise<boolean> {
+    const noteRef = doc(db, 'notes', noteId);
+    const noteSnap = await getDoc(noteRef);
+    if (!noteSnap.exists()) return false;
+    const note = noteSnap.data() as Note;
+    return note.likedBy?.includes(userId) || false;
   },
 
   async saveNote(noteId: string, userId: string): Promise<void> {
     const docRef = doc(db, 'notes', noteId);
     await updateDoc(docRef, { savedBy: arrayUnion(userId) });
     
-    // Also save to user's savedNotes collection
     await setDoc(doc(db, 'users', userId, 'savedNotes', noteId), {
       noteId,
       savedAt: getServerTimestamp(),
@@ -122,6 +145,11 @@ export const notesService = {
     const docRef = doc(db, 'notes', noteId);
     await updateDoc(docRef, { savedBy: arrayRemove(userId) });
     await deleteDoc(doc(db, 'users', userId, 'savedNotes', noteId));
+  },
+
+  async isSavedByUser(noteId: string, userId: string): Promise<boolean> {
+    const savedDoc = await getDoc(doc(db, 'users', userId, 'savedNotes', noteId));
+    return savedDoc.exists();
   },
 
   async getSavedNotes(userId: string): Promise<Note[]> {
@@ -138,8 +166,23 @@ export const notesService = {
     return notes;
   },
 
+  async downloadNote(noteId: string, userId: string, note: { title: string; subject: string; fileUrl: string }): Promise<void> {
+    // Save to user's downloaded notes
+    await setDoc(doc(db, 'users', userId, 'downloadedNotes', noteId), {
+      noteId,
+      title: note.title,
+      subject: note.subject,
+      fileUrl: note.fileUrl,
+      downloadedAt: getServerTimestamp(),
+    });
+  },
+
+  async getDownloadedNotes(userId: string): Promise<Array<{ noteId: string; title: string; subject: string; fileUrl: string; downloadedAt: any }>> {
+    const downloadedDocsSnap = await getDocs(collection(db, 'users', userId, 'downloadedNotes'));
+    return downloadedDocsSnap.docs.map(d => ({ noteId: d.id, ...d.data() } as any));
+  },
+
   async rateNote(noteId: string, userId: string, rating: number, difficulty: 'easy' | 'medium' | 'hard'): Promise<void> {
-    // Save user's rating
     await setDoc(doc(db, 'ratings', `${noteId}_${userId}`), {
       noteId,
       userId,
@@ -148,7 +191,6 @@ export const notesService = {
       createdAt: getServerTimestamp(),
     });
 
-    // Update note's aggregate ratings
     const noteRef = doc(db, 'notes', noteId);
     const noteSnap = await getDoc(noteRef);
     
@@ -169,17 +211,16 @@ export const notesService = {
   },
 
   async search(searchQuery: string): Promise<Note[]> {
-    // Simple client-side search - for production use Algolia or similar
     const allNotes = await this.getAll();
-    const query = searchQuery.toLowerCase();
+    const q = searchQuery.toLowerCase();
     
     return allNotes.filter(note => 
-      note.title.toLowerCase().includes(query) ||
-      note.subject.toLowerCase().includes(query) ||
-      note.authorName.toLowerCase().includes(query) ||
-      note.authorUsername.toLowerCase().includes(query) ||
-      note.topic?.toLowerCase().includes(query) ||
-      note.branch.toLowerCase().includes(query)
+      note.title.toLowerCase().includes(q) ||
+      note.subject.toLowerCase().includes(q) ||
+      note.authorName.toLowerCase().includes(q) ||
+      note.authorUsername.toLowerCase().includes(q) ||
+      note.topic?.toLowerCase().includes(q) ||
+      note.branch.toLowerCase().includes(q)
     );
   },
 };
@@ -227,10 +268,19 @@ export const helpRequestsService = {
   },
 
   async updateStatus(requestId: string, status: HelpRequest['status']): Promise<void> {
-    await updateDoc(doc(db, 'requests', requestId), {
+    const requestRef = doc(db, 'requests', requestId);
+    const requestSnap = await getDoc(requestRef);
+    
+    await updateDoc(requestRef, {
       status,
       updatedAt: getServerTimestamp(),
     });
+    
+    // Notify requester when fulfilled
+    if (status === 'fulfilled' && requestSnap.exists()) {
+      const request = requestSnap.data() as HelpRequest;
+      await createNotification.requestFulfilled(request.requesterId, request.title, requestId);
+    }
   },
 
   async incrementContributions(requestId: string): Promise<void> {
@@ -282,6 +332,20 @@ export const contributionsService = {
       'stats.contributionScore': increment(5),
       updatedAt: getServerTimestamp(),
     });
+    
+    // Notify the requester
+    const requestRef = doc(db, 'requests', data.requestId);
+    const requestSnap = await getDoc(requestRef);
+    if (requestSnap.exists()) {
+      const request = requestSnap.data() as HelpRequest;
+      await createNotification.contribution(
+        request.requesterId, 
+        data.contributorId, 
+        data.contributorName, 
+        request.title, 
+        data.requestId
+      );
+    }
     
     return docRef.id;
   },
@@ -337,7 +401,6 @@ export const achievementsService = {
   },
 
   getActiveAchievement(stats: { uploads: number; helpedRequests: number; totalLikes: number; totalViews: number }, streak: number): Achievement | null {
-    // Find the next achievement to unlock (closest to completion)
     let closest: { achievement: Achievement; progress: number } | null = null;
     
     ACHIEVEMENTS.forEach(achievement => {
@@ -371,21 +434,37 @@ export const usersService = {
   },
 
   async getByUsername(username: string): Promise<any | null> {
-    const q = query(collection(db, 'users'), where('username', '==', username), limit(1));
-    const snapshot = await getDocs(q);
-    return snapshot.empty ? null : { id: snapshot.docs[0].id, ...snapshot.docs[0].data() };
+    if (!username || username.length < 3) return null;
+    
+    try {
+      const q = query(collection(db, 'users'), where('username', '==', username), limit(1));
+      const snapshot = await getDocs(q);
+      return snapshot.empty ? null : { id: snapshot.docs[0].id, ...snapshot.docs[0].data() };
+    } catch (error) {
+      console.error('Error checking username:', error);
+      return null;
+    }
   },
 
   async search(searchQuery: string): Promise<any[]> {
-    // Search by username or name
     const allUsersSnap = await getDocs(collection(db, 'users'));
-    const query = searchQuery.toLowerCase();
+    const q = searchQuery.toLowerCase();
     
     return allUsersSnap.docs
       .map(doc => ({ id: doc.id, ...doc.data() }))
       .filter((user: any) => 
-        user.username?.toLowerCase().includes(query) ||
-        user.name?.toLowerCase().includes(query)
+        user.username?.toLowerCase().includes(q) ||
+        user.name?.toLowerCase().includes(q)
       );
+  },
+
+  async getTopContributors(limitCount: number = 5): Promise<any[]> {
+    const q = query(
+      collection(db, 'users'), 
+      orderBy('stats.contributionScore', 'desc'), 
+      limit(limitCount)
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
   },
 };

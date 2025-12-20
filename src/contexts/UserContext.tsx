@@ -2,7 +2,6 @@ import { createContext, useContext, useState, useEffect, ReactNode, useCallback 
 import { notificationService, Notification } from "@/services/notificationService";
 import { useAuth, UserProfile } from "@/contexts/AuthContext";
 
-// Re-export UserProfile from AuthContext for backwards compatibility
 export type { UserProfile } from "@/contexts/AuthContext";
 
 export interface UserPreferences {
@@ -24,7 +23,6 @@ export interface PrivacySettings {
 }
 
 interface UserContextType {
-  // User - synced from AuthContext
   user: UserProfile | null;
   isAuthenticated: boolean;
   isLoading: boolean;
@@ -32,22 +30,18 @@ interface UserContextType {
   setUser: (user: UserProfile | null) => void;
   isOwner: (profileId: string) => boolean;
   
-  // Preferences
   preferences: UserPreferences;
   updatePreferences: (updates: Partial<UserPreferences>) => void;
   
-  // Privacy
   privacy: PrivacySettings;
   updatePrivacy: (updates: Partial<PrivacySettings>) => void;
   
-  // Notifications
   notifications: Notification[];
   unreadCount: number;
   markNotificationAsRead: (id: string) => void;
   markAllNotificationsAsRead: () => void;
   addNotification: (notification: Omit<Notification, "id" | "createdAt" | "read">) => void;
   
-  // Auth actions
   logout: () => void;
   softDeleteAccount: () => void;
 }
@@ -78,7 +72,6 @@ const STORAGE_KEYS = {
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
 export function UserProvider({ children }: { children: ReactNode }) {
-  // Sync user from AuthContext - this is the single source of truth
   const { userProfile, isAuthenticated: authIsAuthenticated, isLoading: authIsLoading, updateUserProfile, logout: authLogout } = useAuth();
   
   const [preferences, setPreferences] = useState<UserPreferences>(defaultPreferences);
@@ -86,34 +79,42 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Initialize preferences and privacy from localStorage
+  // Initialize preferences from localStorage
   useEffect(() => {
-    const initializeSettings = async () => {
-      try {
-        // Load preferences
-        const storedPrefs = localStorage.getItem(STORAGE_KEYS.PREFERENCES);
-        if (storedPrefs) {
-          setPreferences(JSON.parse(storedPrefs));
-        }
-
-        // Load privacy
-        const storedPrivacy = localStorage.getItem(STORAGE_KEYS.PRIVACY);
-        if (storedPrivacy) {
-          setPrivacy(JSON.parse(storedPrivacy));
-        }
-
-        // Load notifications
-        const notifs = await notificationService.initialize();
-        setNotifications(notifs);
-      } catch (error) {
-        console.error("Error initializing settings:", error);
-      } finally {
-        setIsLoading(false);
+    try {
+      const storedPrefs = localStorage.getItem(STORAGE_KEYS.PREFERENCES);
+      if (storedPrefs) {
+        setPreferences(JSON.parse(storedPrefs));
       }
-    };
 
-    initializeSettings();
+      const storedPrivacy = localStorage.getItem(STORAGE_KEYS.PRIVACY);
+      if (storedPrivacy) {
+        setPrivacy(JSON.parse(storedPrivacy));
+      }
+    } catch (error) {
+      console.error("Error initializing settings:", error);
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
+
+  // Subscribe to real-time notifications when user is authenticated
+  useEffect(() => {
+    if (!userProfile?.id) {
+      setNotifications([]);
+      return;
+    }
+
+    // Subscribe to real-time notifications from Firestore
+    const unsubscribe = notificationService.subscribeToNotifications(
+      userProfile.id,
+      (newNotifications) => {
+        setNotifications(newNotifications);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [userProfile?.id]);
 
   // Apply theme
   useEffect(() => {
@@ -151,12 +152,10 @@ export function UserProvider({ children }: { children: ReactNode }) {
   }, [preferences.compactMode]);
 
   const updateUser = useCallback((updates: Partial<UserProfile>) => {
-    // Delegate to AuthContext
     updateUserProfile(updates);
   }, [updateUserProfile]);
 
   const setUser = useCallback((_newUser: UserProfile | null) => {
-    // This is now managed by AuthContext - no-op for backwards compatibility
     console.warn("setUser is deprecated, user state is managed by AuthContext");
   }, []);
 
@@ -186,13 +185,14 @@ export function UserProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const markAllNotificationsAsRead = useCallback(async () => {
-    await notificationService.markAllAsRead();
+    if (!userProfile?.id) return;
+    await notificationService.markAllAsRead(userProfile.id);
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-  }, []);
+  }, [userProfile?.id]);
 
   const addNotification = useCallback(async (notification: Omit<Notification, "id" | "createdAt" | "read">) => {
-    const newNotif = await notificationService.addNotification(notification);
-    setNotifications(prev => [newNotif, ...prev]);
+    // Notifications are now created via createNotification helpers and received via subscription
+    await notificationService.create(notification);
   }, []);
 
   const logout = useCallback(() => {
@@ -200,7 +200,6 @@ export function UserProvider({ children }: { children: ReactNode }) {
   }, [authLogout]);
 
   const softDeleteAccount = useCallback(() => {
-    // This would need proper implementation with Firebase
     console.warn("softDeleteAccount not yet implemented with Firebase");
   }, []);
 
@@ -241,6 +240,5 @@ export function useUser() {
   return context;
 }
 
-// Backwards compatibility with old ProfileContext
 export const useProfile = useUser;
 export const ProfileProvider = UserProvider;

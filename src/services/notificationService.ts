@@ -1,14 +1,31 @@
-// Notification Service - Handles all notification-related operations
-// TODO: Replace with real-time WebSocket/API when backend is ready
+// Real-time Notification Service using Firestore
+import { 
+  collection, 
+  query, 
+  where, 
+  orderBy, 
+  onSnapshot, 
+  addDoc, 
+  updateDoc, 
+  deleteDoc,
+  doc,
+  getDocs,
+  writeBatch
+} from 'firebase/firestore';
+import { db, getServerTimestamp } from '@/lib/firebase';
 
 export interface Notification {
   id: string;
-  type: "like" | "comment" | "reply" | "help_contribution" | "request_fulfilled" | "mention" | "system";
+  type: 'like' | 'comment' | 'reply' | 'help_contribution' | 'request_fulfilled' | 'mention' | 'general' | 'system';
   title: string;
   message: string;
   read: boolean;
-  createdAt: string;
+  createdAt: any;
+  toUserId: string;
+  fromUserId?: string;
+  fromUserName?: string;
   actionUrl?: string;
+  relatedId?: string;
   fromUser?: {
     id: string;
     name: string;
@@ -16,178 +33,147 @@ export interface Notification {
   };
 }
 
-const STORAGE_KEY = "notehall_notifications";
-
-// Mock delay to simulate API calls
-const mockDelay = (ms: number = 200) => new Promise(resolve => setTimeout(resolve, ms));
-
-// Get notifications from storage
-const getStoredNotifications = (): Notification[] => {
-  const stored = localStorage.getItem(STORAGE_KEY);
-  return stored ? JSON.parse(stored) : [];
-};
-
-// Save notifications to storage
-const saveNotifications = (notifications: Notification[]) => {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(notifications));
-};
-
-// Generate mock notifications for demo
-const generateMockNotifications = (): Notification[] => {
-  return [
-    {
-      id: "1",
-      type: "like",
-      title: "New Like",
-      message: "Priya Sharma liked your note 'DSA Complete Notes'",
-      read: false,
-      createdAt: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
-      actionUrl: "/profile",
-      fromUser: { id: "user-2", name: "Priya Sharma" },
-    },
-    {
-      id: "2",
-      type: "help_contribution",
-      title: "Help Contribution",
-      message: "Amit Kumar uploaded a PDF for your DBMS request",
-      read: false,
-      createdAt: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
-      actionUrl: "/helpdesk",
-      fromUser: { id: "user-3", name: "Amit Kumar" },
-    },
-    {
-      id: "3",
-      type: "reply",
-      title: "New Reply",
-      message: "Sneha replied to your comment on 'OS Notes'",
-      read: false,
-      createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-      actionUrl: "/",
-      fromUser: { id: "user-4", name: "Sneha Gupta" },
-    },
-    {
-      id: "4",
-      type: "request_fulfilled",
-      title: "Request Fulfilled",
-      message: "Your request for 'CN Diagrams' has been fulfilled!",
-      read: true,
-      createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-      actionUrl: "/helpdesk",
-    },
-    {
-      id: "5",
-      type: "system",
-      title: "Welcome to NoteHall!",
-      message: "Start sharing notes and helping others 🚀",
-      read: true,
-      createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-    },
-  ];
-};
-
 export const notificationService = {
-  // Initialize notifications (called on app start)
-  async initialize(): Promise<Notification[]> {
-    await mockDelay();
-    let notifications = getStoredNotifications();
-    
-    // If no notifications, generate mock ones
-    if (notifications.length === 0) {
-      notifications = generateMockNotifications();
-      saveNotifications(notifications);
-    }
-    
-    return notifications;
-  },
-
-  // Get all notifications
-  async getNotifications(): Promise<Notification[]> {
-    await mockDelay();
-    return getStoredNotifications();
-  },
-
-  // Get unread count
-  async getUnreadCount(): Promise<number> {
-    const notifications = getStoredNotifications();
-    return notifications.filter(n => !n.read).length;
-  },
-
-  // Mark notification as read
-  async markAsRead(id: string): Promise<void> {
-    await mockDelay();
-    const notifications = getStoredNotifications();
-    const updated = notifications.map(n => 
-      n.id === id ? { ...n, read: true } : n
+  // Subscribe to real-time notifications
+  subscribeToNotifications(
+    userId: string, 
+    callback: (notifications: Notification[]) => void
+  ): () => void {
+    const q = query(
+      collection(db, 'notifications'),
+      where('toUserId', '==', userId),
+      orderBy('createdAt', 'desc')
     );
-    saveNotifications(updated);
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const notifications: Notification[] = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as Notification));
+      callback(notifications);
+    }, (error) => {
+      console.error('Error subscribing to notifications:', error);
+      callback([]);
+    });
+
+    return unsubscribe;
   },
 
-  // Mark all as read
-  async markAllAsRead(): Promise<void> {
-    await mockDelay();
-    const notifications = getStoredNotifications();
-    const updated = notifications.map(n => ({ ...n, read: true }));
-    saveNotifications(updated);
-  },
-
-  // Add new notification
-  async addNotification(notification: Omit<Notification, "id" | "createdAt" | "read">): Promise<Notification> {
-    await mockDelay();
-    const notifications = getStoredNotifications();
-    const newNotification: Notification = {
+  // Create notification
+  async create(notification: Omit<Notification, 'id' | 'createdAt' | 'read'>): Promise<string> {
+    const docRef = await addDoc(collection(db, 'notifications'), {
       ...notification,
-      id: `notif-${Date.now()}`,
-      createdAt: new Date().toISOString(),
       read: false,
-    };
-    saveNotifications([newNotification, ...notifications]);
-    return newNotification;
+      createdAt: getServerTimestamp(),
+    });
+    return docRef.id;
+  },
+
+  // Mark as read
+  async markAsRead(notificationId: string): Promise<void> {
+    await updateDoc(doc(db, 'notifications', notificationId), { read: true });
+  },
+
+  // Mark all as read for a user
+  async markAllAsRead(userId: string): Promise<void> {
+    const q = query(
+      collection(db, 'notifications'),
+      where('toUserId', '==', userId),
+      where('read', '==', false)
+    );
+    const snapshot = await getDocs(q);
+    
+    const batch = writeBatch(db);
+    snapshot.docs.forEach(docSnap => {
+      batch.update(docSnap.ref, { read: true });
+    });
+    await batch.commit();
   },
 
   // Delete notification
+  async delete(notificationId: string): Promise<void> {
+    await deleteDoc(doc(db, 'notifications', notificationId));
+  },
+
+  // Legacy methods for backwards compatibility
+  async initialize(): Promise<Notification[]> {
+    return [];
+  },
+
+  async getNotifications(): Promise<Notification[]> {
+    return [];
+  },
+
+  async getUnreadCount(): Promise<number> {
+    return 0;
+  },
+
+  async addNotification(notification: Omit<Notification, 'id' | 'createdAt' | 'read'>): Promise<Notification> {
+    const id = await this.create(notification);
+    return { ...notification, id, read: false, createdAt: new Date().toISOString() };
+  },
+
   async deleteNotification(id: string): Promise<void> {
-    await mockDelay();
-    const notifications = getStoredNotifications();
-    const filtered = notifications.filter(n => n.id !== id);
-    saveNotifications(filtered);
+    await this.delete(id);
   },
 
-  // Clear all notifications
   async clearAll(): Promise<void> {
-    await mockDelay();
-    saveNotifications([]);
+    // Not implemented for Firestore
   },
 
-  // Simulate receiving a new notification (for demo purposes)
   simulateNewNotification(): Notification {
-    const types: Notification["type"][] = ["like", "comment", "reply", "help_contribution"];
-    const randomType = types[Math.floor(Math.random() * types.length)];
-    const users = [
-      { id: "user-2", name: "Priya Sharma" },
-      { id: "user-3", name: "Amit Kumar" },
-      { id: "user-4", name: "Sneha Gupta" },
-      { id: "user-5", name: "Rahul Verma" },
-    ];
-    const randomUser = users[Math.floor(Math.random() * users.length)];
-
-    const messages: Record<Notification["type"], string> = {
-      like: `${randomUser.name} liked your note`,
-      comment: `${randomUser.name} commented on your note`,
-      reply: `${randomUser.name} replied to your comment`,
-      help_contribution: `${randomUser.name} helped with your request`,
-      request_fulfilled: "Your request has been fulfilled!",
-      mention: `${randomUser.name} mentioned you`,
-      system: "System notification",
-    };
-
     return {
       id: `notif-${Date.now()}`,
-      type: randomType,
-      title: randomType.charAt(0).toUpperCase() + randomType.slice(1).replace("_", " "),
-      message: messages[randomType],
+      type: 'general',
+      title: 'New Notification',
+      message: 'This is a test notification',
       read: false,
       createdAt: new Date().toISOString(),
-      fromUser: randomUser,
+      toUserId: '',
     };
+  },
+};
+
+// Helper to create notifications for specific events
+export const createNotification = {
+  async like(noteAuthorId: string, fromUserId: string, fromUserName: string, noteTitle: string, noteId: string) {
+    if (noteAuthorId === fromUserId) return;
+    
+    await notificationService.create({
+      type: 'like',
+      title: 'New Like',
+      message: `${fromUserName} liked your note "${noteTitle}"`,
+      toUserId: noteAuthorId,
+      fromUserId,
+      fromUserName,
+      relatedId: noteId,
+      actionUrl: `/note/${noteId}`,
+    });
+  },
+
+  async contribution(requesterId: string, fromUserId: string, fromUserName: string, requestTitle: string, requestId: string) {
+    if (requesterId === fromUserId) return;
+    
+    await notificationService.create({
+      type: 'help_contribution',
+      title: 'New Contribution',
+      message: `${fromUserName} contributed to your request "${requestTitle}"`,
+      toUserId: requesterId,
+      fromUserId,
+      fromUserName,
+      relatedId: requestId,
+      actionUrl: `/helpdesk`,
+    });
+  },
+
+  async requestFulfilled(requesterId: string, requestTitle: string, requestId: string) {
+    await notificationService.create({
+      type: 'request_fulfilled',
+      title: 'Request Fulfilled',
+      message: `Your request "${requestTitle}" has been fulfilled!`,
+      toUserId: requesterId,
+      relatedId: requestId,
+      actionUrl: `/helpdesk`,
+    });
   },
 };

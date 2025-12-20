@@ -1,5 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from "react";
 import { toast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+import { notesService } from "@/services/firestoreService";
 
 interface SavedNote {
   id: string;
@@ -12,34 +14,45 @@ interface SavedNotesContextType {
   savedNoteIds: string[];
   savedNotes: SavedNote[];
   isNoteSaved: (noteId: string) => boolean;
-  saveNote: (note: { id: string; title: string; subject: string }) => void;
-  unsaveNote: (noteId: string) => void;
-  toggleSave: (note: { id: string; title: string; subject: string }) => void;
+  saveNote: (note: { id: string; title: string; subject: string }) => Promise<void>;
+  unsaveNote: (noteId: string) => Promise<void>;
+  toggleSave: (note: { id: string; title: string; subject: string }) => Promise<void>;
+  loading: boolean;
 }
-
-const STORAGE_KEY = "notehall_saved_notes_data";
 
 const SavedNotesContext = createContext<SavedNotesContextType | undefined>(undefined);
 
 export function SavedNotesProvider({ children }: { children: ReactNode }) {
+  const { userProfile } = useAuth();
   const [savedNotes, setSavedNotes] = useState<SavedNote[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  // Load from localStorage on mount
+  // Load saved notes from Firestore when user changes
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        setSavedNotes(JSON.parse(stored));
+    const loadSavedNotes = async () => {
+      if (!userProfile?.id) {
+        setSavedNotes([]);
+        return;
       }
-    } catch (error) {
-      console.error("Error loading saved notes:", error);
-    }
-  }, []);
 
-  // Persist to localStorage whenever saved notes change
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(savedNotes));
-  }, [savedNotes]);
+      setLoading(true);
+      try {
+        const notes = await notesService.getSavedNotes(userProfile.id);
+        setSavedNotes(notes.map(n => ({
+          id: n.id,
+          title: n.title,
+          subject: n.subject,
+          savedAt: n.createdAt?.toDate?.()?.toISOString() || new Date().toISOString(),
+        })));
+      } catch (error) {
+        console.error("Error loading saved notes:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadSavedNotes();
+  }, [userProfile?.id]);
 
   const savedNoteIds = savedNotes.map(n => n.id);
 
@@ -47,30 +60,61 @@ export function SavedNotesProvider({ children }: { children: ReactNode }) {
     return savedNoteIds.includes(noteId);
   }, [savedNoteIds]);
 
-  const saveNote = useCallback((note: { id: string; title: string; subject: string }) => {
-    setSavedNotes(prev => {
-      if (prev.some(n => n.id === note.id)) return prev;
-      return [...prev, { ...note, savedAt: new Date().toISOString() }];
-    });
-    toast({
-      title: "Saved!",
-      description: "Note added to your collection",
-    });
-  }, []);
+  const saveNote = useCallback(async (note: { id: string; title: string; subject: string }) => {
+    if (!userProfile?.id) {
+      toast({
+        title: "Please log in",
+        description: "You need to be logged in to save notes",
+        variant: "destructive",
+      });
+      return;
+    }
 
-  const unsaveNote = useCallback((noteId: string) => {
-    setSavedNotes(prev => prev.filter(n => n.id !== noteId));
-    toast({
-      title: "Removed",
-      description: "Note removed from your collection",
-    });
-  }, []);
+    try {
+      await notesService.saveNote(note.id, userProfile.id);
+      setSavedNotes(prev => {
+        if (prev.some(n => n.id === note.id)) return prev;
+        return [...prev, { ...note, savedAt: new Date().toISOString() }];
+      });
+      toast({
+        title: "Saved!",
+        description: "Note added to your collection",
+      });
+    } catch (error) {
+      console.error("Error saving note:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save note",
+        variant: "destructive",
+      });
+    }
+  }, [userProfile?.id]);
 
-  const toggleSave = useCallback((note: { id: string; title: string; subject: string }) => {
+  const unsaveNote = useCallback(async (noteId: string) => {
+    if (!userProfile?.id) return;
+
+    try {
+      await notesService.unsaveNote(noteId, userProfile.id);
+      setSavedNotes(prev => prev.filter(n => n.id !== noteId));
+      toast({
+        title: "Removed",
+        description: "Note removed from your collection",
+      });
+    } catch (error) {
+      console.error("Error unsaving note:", error);
+      toast({
+        title: "Error",
+        description: "Failed to remove note",
+        variant: "destructive",
+      });
+    }
+  }, [userProfile?.id]);
+
+  const toggleSave = useCallback(async (note: { id: string; title: string; subject: string }) => {
     if (isNoteSaved(note.id)) {
-      unsaveNote(note.id);
+      await unsaveNote(note.id);
     } else {
-      saveNote(note);
+      await saveNote(note);
     }
   }, [isNoteSaved, saveNote, unsaveNote]);
 
@@ -83,6 +127,7 @@ export function SavedNotesProvider({ children }: { children: ReactNode }) {
         saveNote,
         unsaveNote,
         toggleSave,
+        loading,
       }}
     >
       {children}
