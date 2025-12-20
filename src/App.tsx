@@ -22,7 +22,7 @@ import { OnboardingDialog } from "@/components/onboarding/OnboardingDialog";
 
 const queryClient = new QueryClient();
 
-// Protected Route wrapper
+// Protected Route wrapper - only used inside AuthProvider
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
   
@@ -41,7 +41,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-// Auth Route wrapper (redirects to home if already logged in)
+// Auth Route wrapper - only used inside AuthProvider
 function AuthRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
   
@@ -60,7 +60,7 @@ function AuthRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-// Onboarding dialog component
+// Onboarding dialog - only used inside AuthProvider
 function OnboardingWrapper() {
   const { needsOnboarding, completeOnboarding, userProfile } = useAuth();
   
@@ -73,32 +73,38 @@ function OnboardingWrapper() {
   );
 }
 
-// Main app content with routing - must be inside AuthProvider
-function AppContent() {
+// All routes and auth-dependent components - MUST be inside AuthProvider
+function AuthenticatedApp() {
   return (
-    <>
-      <Routes>
-        <Route path="/login" element={<AuthRoute><Login /></AuthRoute>} />
-        <Route path="/signup" element={<AuthRoute><Signup /></AuthRoute>} />
-        <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-        <Route path="/upload" element={<ProtectedRoute><Upload /></ProtectedRoute>} />
-        <Route path="/helpdesk" element={<ProtectedRoute><HelpDesk /></ProtectedRoute>} />
-        <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-        <Route path="/profile/:userId" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-        <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-        <Route path="/gemini" element={<ProtectedRoute><Gemini /></ProtectedRoute>} />
-        <Route 
-          path="/campusvoice" 
-          element={<Placeholder title="CampusVoice" description="Share your campus experiences and feedback. Coming soon!" externalUrl="https://campusvoice-git-main-hiral-goyals-projects.vercel.app/" />} 
-        />
-        <Route 
-          path="/campusbuzz" 
-          element={<Placeholder title="CampusBuzz" description="Stay updated with the latest campus news and events. Coming soon!" />} 
-        />
-        <Route path="*" element={<NotFound />} />
-      </Routes>
-      <OnboardingWrapper />
-    </>
+    <UserProvider>
+      <SavedNotesProvider>
+        <HelpRequestsProvider>
+          <SearchProvider>
+            <Routes>
+              <Route path="/login" element={<AuthRoute><Login /></AuthRoute>} />
+              <Route path="/signup" element={<AuthRoute><Signup /></AuthRoute>} />
+              <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+              <Route path="/upload" element={<ProtectedRoute><Upload /></ProtectedRoute>} />
+              <Route path="/helpdesk" element={<ProtectedRoute><HelpDesk /></ProtectedRoute>} />
+              <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+              <Route path="/profile/:userId" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+              <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+              <Route path="/gemini" element={<ProtectedRoute><Gemini /></ProtectedRoute>} />
+              <Route 
+                path="/campusvoice" 
+                element={<Placeholder title="CampusVoice" description="Share your campus experiences and feedback. Coming soon!" externalUrl="https://campusvoice-git-main-hiral-goyals-projects.vercel.app/" />} 
+              />
+              <Route 
+                path="/campusbuzz" 
+                element={<Placeholder title="CampusBuzz" description="Stay updated with the latest campus news and events. Coming soon!" />} 
+              />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+            <OnboardingWrapper />
+          </SearchProvider>
+        </HelpRequestsProvider>
+      </SavedNotesProvider>
+    </UserProvider>
   );
 }
 
@@ -110,15 +116,7 @@ const App = () => {
         <Sonner />
         <BrowserRouter>
           <AuthProvider>
-            <UserProvider>
-              <SavedNotesProvider>
-                <HelpRequestsProvider>
-                  <SearchProvider>
-                    <AppContent />
-                  </SearchProvider>
-                </HelpRequestsProvider>
-              </SavedNotesProvider>
-            </UserProvider>
+            <AuthenticatedApp />
           </AuthProvider>
         </BrowserRouter>
       </TooltipProvider>
