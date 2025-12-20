@@ -6,13 +6,20 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { useUser } from "@/contexts/UserContext";
 import { Check, GraduationCap, BookOpen, Loader2 } from "lucide-react";
 import logo from "@/assets/logo.png";
 
 interface OnboardingDialogProps {
   open: boolean;
-  onComplete: () => void;
+  onComplete: (data: OnboardingData) => void;
+  userName?: string;
+}
+
+interface OnboardingData {
+  year: string;
+  branch: string;
+  college: string;
+  interests: string[];
 }
 
 const subjectInterests = [
@@ -25,9 +32,8 @@ const subjectInterests = [
   { id: "data-science", label: "Data Science & AI" },
 ];
 
-export function OnboardingDialog({ open, onComplete }: OnboardingDialogProps) {
+export function OnboardingDialog({ open, onComplete, userName }: OnboardingDialogProps) {
   const { toast } = useToast();
-  const { updateUser } = useUser();
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     year: "",
@@ -76,23 +82,18 @@ export function OnboardingDialog({ open, onComplete }: OnboardingDialogProps) {
 
     setIsLoading(true);
     
-    // Save to user context
-    updateUser({
-      year: year,
-      branch: formData.branch,
-      college: formData.college,
-    });
-
-    // Store interests in localStorage for recommendations
-    localStorage.setItem("notehall_interests", JSON.stringify(formData.interests));
-
-    toast({
-      title: "Welcome to NoteHall! 🎉",
-      description: "Your profile has been set up. Start exploring notes!",
-    });
-
-    setIsLoading(false);
-    onComplete();
+    try {
+      await onComplete({
+        year,
+        branch: formData.branch,
+        college: formData.college,
+        interests: formData.interests,
+      });
+    } catch (error) {
+      toast({ title: "Failed to save", description: "Please try again", variant: "destructive" });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -104,7 +105,7 @@ export function OnboardingDialog({ open, onComplete }: OnboardingDialogProps) {
           </div>
           <DialogTitle className="text-xl flex items-center justify-center gap-2">
             <GraduationCap className="w-5 h-5 text-primary" />
-            Complete Your Profile
+            {userName ? `Welcome, ${userName}!` : "Complete Your Profile"}
           </DialogTitle>
           <DialogDescription>
             Help us personalize your experience with better recommendations
