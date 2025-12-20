@@ -13,7 +13,7 @@ import Upload from "./pages/Upload";
 import HelpDesk from "./pages/HelpDesk";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
-import AIAssistant from "./pages/AIAssistant";
+import Gemini from "./pages/Gemini";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import Placeholder from "./pages/Placeholder";
@@ -87,7 +87,7 @@ const AppRoutes = () => (
       <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
       <Route path="/profile/:userId" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
       <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-      <Route path="/ai-assistant" element={<ProtectedRoute><AIAssistant /></ProtectedRoute>} />
+      <Route path="/gemini" element={<ProtectedRoute><Gemini /></ProtectedRoute>} />
       <Route 
         path="/campusvoice" 
         element={<Placeholder title="CampusVoice" description="Share your campus experiences and feedback. Coming soon!" externalUrl="https://campusvoice-git-main-hiral-goyals-projects.vercel.app/" />} 

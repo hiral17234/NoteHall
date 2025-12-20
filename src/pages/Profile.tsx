@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { NoteCard } from "@/components/notes/NoteCard";
@@ -6,16 +6,14 @@ import { NoteCardSkeleton, ProfileStatsSkeleton } from "@/components/ui/skeleton
 import { EmptyState } from "@/components/ui/empty-state";
 import { EditProfileDialog } from "@/components/profile/EditProfileDialog";
 import { ContributionCard, Contribution } from "@/components/helpdesk/ContributionCard";
-import { StatDetailModal, AchievementsSection } from "@/components/profile/StatDetailModal";
-import { useSavedNotes } from "@/contexts/SavedNotesContext";
-import { useHelpRequests } from "@/contexts/HelpRequestsContext";
+import { StatDetailModal, AchievementsSection, Achievement } from "@/components/profile/StatDetailModal";
+import { useAuth, UserProfile } from "@/contexts/AuthContext";
+import { usersService, notesService, Note, contributionsService, helpRequestsService, achievementsService } from "@/services/firestoreService";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { useUser } from "@/contexts/UserContext";
 import { 
   Edit2, 
   Github, 
@@ -27,174 +25,20 @@ import {
   BarChart3,
   ThumbsUp,
   Eye,
-  Users,
   TrendingUp,
   Award,
   Star,
   Zap,
   Instagram,
   Twitter,
-  Clock,
-  Target,
-  BookOpen,
   Flame,
   Share2,
-  Lock,
-  Trophy,
   ArrowLeft,
-  Medal
 } from "lucide-react";
 
-// Mock data for other users
-const otherUsersData: Record<string, any> = {
-  "user-2": {
-    id: "user-2",
-    name: "Priya Sharma",
-    bio: "Sharing knowledge is caring! 📚✨ Always ready to help fellow students.",
-    college: "MITS Gwalior",
-    branch: "Computer Science",
-    year: "3rd Year",
-    degree: "btech",
-    avatar: "",
-    github: "priyasharma",
-    linkedin: "priyasharma",
-    portfolio: "",
-    instagram: "priya.sharma",
-    twitter: "",
-    streak: 21,
-    stats: {
-      uploads: 45,
-      totalLikes: 2150,
-      totalViews: 12500,
-      helpedRequests: 32,
-      contributionScore: 98,
-    },
-    badges: [
-      { id: "top", label: "Top Contributor", icon: "Award", color: "bg-primary/20 text-primary" },
-      { id: "helpful", label: "Helpful", icon: "Star", color: "bg-chart-1/20 text-chart-1" },
-      { id: "streak-14", label: "14 Day Streak", icon: "Flame", color: "bg-red-500/20 text-red-500" },
-    ],
-  },
-  "user-3": {
-    id: "user-3",
-    name: "Amit Kumar",
-    bio: "ECE student | Tech enthusiast | Notes collector 🎯",
-    college: "MITS Gwalior",
-    branch: "ECE",
-    year: "2nd Year",
-    degree: "btech",
-    avatar: "",
-    github: "amitkumar",
-    linkedin: "amitkumar",
-    portfolio: "",
-    instagram: "",
-    twitter: "amitkumar",
-    streak: 14,
-    stats: {
-      uploads: 18,
-      totalLikes: 890,
-      totalViews: 5200,
-      helpedRequests: 12,
-      contributionScore: 78,
-    },
-    badges: [
-      { id: "helpful", label: "Helpful", icon: "Star", color: "bg-chart-1/20 text-chart-1" },
-      { id: "streak-7", label: "7 Day Streak", icon: "Flame", color: "bg-orange-500/20 text-orange-500" },
-    ],
-  },
-};
-
-const mockUploadedNotes = [
-  {
-    id: "1",
-    title: "Data Structures - Complete Notes",
-    subject: "DSA",
-    branch: "CSE",
-    year: "2nd Year",
-    fileType: "pdf" as const,
-    likes: 245,
-    dislikes: 12,
-    views: 1520,
-    author: "John Doe",
-    timestamp: "2 days ago",
-  },
-  {
-    id: "2",
-    title: "Operating Systems - Process Diagrams",
-    subject: "OS",
-    branch: "CSE",
-    year: "3rd Year",
-    fileType: "image" as const,
-    likes: 189,
-    dislikes: 8,
-    views: 890,
-    author: "John Doe",
-    timestamp: "1 week ago",
-  },
-];
-
-const mockSavedNotes = [
-  {
-    id: "3",
-    title: "DBMS - Normalization Explained",
-    subject: "DBMS",
-    branch: "CSE",
-    year: "2nd Year",
-    fileType: "video" as const,
-    likes: 312,
-    dislikes: 15,
-    views: 2100,
-    author: "Priya Sharma",
-    timestamp: "3 days ago",
-  },
-];
-
-const mockHelpRequests = [
-  { id: "1", title: "DBMS ER Diagram Notes - Unit 2", status: "fulfilled", timestamp: "1 week ago", subject: "DBMS" },
-  { id: "2", title: "OS Process Synchronization", status: "open", timestamp: "3 days ago", subject: "OS" },
-];
-
-const mockSharedContributions: Contribution[] = [
-  {
-    id: "sc1",
-    type: "pdf",
-    fileName: "CN_Unit3_Complete.pdf",
-    message: "Complete notes with diagrams",
-    contributorId: "current-user",
-    contributorName: "John Doe",
-    timestamp: "3 days ago",
-    likes: 15,
-  },
-  {
-    id: "sc2",
-    type: "link",
-    link: "https://drive.google.com/file/dbms-notes",
-    message: "DBMS ER Diagram materials",
-    contributorId: "current-user",
-    contributorName: "John Doe",
-    timestamp: "1 week ago",
-    likes: 23,
-  },
-  {
-    id: "sc3",
-    type: "image",
-    fileName: "OS_Process_Diagram.png",
-    message: "Visual explanation of process states",
-    contributorId: "current-user",
-    contributorName: "John Doe",
-    timestamp: "2 weeks ago",
-    likes: 18,
-  },
-];
-
-const studyInsights = {
-  mostStudied: [
-    { subject: "DSA", percentage: 85 },
-    { subject: "OS", percentage: 65 },
-    { subject: "DBMS", percentage: 50 },
-  ],
-  timeSpent: "42 hours this month",
-  weakAreas: ["Computer Networks", "Machine Learning"],
+const getBadgeIcon = (iconName: string) => {
+  const icons: Record<string, any> = { Award, Star, Zap, Flame };
+  return icons[iconName] || Award;
 };
 
 const streakBadges = [
@@ -205,81 +49,89 @@ const streakBadges = [
   { days: 100, label: "100 Day Legend", color: "bg-chart-1/20 text-chart-1" },
 ];
 
-const getBadgeIcon = (iconName: string) => {
-  const icons: Record<string, any> = { Award, Star, Zap, Flame };
-  return icons[iconName] || Award;
-};
-
 export default function Profile() {
   const { userId } = useParams();
   const navigate = useNavigate();
-  const { user: currentUserProfile, updateUser, isOwner } = useUser();
-  const { savedNotes } = useSavedNotes();
-  const { getUserRequests, closeRequest } = useHelpRequests();
+  const { userProfile: currentUser, updateUserProfile } = useAuth();
   
   const [loading, setLoading] = useState(true);
+  const [profileData, setProfileData] = useState<UserProfile | null>(null);
+  const [uploadedNotes, setUploadedNotes] = useState<Note[]>([]);
+  const [savedNotes, setSavedNotes] = useState<Note[]>([]);
+  const [contributions, setContributions] = useState<any[]>([]);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [statModalOpen, setStatModalOpen] = useState<"uploads" | "likes" | "views" | "helped" | "score" | null>(null);
-  
-  // Get user's help requests
-  const userRequests = getUserRequests("current-user");
 
   // Determine if viewing own profile or someone else's
-  const isOwnProfile = !userId || userId === "current-user" || userId === currentUserProfile?.id;
-  
-  // Get the profile data to display
-  const profileData = useMemo(() => {
-    if (isOwnProfile) return currentUserProfile;
-    // Look up other user's data
-    const otherUser = otherUsersData[userId!];
-    if (otherUser) return otherUser;
-    // Check if it's the current user by username match
-    if (currentUserProfile?.username === userId) return currentUserProfile;
-    // Return mock data for unknown users
-    return otherUsersData["user-2"] || currentUserProfile;
-  }, [userId, isOwnProfile, currentUserProfile]);
+  const isOwnProfile = !userId || userId === "current-user" || userId === currentUser?.id;
+  const targetUserId = isOwnProfile ? currentUser?.id : userId;
 
-  const [stats, setStats] = useState(profileData?.stats || currentUserProfile?.stats);
-
+  // Load profile data
   useEffect(() => {
-    setLoading(true);
-    const loadTimer = setTimeout(() => setLoading(false), 1000);
-    
-    // Only auto-update stats for own profile
-    let statsInterval: NodeJS.Timeout | undefined;
-    if (isOwnProfile) {
-      statsInterval = setInterval(() => {
-        setStats(prev => ({
-          ...prev,
-          totalViews: prev.totalViews + Math.floor(Math.random() * 5),
-          totalLikes: prev.totalLikes + (Math.random() > 0.7 ? 1 : 0),
-        }));
-      }, 5000);
-    }
-
-    return () => {
-      clearTimeout(loadTimer);
-      if (statsInterval) clearInterval(statsInterval);
+    const loadProfile = async () => {
+      setLoading(true);
+      try {
+        if (isOwnProfile && currentUser) {
+          setProfileData(currentUser);
+        } else if (targetUserId) {
+          let profile = await usersService.getById(targetUserId);
+          if (!profile) {
+            profile = await usersService.getByUsername(targetUserId);
+          }
+          setProfileData(profile);
+        }
+      } catch (error) {
+        console.error("Error loading profile:", error);
+      }
     };
-  }, [userId, isOwnProfile]);
 
+    loadProfile();
+  }, [isOwnProfile, currentUser, targetUserId]);
+
+  // Load user content
   useEffect(() => {
-    if (profileData?.stats) {
-      setStats(profileData.stats);
-    }
-  }, [profileData]);
+    const loadContent = async () => {
+      if (!profileData?.id) return;
 
-  const handleProfileSave = (updatedProfile: any) => {
-    updateUser(updatedProfile);
-  };
+      try {
+        const [notes, saved, contribs] = await Promise.all([
+          notesService.getByUser(profileData.id),
+          isOwnProfile ? notesService.getSavedNotes(profileData.id) : Promise.resolve([]),
+          contributionsService.getByUser(profileData.id),
+        ]);
 
-  const handleViewProfile = (userId: string) => {
-    navigate(`/profile/${userId}`);
+        setUploadedNotes(notes);
+        setSavedNotes(saved);
+        setContributions(contribs);
+      } catch (error) {
+        console.error("Error loading content:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadContent();
+  }, [profileData?.id, isOwnProfile]);
+
+  const handleProfileSave = async (updatedProfile: any) => {
+    await updateUserProfile(updatedProfile);
+    setProfileData(prev => prev ? { ...prev, ...updatedProfile } : null);
   };
 
   const currentStreakBadge = streakBadges.filter(b => (profileData?.streak || 0) >= b.days).pop();
+  
+  // Convert earned achievements to display format
+  const earnedAchievementsList = profileData?.stats ? achievementsService.checkAchievements(profileData.stats, profileData.streak || 0) : [];
+  const displayAchievements: Achievement[] = earnedAchievementsList.map(a => ({
+    id: a.id,
+    title: a.label,
+    description: a.description,
+    icon: a.icon,
+    color: a.color,
+    earnedAt: new Date().toISOString(),
+  }));
 
-  if (!profileData) {
+  if (!profileData && !loading) {
     return (
       <MainLayout>
         <div className="flex items-center justify-center h-64">
@@ -288,6 +140,8 @@ export default function Profile() {
       </MainLayout>
     );
   }
+
+  const stats = profileData?.stats || { uploads: 0, totalLikes: 0, totalViews: 0, helpedRequests: 0, contributionScore: 0 };
 
   return (
     <MainLayout>
@@ -304,6 +158,7 @@ export default function Profile() {
             Back
           </Button>
         )}
+
         {/* Profile Header */}
         <Card className="bg-card border-border mb-6">
           <CardContent className="pt-6">
@@ -311,9 +166,9 @@ export default function Profile() {
               {/* Avatar */}
               <div className="flex flex-col items-center sm:items-start">
                 <Avatar className="w-24 h-24 border-4 border-primary/20">
-                  <AvatarImage src={profileData.avatar} />
+                  <AvatarImage src={profileData?.avatar} />
                   <AvatarFallback className="bg-primary text-primary-foreground text-2xl">
-                    {profileData.name.split(" ").map((n: string) => n[0]).join("")}
+                    {profileData?.name?.split(" ").map((n: string) => n[0]).join("") || "?"}
                   </AvatarFallback>
                 </Avatar>
                 {isOwnProfile ? (
@@ -327,11 +182,7 @@ export default function Profile() {
                     Edit Profile
                   </Button>
                 ) : (
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="mt-3 gap-1"
-                  >
+                  <Button variant="outline" size="sm" className="mt-3 gap-1">
                     <Share2 className="w-3 h-3" />
                     Share Profile
                   </Button>
@@ -341,8 +192,8 @@ export default function Profile() {
               {/* Info */}
               <div className="flex-1 text-center sm:text-left">
                 <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
-                  <h1 className="text-2xl font-bold text-foreground">{profileData.name}</h1>
-                  {profileData.badges.map((badge: any) => {
+                  <h1 className="text-2xl font-bold text-foreground">{profileData?.name}</h1>
+                  {profileData?.badges?.map((badge: any) => {
                     const IconComponent = getBadgeIcon(badge.icon);
                     return (
                       <Badge key={badge.id} className={badge.color}>
@@ -351,34 +202,33 @@ export default function Profile() {
                       </Badge>
                     );
                   })}
-                  {currentStreakBadge && !profileData.badges.some((b: any) => b.id.includes("streak")) && (
+                  {currentStreakBadge && (
                     <Badge className={currentStreakBadge.color}>
                       <Flame className="w-3 h-3 mr-1" />
                       {currentStreakBadge.label}
                     </Badge>
                   )}
                 </div>
-                <p className="text-muted-foreground mt-1">{profileData.bio}</p>
+                <p className="text-muted-foreground mt-1">{profileData?.bio}</p>
                 
-                {/* Streak Display */}
-                {profileData.streak > 0 && (
+                {(profileData?.streak || 0) > 0 && (
                   <div className="flex items-center justify-center sm:justify-start gap-2 mt-2">
                     <Flame className="w-4 h-4 text-orange-500" />
-                    <span className="text-sm font-medium text-foreground">{profileData.streak} day streak!</span>
+                    <span className="text-sm font-medium text-foreground">{profileData?.streak} day streak!</span>
                   </div>
                 )}
                 
                 <div className="flex flex-wrap justify-center sm:justify-start gap-4 mt-4 text-sm text-muted-foreground">
-                  <span className="font-medium text-foreground">{profileData.college}</span>
+                  <span className="font-medium text-foreground">{profileData?.college || "No college set"}</span>
                   <span>•</span>
-                  <span>{profileData.branch}</span>
+                  <span>{profileData?.branch || "No branch"}</span>
                   <span>•</span>
-                  <span>{profileData.year}</span>
+                  <span>{profileData?.year || "No year"}</span>
                 </div>
 
                 {/* Social Links */}
                 <div className="flex flex-wrap justify-center sm:justify-start gap-2 mt-4">
-                  {profileData.github && (
+                  {profileData?.github && (
                     <Button 
                       variant="outline" 
                       size="sm" 
@@ -389,7 +239,7 @@ export default function Profile() {
                       GitHub
                     </Button>
                   )}
-                  {profileData.linkedin && (
+                  {profileData?.linkedin && (
                     <Button 
                       variant="outline" 
                       size="sm" 
@@ -400,7 +250,7 @@ export default function Profile() {
                       LinkedIn
                     </Button>
                   )}
-                  {profileData.portfolio && (
+                  {profileData?.portfolio && (
                     <Button 
                       variant="outline" 
                       size="sm" 
@@ -411,7 +261,7 @@ export default function Profile() {
                       Portfolio
                     </Button>
                   )}
-                  {profileData.instagram && (
+                  {profileData?.instagram && (
                     <Button 
                       variant="outline" 
                       size="sm" 
@@ -421,7 +271,7 @@ export default function Profile() {
                       <Instagram className="w-4 h-4" />
                     </Button>
                   )}
-                  {profileData.twitter && (
+                  {profileData?.twitter && (
                     <Button 
                       variant="outline" 
                       size="sm" 
@@ -490,7 +340,7 @@ export default function Profile() {
                 onClick={() => setStatModalOpen("helped")}
               >
                 <CardContent className="pt-4 text-center">
-                  <Users className="w-6 h-6 mx-auto text-primary mb-2" />
+                  <HandHelping className="w-6 h-6 mx-auto text-primary mb-2" />
                   <p className="text-2xl font-bold text-foreground">{stats.helpedRequests}</p>
                   <p className="text-xs text-muted-foreground">Helped</p>
                 </CardContent>
@@ -500,7 +350,7 @@ export default function Profile() {
                 onClick={() => setStatModalOpen("score")}
               >
                 <CardContent className="pt-4 text-center">
-                  <Target className="w-6 h-6 mx-auto text-primary mb-2" />
+                  <BarChart3 className="w-6 h-6 mx-auto text-primary mb-2" />
                   <p className="text-2xl font-bold text-foreground">{stats.contributionScore}</p>
                   <p className="text-xs text-muted-foreground">Score</p>
                 </CardContent>
@@ -509,307 +359,183 @@ export default function Profile() {
           )}
         </div>
 
-        {/* Tabs - Different for own profile vs others */}
-        <Tabs defaultValue="uploaded" className="space-y-4">
-          <TabsList className="bg-muted w-full justify-start overflow-x-auto">
-            <TabsTrigger value="uploaded" className="gap-1.5 data-[state=active]:bg-card">
+        {/* Achievements Section */}
+        <AchievementsSection 
+          achievements={displayAchievements}
+          isOwner={isOwnProfile}
+        />
+
+        {/* Tabs */}
+        <Tabs defaultValue="uploads" className="mt-6">
+          <TabsList className="bg-muted mb-4">
+            <TabsTrigger value="uploads" className="gap-2 data-[state=active]:bg-card">
               <FileText className="w-4 h-4" />
-              Uploaded
+              Uploads ({uploadedNotes.length})
             </TabsTrigger>
             {isOwnProfile && (
-              <TabsTrigger value="saved" className="gap-1.5 data-[state=active]:bg-card">
+              <TabsTrigger value="saved" className="gap-2 data-[state=active]:bg-card">
                 <Bookmark className="w-4 h-4" />
-                Saved
+                Saved ({savedNotes.length})
               </TabsTrigger>
             )}
-            <TabsTrigger value="shared" className="gap-1.5 data-[state=active]:bg-card">
-              <Share2 className="w-4 h-4" />
-              Shared
+            <TabsTrigger value="contributions" className="gap-2 data-[state=active]:bg-card">
+              <HandHelping className="w-4 h-4" />
+              Contributions ({contributions.length})
             </TabsTrigger>
-            {isOwnProfile && (
-              <TabsTrigger value="requests" className="gap-1.5 data-[state=active]:bg-card">
-                <HandHelping className="w-4 h-4" />
-                Requests
-              </TabsTrigger>
-            )}
-            <TabsTrigger value="contributions" className="gap-1.5 data-[state=active]:bg-card">
-              <Award className="w-4 h-4" />
-              Contributions
-            </TabsTrigger>
-            <TabsTrigger value="achievements" className="gap-1.5 data-[state=active]:bg-card">
-              <Medal className="w-4 h-4" />
-              Achievements
-            </TabsTrigger>
-            {isOwnProfile && (
-              <TabsTrigger value="stats" className="gap-1.5 data-[state=active]:bg-card">
-                <BarChart3 className="w-4 h-4" />
-                Stats
-              </TabsTrigger>
-            )}
           </TabsList>
 
-          <TabsContent value="uploaded" className="space-y-4">
+          <TabsContent value="uploads">
             {loading ? (
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-4">
                 <NoteCardSkeleton />
                 <NoteCardSkeleton />
               </div>
-            ) : mockUploadedNotes.length > 0 ? (
-              <div className="grid gap-4 md:grid-cols-2">
-                {mockUploadedNotes.map((note) => (
-                  <NoteCard key={note.id} note={note} />
-                ))}
-              </div>
+            ) : uploadedNotes.length === 0 ? (
+              <EmptyState
+                type="notes"
+                title="No uploads yet"
+                description={isOwnProfile ? "Share your first note with the community!" : "This user hasn't uploaded any notes yet."}
+              />
             ) : (
-              <EmptyState type="notes" title="No uploads yet" description="Upload your first note to help others!" />
-            )}
-          </TabsContent>
-
-          {isOwnProfile && (
-            <TabsContent value="saved" className="space-y-4">
-              {loading ? (
-                <div className="grid gap-4 md:grid-cols-2">
-                  <NoteCardSkeleton />
-                </div>
-              ) : savedNotes.length > 0 ? (
-                <div className="grid gap-4 md:grid-cols-2">
-                  {savedNotes.map((note) => (
-                    <NoteCard key={note.id} note={{
+              <div className="grid gap-4">
+                {uploadedNotes.map((note) => (
+                  <NoteCard
+                    key={note.id}
+                    note={{
                       id: note.id,
                       title: note.title,
                       subject: note.subject,
-                      branch: "CSE",
-                      year: "2nd Year",
-                      fileType: "pdf" as const,
-                      likes: 0,
-                      dislikes: 0,
-                      views: 0,
-                      author: "Saved",
-                      timestamp: new Date(note.savedAt).toLocaleDateString(),
-                    }} />
-                  ))}
-                </div>
-              ) : (
-                <EmptyState type="saved" />
-              )}
-            </TabsContent>
-          )}
-
-          <TabsContent value="shared" className="space-y-4">
-            {!isOwnProfile && (
-              <p className="text-sm text-muted-foreground mb-4">
-                Files and links shared by {profileData.name} to help others
-              </p>
-            )}
-            {loading ? (
-              <NoteCardSkeleton />
-            ) : mockSharedContributions.length > 0 ? (
-              <div className="space-y-3">
-                {mockSharedContributions.map((contribution) => (
-                  <ContributionCard
-                    key={contribution.id}
-                    contribution={contribution}
+                      branch: note.branch,
+                      year: note.year,
+                      fileType: note.fileType,
+                      likes: note.likes,
+                      dislikes: note.dislikes,
+                      views: note.views,
+                      author: note.authorName,
+                      timestamp: note.createdAt?.toDate?.()?.toLocaleDateString() || "Recently",
+                      topic: note.topic,
+                    }}
                   />
                 ))}
               </div>
-            ) : (
-              <EmptyState type="helped" title="No shared content yet" description="Files and links shared will appear here." />
             )}
           </TabsContent>
 
           {isOwnProfile && (
-            <TabsContent value="requests" className="space-y-4">
+            <TabsContent value="saved">
               {loading ? (
-                <NoteCardSkeleton />
-              ) : userRequests.length > 0 ? (
-                userRequests.map((request) => (
-                  <Card key={request.id} className="bg-card border-border hover:border-primary/30 transition-colors">
-                    <CardContent className="py-4 flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                          <HandHelping className="w-5 h-5 text-primary" />
-                        </div>
-                        <div>
-                          <p className="font-medium text-foreground">{request.title}</p>
-                          <p className="text-sm text-muted-foreground">{request.subject} • {request.timestamp}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {request.status !== "fulfilled" && (
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => closeRequest(request.id)}
-                          >
-                            Close
-                          </Button>
-                        )}
-                        <Badge className={request.status === "fulfilled" ? "bg-chart-1 text-primary-foreground" : "bg-primary text-primary-foreground"}>
-                          {request.status === "fulfilled" ? "Fulfilled" : "Open"}
-                        </Badge>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))
+                <div className="grid gap-4">
+                  <NoteCardSkeleton />
+                </div>
+              ) : savedNotes.length === 0 ? (
+                <EmptyState
+                  type="saved"
+                  title="No saved notes"
+                  description="Save notes you want to revisit later!"
+                />
               ) : (
-                <EmptyState type="requests" title="No requests yet" description="Create a request to get help from others!" />
+                <div className="grid gap-4">
+                  {savedNotes.map((note) => (
+                    <NoteCard
+                      key={note.id}
+                      note={{
+                        id: note.id,
+                        title: note.title,
+                        subject: note.subject,
+                        branch: note.branch,
+                        year: note.year,
+                        fileType: note.fileType,
+                        likes: note.likes,
+                        dislikes: note.dislikes,
+                        views: note.views,
+                        author: note.authorName,
+                        timestamp: note.createdAt?.toDate?.()?.toLocaleDateString() || "Recently",
+                        topic: note.topic,
+                      }}
+                    />
+                  ))}
+                </div>
               )}
             </TabsContent>
           )}
 
-          <TabsContent value="achievements" className="space-y-4">
-            <AchievementsSection achievements={[]} isOwner={isOwnProfile} />
-          </TabsContent>
-
-          <TabsContent value="contributions" className="space-y-4">
+          <TabsContent value="contributions">
             {loading ? (
-              <NoteCardSkeleton />
+              <div className="space-y-4">
+                <NoteCardSkeleton />
+              </div>
+            ) : contributions.length === 0 ? (
+              <EmptyState
+                type="helped"
+                title="No contributions yet"
+                description={isOwnProfile ? "Help others by contributing to help requests!" : "This user hasn't contributed yet."}
+              />
             ) : (
-              <>
-                <Card className="bg-card border-border hover:border-primary/30 transition-colors">
-                  <CardContent className="py-4 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                        <HandHelping className="w-5 h-5 text-primary" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-foreground">Helped with Computer Networks Notes</p>
-                        <p className="text-sm text-muted-foreground">CN • 1 week ago</p>
-                      </div>
-                    </div>
-                    <Badge variant="outline" className="border-primary/30 text-primary">Helped</Badge>
-                  </CardContent>
-                </Card>
-                <Card className="bg-card border-border hover:border-primary/30 transition-colors">
-                  <CardContent className="py-4 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                        <FileText className="w-5 h-5 text-primary" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-foreground">Uploaded DSA Complete Notes</p>
-                        <p className="text-sm text-muted-foreground">DSA • 3 weeks ago</p>
-                      </div>
-                    </div>
-                    <Badge variant="outline" className="border-primary/30 text-primary">Uploaded</Badge>
-                  </CardContent>
-                </Card>
-              </>
+              <div className="space-y-4">
+                {contributions.map((contrib) => {
+                  const contribution: Contribution = {
+                    id: contrib.id,
+                    type: contrib.type,
+                    message: contrib.content,
+                    contributorId: contrib.contributorId,
+                    contributorName: contrib.contributorName,
+                    timestamp: contrib.createdAt?.toDate?.()?.toLocaleDateString() || "Recently",
+                    likes: 0,
+                    fileName: contrib.fileUrl ? "Attached file" : undefined,
+                    link: contrib.type === 'link' ? contrib.content : undefined,
+                  };
+                  return (
+                    <ContributionCard
+                      key={contrib.id}
+                      contribution={contribution}
+                      onViewProfile={(id) => navigate(`/profile/${id}`)}
+                    />
+                  );
+                })}
+              </div>
             )}
           </TabsContent>
-
-          {isOwnProfile && (
-            <TabsContent value="stats" className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-2">
-                {/* Activity Overview */}
-                <Card className="bg-card border-border">
-                  <CardContent className="py-6">
-                    <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2">
-                      <BarChart3 className="w-5 h-5 text-primary" />
-                      Activity Overview
-                    </h3>
-                    <div className="space-y-4">
-                      <div>
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-sm text-muted-foreground">Notes Uploaded</span>
-                          <span className="text-sm font-medium text-foreground">{stats.uploads}</span>
-                        </div>
-                        <Progress value={60} className="h-2" />
-                      </div>
-                      
-                      <div>
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-sm text-muted-foreground">Engagement Rate</span>
-                          <span className="text-sm font-medium text-foreground">85%</span>
-                        </div>
-                        <Progress value={85} className="h-2" />
-                      </div>
-                      
-                      <div>
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-sm text-muted-foreground">Help Score</span>
-                          <span className="text-sm font-medium text-foreground">{stats.contributionScore}/100</span>
-                        </div>
-                        <Progress value={stats.contributionScore} className="h-2" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Study Insights */}
-                <Card className="bg-card border-border">
-                  <CardContent className="py-6">
-                    <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2">
-                      <BookOpen className="w-5 h-5 text-primary" />
-                      Study Insights
-                    </h3>
-                    <div className="space-y-4">
-                      <div className="flex items-center gap-2 text-sm">
-                        <Clock className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-muted-foreground">Time spent:</span>
-                        <span className="font-medium text-foreground">{studyInsights.timeSpent}</span>
-                      </div>
-                      
-                      <div>
-                        <p className="text-sm text-muted-foreground mb-2">Most studied subjects:</p>
-                        <div className="space-y-2">
-                          {studyInsights.mostStudied.map(item => (
-                            <div key={item.subject}>
-                              <div className="flex items-center justify-between mb-1">
-                                <span className="text-sm text-foreground">{item.subject}</span>
-                                <span className="text-xs text-muted-foreground">{item.percentage}%</span>
-                              </div>
-                              <Progress value={item.percentage} className="h-1.5" />
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div>
-                        <p className="text-sm text-muted-foreground mb-2">Areas to improve:</p>
-                        <div className="flex flex-wrap gap-2">
-                          {studyInsights.weakAreas.map(area => (
-                            <Badge key={area} variant="outline" className="border-destructive/30 text-destructive">
-                              {area}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </TabsContent>
-          )}
         </Tabs>
+
+        {/* Modals */}
+        {profileData && (
+          <EditProfileDialog
+            open={editDialogOpen}
+            onOpenChange={setEditDialogOpen}
+            profile={{
+              name: profileData.name,
+              bio: profileData.bio,
+              college: profileData.college,
+              branch: profileData.branch,
+              year: profileData.year,
+              degree: profileData.degree,
+              avatar: profileData.avatar,
+              github: profileData.github,
+              linkedin: profileData.linkedin,
+              portfolio: profileData.portfolio,
+              instagram: profileData.instagram,
+              twitter: profileData.twitter,
+            }}
+            onSave={handleProfileSave}
+          />
+        )}
+
+        {statModalOpen && (
+          <StatDetailModal
+            open={!!statModalOpen}
+            onClose={() => setStatModalOpen(null)}
+            statType={statModalOpen}
+            value={
+              statModalOpen === "uploads" ? stats.uploads :
+              statModalOpen === "likes" ? stats.totalLikes :
+              statModalOpen === "views" ? stats.totalViews :
+              statModalOpen === "helped" ? stats.helpedRequests :
+              stats.contributionScore
+            }
+            isOwner={isOwnProfile}
+          />
+        )}
       </div>
-
-      {/* Edit Profile Dialog - Only for own profile */}
-      {isOwnProfile && (
-        <EditProfileDialog
-          open={editDialogOpen}
-          onOpenChange={setEditDialogOpen}
-          profile={currentUserProfile}
-          onSave={handleProfileSave}
-        />
-      )}
-
-      {/* Stat Detail Modal */}
-      {statModalOpen && (
-        <StatDetailModal
-          open={!!statModalOpen}
-          onClose={() => setStatModalOpen(null)}
-          statType={statModalOpen}
-          value={
-            statModalOpen === "uploads" ? stats.uploads :
-            statModalOpen === "likes" ? stats.totalLikes :
-            statModalOpen === "views" ? stats.totalViews :
-            statModalOpen === "helped" ? stats.helpedRequests :
-            stats.contributionScore
-          }
-          isOwner={isOwnProfile}
-        />
-      )}
     </MainLayout>
   );
 }

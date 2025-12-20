@@ -50,7 +50,6 @@ export function MainLayout({ children }: MainLayoutProps) {
               <span className="font-semibold text-foreground hidden sm:inline">NoteHall</span>
             </div>
             <SearchBar 
-              notes={allNotes}
               onSelectNote={handleNoteSelect}
               placeholder="Search notes, subjects, topics..."
             />

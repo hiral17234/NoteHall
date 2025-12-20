@@ -35,7 +35,7 @@ const ecosystemItems = [
 
 const mainNavItems = [
   { title: "Help Desk", path: "/helpdesk", icon: HelpCircle },
-  { title: "Gemini", path: "/ai-assistant", icon: Bot },
+  { title: "Gemini", path: "/gemini", icon: Bot },
   { title: "Profile", path: "/profile", icon: User },
   { title: "Settings", path: "/settings", icon: Settings },
 ];

@@ -1,21 +1,12 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Search, X, FileText, User, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useDebounce } from "@/hooks/useDebounce";
+import { notesService, Note } from "@/services/firestoreService";
 import { cn } from "@/lib/utils";
 
-interface Note {
-  id: string;
-  title: string;
-  subject: string;
-  author: string;
-  branch?: string;
-  topic?: string;
-}
-
 interface SearchBarProps {
-  notes: Note[];
   onSelectNote?: (note: Note) => void;
   onSearch?: (query: string, results: Note[]) => void;
   placeholder?: string;
@@ -23,7 +14,6 @@ interface SearchBarProps {
 }
 
 export function SearchBar({ 
-  notes, 
   onSelectNote, 
   onSearch,
   placeholder = "Search notes, subjects, topics...",
@@ -33,12 +23,12 @@ export function SearchBar({
   const [isOpen, setIsOpen] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [results, setResults] = useState<Note[]>([]);
-  const debouncedQuery = useDebounce(query, 200);
+  const debouncedQuery = useDebounce(query, 300);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Perform search when debounced query changes
-  useEffect(() => {
-    if (!debouncedQuery.trim()) {
+  // Perform real Firestore search when debounced query changes
+  const performSearch = useCallback(async (searchQuery: string) => {
+    if (!searchQuery.trim()) {
       setResults([]);
       setIsSearching(false);
       onSearch?.("", []);
@@ -46,28 +36,21 @@ export function SearchBar({
     }
 
     setIsSearching(true);
-    const normalizedQuery = debouncedQuery.toLowerCase();
+    try {
+      const searchResults = await notesService.search(searchQuery);
+      setResults(searchResults);
+      onSearch?.(searchQuery, searchResults);
+    } catch (error) {
+      console.error("Search error:", error);
+      setResults([]);
+    } finally {
+      setIsSearching(false);
+    }
+  }, [onSearch]);
 
-    const filtered = notes.filter(note => {
-      const title = (note.title || "").toLowerCase();
-      const subject = (note.subject || "").toLowerCase();
-      const author = (note.author || "").toLowerCase();
-      const topic = (note.topic || "").toLowerCase();
-      const branch = (note.branch || "").toLowerCase();
-
-      return (
-        title.includes(normalizedQuery) ||
-        subject.includes(normalizedQuery) ||
-        author.includes(normalizedQuery) ||
-        topic.includes(normalizedQuery) ||
-        branch.includes(normalizedQuery)
-      );
-    });
-
-    setResults(filtered);
-    setIsSearching(false);
-    onSearch?.(debouncedQuery, filtered);
-  }, [debouncedQuery, notes, onSearch]);
+  useEffect(() => {
+    performSearch(debouncedQuery);
+  }, [debouncedQuery, performSearch]);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -80,19 +63,23 @@ export function SearchBar({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const highlightMatch = (text: string, query: string) => {
-    if (!query.trim()) return text;
-    const regex = new RegExp(`(${query})`, "gi");
-    const parts = text.split(regex);
-    return parts.map((part, i) =>
-      regex.test(part) ? (
-        <mark key={i} className="bg-primary/30 text-foreground rounded px-0.5">
-          {part}
-        </mark>
-      ) : (
-        part
-      )
-    );
+  const highlightMatch = (text: string, searchQuery: string) => {
+    if (!searchQuery.trim() || !text) return text;
+    try {
+      const regex = new RegExp(`(${searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, "gi");
+      const parts = text.split(regex);
+      return parts.map((part, i) =>
+        regex.test(part) ? (
+          <mark key={i} className="bg-primary/30 text-foreground rounded px-0.5">
+            {part}
+          </mark>
+        ) : (
+          part
+        )
+      );
+    } catch {
+      return text;
+    }
   };
 
   const handleSelect = (note: Note) => {
@@ -168,7 +155,7 @@ export function SearchBar({
                       <span>•</span>
                       <span className="flex items-center gap-1">
                         <User className="w-3 h-3" />
-                        {highlightMatch(note.author, query)}
+                        {highlightMatch(note.authorName, query)}
                       </span>
                     </div>
                     {note.topic && (

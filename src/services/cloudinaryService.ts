@@ -91,6 +91,17 @@ class CloudinaryService {
     });
   }
 
+  // Alias for convenience
+  async uploadFile(
+    file: File,
+    onProgress?: (progress: number) => void
+  ): Promise<CloudinaryUploadResult> {
+    return this.upload(file, {
+      folder: "notehall",
+      onProgress: onProgress ? (p) => onProgress(p.percentage) : undefined,
+    });
+  }
+
   async uploadMultiple(
     files: File[],
     options?: {
