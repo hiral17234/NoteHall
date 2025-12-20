@@ -78,11 +78,12 @@ export default function Login() {
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <Card className="w-full max-w-md bg-card border-border">
         <CardHeader className="text-center">
-          <div className="flex justify-center items-center gap-2 mb-4">
-            <img src={logo} alt="NoteHall" className="h-12 w-auto" />
-            <span className="font-bold text-xl text-foreground">NoteHall</span>
+          <div className="flex flex-col justify-center items-center gap-3 mb-4">
+            <img src={logo} alt="NoteHall" className="h-16 w-auto" />
+            <h1 className="font-bold text-3xl text-primary tracking-tight">NoteHall</h1>
+            <p className="text-sm text-muted-foreground">Your Academic Note Sharing Platform</p>
           </div>
-          <CardTitle className="text-2xl">Welcome back</CardTitle>
+          <CardTitle className="text-xl">Welcome back</CardTitle>
           <CardDescription>Sign in to your NoteHall account</CardDescription>
         </CardHeader>
         <CardContent>

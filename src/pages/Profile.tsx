@@ -9,6 +9,7 @@ import { ContributionCard, Contribution } from "@/components/helpdesk/Contributi
 import { StatDetailModal, AchievementsSection, Achievement } from "@/components/profile/StatDetailModal";
 import { useAuth, UserProfile } from "@/contexts/AuthContext";
 import { usersService, notesService, Note, contributionsService, helpRequestsService, achievementsService } from "@/services/firestoreService";
+import { parseSocialLink } from "@/lib/socialLinks";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -34,6 +35,7 @@ import {
   Flame,
   Share2,
   ArrowLeft,
+  Download,
 } from "lucide-react";
 
 const getBadgeIcon = (iconName: string) => {
@@ -58,6 +60,7 @@ export default function Profile() {
   const [profileData, setProfileData] = useState<UserProfile | null>(null);
   const [uploadedNotes, setUploadedNotes] = useState<Note[]>([]);
   const [savedNotes, setSavedNotes] = useState<Note[]>([]);
+  const [downloadedNotes, setDownloadedNotes] = useState<any[]>([]);
   const [contributions, setContributions] = useState<any[]>([]);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [statModalOpen, setStatModalOpen] = useState<"uploads" | "likes" | "views" | "helped" | "score" | null>(null);
@@ -103,6 +106,12 @@ export default function Profile() {
         setUploadedNotes(notes);
         setSavedNotes(saved);
         setContributions(contribs);
+        
+        // Load downloaded notes from localStorage (only for own profile)
+        if (isOwnProfile) {
+          const downloaded = JSON.parse(localStorage.getItem("notehall_downloaded_notes") || "[]");
+          setDownloadedNotes(downloaded);
+        }
       } catch (error) {
         console.error("Error loading content:", error);
       } finally {
@@ -233,7 +242,7 @@ export default function Profile() {
                       variant="outline" 
                       size="sm" 
                       className="gap-1.5"
-                      onClick={() => window.open(`https://github.com/${profileData.github}`, '_blank', 'noopener,noreferrer')}
+                      onClick={() => window.open(parseSocialLink(profileData.github, 'github'), '_blank', 'noopener,noreferrer')}
                     >
                       <Github className="w-4 h-4" />
                       GitHub
@@ -244,7 +253,7 @@ export default function Profile() {
                       variant="outline" 
                       size="sm" 
                       className="gap-1.5"
-                      onClick={() => window.open(`https://linkedin.com/in/${profileData.linkedin}`, '_blank', 'noopener,noreferrer')}
+                      onClick={() => window.open(parseSocialLink(profileData.linkedin, 'linkedin'), '_blank', 'noopener,noreferrer')}
                     >
                       <Linkedin className="w-4 h-4" />
                       LinkedIn
@@ -255,7 +264,7 @@ export default function Profile() {
                       variant="outline" 
                       size="sm" 
                       className="gap-1.5"
-                      onClick={() => window.open(`https://${profileData.portfolio}`, '_blank', 'noopener,noreferrer')}
+                      onClick={() => window.open(parseSocialLink(profileData.portfolio, 'portfolio'), '_blank', 'noopener,noreferrer')}
                     >
                       <Globe className="w-4 h-4" />
                       Portfolio
@@ -266,7 +275,7 @@ export default function Profile() {
                       variant="outline" 
                       size="sm" 
                       className="gap-1.5"
-                      onClick={() => window.open(`https://instagram.com/${profileData.instagram}`, '_blank', 'noopener,noreferrer')}
+                      onClick={() => window.open(parseSocialLink(profileData.instagram, 'instagram'), '_blank', 'noopener,noreferrer')}
                     >
                       <Instagram className="w-4 h-4" />
                     </Button>
@@ -276,7 +285,7 @@ export default function Profile() {
                       variant="outline" 
                       size="sm" 
                       className="gap-1.5"
-                      onClick={() => window.open(`https://x.com/${profileData.twitter}`, '_blank', 'noopener,noreferrer')}
+                      onClick={() => window.open(parseSocialLink(profileData.twitter, 'twitter'), '_blank', 'noopener,noreferrer')}
                     >
                       <Twitter className="w-4 h-4" />
                     </Button>
@@ -376,6 +385,12 @@ export default function Profile() {
               <TabsTrigger value="saved" className="gap-2 data-[state=active]:bg-card">
                 <Bookmark className="w-4 h-4" />
                 Saved ({savedNotes.length})
+              </TabsTrigger>
+            )}
+            {isOwnProfile && (
+              <TabsTrigger value="downloaded" className="gap-2 data-[state=active]:bg-card">
+                <Download className="w-4 h-4" />
+                Downloaded ({downloadedNotes.length})
               </TabsTrigger>
             )}
             <TabsTrigger value="contributions" className="gap-2 data-[state=active]:bg-card">

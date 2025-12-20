@@ -8,17 +8,22 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
-import { User, Bell, Shield, Palette, LogOut, AlertTriangle } from "lucide-react";
+import { User, Bell, Shield, Palette, LogOut, AlertTriangle, Key, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "@/contexts/UserContext";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { sendPasswordResetEmail } from "firebase/auth";
+import { auth } from "@/lib/firebase";
 
 export default function Settings() {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { user, updateUser, preferences, updatePreferences, privacy, updatePrivacy, softDeleteAccount } = useUser();
+  const { userProfile } = useAuth();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [passwordResetLoading, setPasswordResetLoading] = useState(false);
   
   // Form state
   const [formData, setFormData] = useState({
@@ -367,17 +372,6 @@ export default function Settings() {
                   />
                 </div>
                 
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium text-foreground">Allow Direct Messages</p>
-                    <p className="text-sm text-muted-foreground">Let others send you direct messages</p>
-                  </div>
-                  <Switch 
-                    checked={privacy.allowDirectMessages}
-                    onCheckedChange={(checked) => handlePrivacyChange("allowDirectMessages", checked)}
-                  />
-                </div>
-
                 <Separator />
 
                 <div className="space-y-4">

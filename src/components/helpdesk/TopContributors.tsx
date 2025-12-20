@@ -1,8 +1,11 @@
-import { Award, Flame, TrendingUp, Crown } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Flame, TrendingUp, Crown, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { collection, getDocs, query, orderBy, limit } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 interface Contributor {
   id: string;
@@ -10,16 +13,10 @@ interface Contributor {
   avatar?: string;
   branch: string;
   year: string;
-  contributionsThisWeek: number;
+  contributionScore: number;
   streak: number;
   rank: number;
 }
-
-const mockTopContributors: Contributor[] = [
-  { id: "1", name: "Priya Sharma", branch: "CSE", year: "3rd Year", contributionsThisWeek: 12, streak: 21, rank: 1 },
-  { id: "2", name: "Amit Kumar", branch: "CSE", year: "2nd Year", contributionsThisWeek: 9, streak: 14, rank: 2 },
-  { id: "3", name: "John Doe", branch: "CSE", year: "3rd Year", contributionsThisWeek: 7, streak: 12, rank: 3 },
-];
 
 const streakBadges = [
   { days: 7, label: "7 Day", color: "bg-orange-500/20 text-orange-500" },
@@ -40,6 +37,76 @@ const rankStyles = {
 };
 
 export function TopContributors({ onViewProfile }: { onViewProfile?: (userId: string) => void }) {
+  const [contributors, setContributors] = useState<Contributor[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchTopContributors = async () => {
+      try {
+        // Query users ordered by contribution score
+        const usersRef = collection(db, "users");
+        const q = query(usersRef, orderBy("stats.contributionScore", "desc"), limit(5));
+        const snapshot = await getDocs(q);
+        
+        const topUsers: Contributor[] = snapshot.docs
+          .map((doc, index) => {
+            const data = doc.data();
+            return {
+              id: doc.id,
+              name: data.name || "Anonymous",
+              avatar: data.avatar,
+              branch: data.branch || "Unknown",
+              year: data.year || "Unknown",
+              contributionScore: data.stats?.contributionScore || 0,
+              streak: data.streak || 0,
+              rank: index + 1,
+            };
+          })
+          .filter(user => user.contributionScore > 0); // Only show users with contributions
+        
+        setContributors(topUsers);
+      } catch (error) {
+        console.error("Error fetching top contributors:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTopContributors();
+  }, []);
+
+  if (loading) {
+    return (
+      <Card className="bg-card border-border">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Crown className="w-5 h-5 text-primary" />
+            Top Contributors This Week
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex items-center justify-center py-8">
+          <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (contributors.length === 0) {
+    return (
+      <Card className="bg-card border-border">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Crown className="w-5 h-5 text-primary" />
+            Top Contributors This Week
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="py-8 text-center text-muted-foreground">
+          <p className="text-sm">No contributors yet. Be the first!</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card className="bg-card border-border">
       <CardHeader className="pb-3">
@@ -49,7 +116,7 @@ export function TopContributors({ onViewProfile }: { onViewProfile?: (userId: st
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
-        {mockTopContributors.map((contributor) => {
+        {contributors.map((contributor) => {
           const streakBadge = getStreakBadge(contributor.streak);
           return (
             <div
@@ -93,7 +160,7 @@ export function TopContributors({ onViewProfile }: { onViewProfile?: (userId: st
                 )}
                 <div className="flex items-center gap-1 text-xs text-muted-foreground">
                   <TrendingUp className="w-3 h-3 text-chart-1" />
-                  <span className="font-medium">{contributor.contributionsThisWeek}</span>
+                  <span className="font-medium">{contributor.contributionScore}</span>
                 </div>
               </div>
             </div>
