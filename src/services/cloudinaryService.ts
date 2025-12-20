@@ -1,8 +1,8 @@
 // Cloudinary Upload Service for NoteHall
 // Uses unsigned uploads with preset
 
-const CLOUDINARY_CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
-const CLOUDINARY_UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
+const CLOUDINARY_CLOUD_NAME = "dxapljgci";
+const CLOUDINARY_UPLOAD_PRESET = "notehall_uploads";
 
 export interface CloudinaryUploadResult {
   secure_url: string;
