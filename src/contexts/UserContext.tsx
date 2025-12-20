@@ -1,43 +1,9 @@
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from "react";
 import { notificationService, Notification } from "@/services/notificationService";
+import { useAuth, UserProfile } from "@/contexts/AuthContext";
 
-// Types
-export interface UserProfile {
-  id: string;
-  name: string;
-  username: string;
-  email: string;
-  phone?: string;
-  bio: string;
-  college: string;
-  branch: string;
-  year: string;
-  degree: string;
-  avatar: string;
-  github: string;
-  linkedin: string;
-  portfolio: string;
-  instagram: string;
-  twitter: string;
-  streak: number;
-  lastActiveDate: string;
-  isActive: boolean;
-  deletedAt?: string;
-  stats: {
-    uploads: number;
-    totalLikes: number;
-    totalViews: number;
-    helpedRequests: number;
-    contributionScore: number;
-  };
-  badges: Array<{
-    id: string;
-    label: string;
-    icon: string;
-    color: string;
-    earnedAt?: string;
-  }>;
-}
+// Re-export UserProfile from AuthContext for backwards compatibility
+export type { UserProfile } from "@/contexts/AuthContext";
 
 export interface UserPreferences {
   theme: "light" | "dark" | "system";
@@ -58,7 +24,7 @@ export interface PrivacySettings {
 }
 
 interface UserContextType {
-  // User
+  // User - synced from AuthContext
   user: UserProfile | null;
   isAuthenticated: boolean;
   isLoading: boolean;
@@ -104,42 +70,7 @@ const defaultPrivacy: PrivacySettings = {
   allowDirectMessages: true,
 };
 
-const defaultUser: UserProfile = {
-  id: "current-user",
-  name: "John Doe",
-  username: "johndoe",
-  email: "john@example.com",
-  phone: "+91 9876543210",
-  bio: "CSE student passionate about coding and sharing knowledge 🚀🔥 Love to help others learn! 📚",
-  college: "MITS Gwalior",
-  branch: "Computer Science",
-  year: "3rd Year",
-  degree: "btech",
-  avatar: "",
-  github: "johndoe",
-  linkedin: "johndoe",
-  portfolio: "johndoe.dev",
-  instagram: "johndoe",
-  twitter: "johndoe",
-  streak: 12,
-  lastActiveDate: new Date().toISOString(),
-  isActive: true,
-  stats: {
-    uploads: 24,
-    totalLikes: 1250,
-    totalViews: 8500,
-    helpedRequests: 15,
-    contributionScore: 92,
-  },
-  badges: [
-    { id: "top", label: "Top Contributor", icon: "Award", color: "bg-primary/20 text-primary" },
-    { id: "helpful", label: "Helpful", icon: "Star", color: "bg-chart-1/20 text-chart-1" },
-    { id: "streak-7", label: "7 Day Streak", icon: "Flame", color: "bg-orange-500/20 text-orange-500", earnedAt: "2024-01-10" },
-  ],
-};
-
 const STORAGE_KEYS = {
-  USER: "notehall_user",
   PREFERENCES: "notehall_preferences",
   PRIVACY: "notehall_privacy",
 };
@@ -147,26 +78,18 @@ const STORAGE_KEYS = {
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
 export function UserProvider({ children }: { children: ReactNode }) {
-  const [user, setUserState] = useState<UserProfile | null>(null);
+  // Sync user from AuthContext - this is the single source of truth
+  const { userProfile, isAuthenticated: authIsAuthenticated, isLoading: authIsLoading, updateUserProfile, logout: authLogout } = useAuth();
+  
   const [preferences, setPreferences] = useState<UserPreferences>(defaultPreferences);
   const [privacy, setPrivacy] = useState<PrivacySettings>(defaultPrivacy);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Initialize from localStorage
+  // Initialize preferences and privacy from localStorage
   useEffect(() => {
-    const initializeUser = async () => {
+    const initializeSettings = async () => {
       try {
-        // Load user
-        const storedUser = localStorage.getItem(STORAGE_KEYS.USER);
-        if (storedUser) {
-          setUserState(JSON.parse(storedUser));
-        } else {
-          // Use default user for demo
-          setUserState(defaultUser);
-          localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(defaultUser));
-        }
-
         // Load preferences
         const storedPrefs = localStorage.getItem(STORAGE_KEYS.PREFERENCES);
         if (storedPrefs) {
@@ -183,13 +106,13 @@ export function UserProvider({ children }: { children: ReactNode }) {
         const notifs = await notificationService.initialize();
         setNotifications(notifs);
       } catch (error) {
-        console.error("Error initializing user:", error);
+        console.error("Error initializing settings:", error);
       } finally {
         setIsLoading(false);
       }
     };
 
-    initializeUser();
+    initializeSettings();
   }, []);
 
   // Apply theme
@@ -228,21 +151,13 @@ export function UserProvider({ children }: { children: ReactNode }) {
   }, [preferences.compactMode]);
 
   const updateUser = useCallback((updates: Partial<UserProfile>) => {
-    setUserState(prev => {
-      if (!prev) return prev;
-      const updated = { ...prev, ...updates };
-      localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(updated));
-      return updated;
-    });
-  }, []);
+    // Delegate to AuthContext
+    updateUserProfile(updates);
+  }, [updateUserProfile]);
 
-  const setUser = useCallback((newUser: UserProfile | null) => {
-    setUserState(newUser);
-    if (newUser) {
-      localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(newUser));
-    } else {
-      localStorage.removeItem(STORAGE_KEYS.USER);
-    }
+  const setUser = useCallback((_newUser: UserProfile | null) => {
+    // This is now managed by AuthContext - no-op for backwards compatibility
+    console.warn("setUser is deprecated, user state is managed by AuthContext");
   }, []);
 
   const updatePreferences = useCallback((updates: Partial<UserPreferences>) => {
@@ -262,8 +177,8 @@ export function UserProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const isOwner = useCallback((profileId: string) => {
-    return profileId === user?.id || profileId === "current-user";
-  }, [user?.id]);
+    return profileId === userProfile?.id;
+  }, [userProfile?.id]);
 
   const markNotificationAsRead = useCallback(async (id: string) => {
     await notificationService.markAsRead(id);
@@ -281,26 +196,22 @@ export function UserProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(() => {
-    localStorage.removeItem(STORAGE_KEYS.USER);
-    setUserState(null);
-  }, []);
+    authLogout();
+  }, [authLogout]);
 
   const softDeleteAccount = useCallback(() => {
-    if (user) {
-      const deleted = { ...user, isActive: false, deletedAt: new Date().toISOString() };
-      localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(deleted));
-      setUserState(null);
-    }
-  }, [user]);
+    // This would need proper implementation with Firebase
+    console.warn("softDeleteAccount not yet implemented with Firebase");
+  }, []);
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
   return (
     <UserContext.Provider
       value={{
-        user,
-        isAuthenticated: !!user && user.isActive,
-        isLoading,
+        user: userProfile,
+        isAuthenticated: authIsAuthenticated,
+        isLoading: authIsLoading || isLoading,
         updateUser,
         setUser,
         isOwner,
