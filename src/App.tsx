@@ -60,67 +60,68 @@ function AuthRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-// Onboarding wrapper
-function OnboardingWrapper({ children }: { children: React.ReactNode }) {
+// Onboarding dialog component
+function OnboardingWrapper() {
   const { needsOnboarding, completeOnboarding, userProfile } = useAuth();
   
   return (
+    <OnboardingDialog 
+      open={needsOnboarding} 
+      onComplete={completeOnboarding}
+      userName={userProfile?.name}
+    />
+  );
+}
+
+// Main app content with routing - must be inside AuthProvider
+function AppContent() {
+  return (
     <>
-      {children}
-      <OnboardingDialog 
-        open={needsOnboarding} 
-        onComplete={completeOnboarding}
-        userName={userProfile?.name}
-      />
+      <Routes>
+        <Route path="/login" element={<AuthRoute><Login /></AuthRoute>} />
+        <Route path="/signup" element={<AuthRoute><Signup /></AuthRoute>} />
+        <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+        <Route path="/upload" element={<ProtectedRoute><Upload /></ProtectedRoute>} />
+        <Route path="/helpdesk" element={<ProtectedRoute><HelpDesk /></ProtectedRoute>} />
+        <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+        <Route path="/profile/:userId" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+        <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+        <Route path="/gemini" element={<ProtectedRoute><Gemini /></ProtectedRoute>} />
+        <Route 
+          path="/campusvoice" 
+          element={<Placeholder title="CampusVoice" description="Share your campus experiences and feedback. Coming soon!" externalUrl="https://campusvoice-git-main-hiral-goyals-projects.vercel.app/" />} 
+        />
+        <Route 
+          path="/campusbuzz" 
+          element={<Placeholder title="CampusBuzz" description="Stay updated with the latest campus news and events. Coming soon!" />} 
+        />
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+      <OnboardingWrapper />
     </>
   );
 }
 
-const AppRoutes = () => (
-  <OnboardingWrapper>
-    <Routes>
-      <Route path="/login" element={<AuthRoute><Login /></AuthRoute>} />
-      <Route path="/signup" element={<AuthRoute><Signup /></AuthRoute>} />
-      <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-      <Route path="/upload" element={<ProtectedRoute><Upload /></ProtectedRoute>} />
-      <Route path="/helpdesk" element={<ProtectedRoute><HelpDesk /></ProtectedRoute>} />
-      <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-      <Route path="/profile/:userId" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-      <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-      <Route path="/gemini" element={<ProtectedRoute><Gemini /></ProtectedRoute>} />
-      <Route 
-        path="/campusvoice" 
-        element={<Placeholder title="CampusVoice" description="Share your campus experiences and feedback. Coming soon!" externalUrl="https://campusvoice-git-main-hiral-goyals-projects.vercel.app/" />} 
-      />
-      <Route 
-        path="/campusbuzz" 
-        element={<Placeholder title="CampusBuzz" description="Stay updated with the latest campus news and events. Coming soon!" />} 
-      />
-      <Route path="*" element={<NotFound />} />
-    </Routes>
-  </OnboardingWrapper>
-);
-
 const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <UserProvider>
-          <SavedNotesProvider>
-            <HelpRequestsProvider>
-              <SearchProvider>
-                <TooltipProvider>
-                  <Toaster />
-                  <Sonner />
-                  <BrowserRouter>
-                    <AppRoutes />
-                  </BrowserRouter>
-                </TooltipProvider>
-              </SearchProvider>
-            </HelpRequestsProvider>
-          </SavedNotesProvider>
-        </UserProvider>
-      </AuthProvider>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <AuthProvider>
+            <UserProvider>
+              <SavedNotesProvider>
+                <HelpRequestsProvider>
+                  <SearchProvider>
+                    <AppContent />
+                  </SearchProvider>
+                </HelpRequestsProvider>
+              </SavedNotesProvider>
+            </UserProvider>
+          </AuthProvider>
+        </BrowserRouter>
+      </TooltipProvider>
     </QueryClientProvider>
   );
 };
