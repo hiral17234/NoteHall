@@ -10,7 +10,7 @@ import {
   updateProfile
 } from "firebase/auth";
 import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
-import { auth, db, googleProvider, githubProvider, getServerTimestamp, firebaseReady } from "@/lib/firebase";
+import { auth, db, googleProvider, githubProvider, getServerTimestamp } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
 
 // Types
