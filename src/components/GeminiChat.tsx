@@ -88,19 +88,8 @@ export function GeminiChat({ noteContext, className }: GeminiChatProps) {
     sendMessage(prompt);
   };
 
-  if (!isConfigured) {
-    return (
-      <Card className={cn("bg-card border-border", className)}>
-        <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-          <AlertCircle className="w-12 h-12 text-destructive mb-4" />
-          <h3 className="font-semibold text-lg text-foreground mb-2">Gemini Not Configured</h3>
-          <p className="text-muted-foreground text-sm max-w-sm">
-            Please add your Gemini API key as <code className="bg-muted px-1.5 py-0.5 rounded">VITE_GEMINI_API_KEY</code> in your environment variables.
-          </p>
-        </CardContent>
-      </Card>
-    );
-  }
+  // Gemini is always configured via backend API
+  // No need to check for API key on frontend
 
   return (
     <Card className={cn("bg-card border-border flex flex-col h-full", className)}>

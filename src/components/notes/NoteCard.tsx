@@ -251,7 +251,7 @@ export function NoteCard({ note, onAskAI, onExpand }: NoteCardProps) {
             <Star
               className={cn(
                 "w-4 h-4",
-                star <= rating ? "fill-chart-1 text-chart-1" : "text-muted-foreground"
+                star <= rating ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground"
               )}
             />
           </button>
@@ -471,7 +471,7 @@ export function NoteCard({ note, onAskAI, onExpand }: NoteCardProps) {
                     <Star
                       className={cn(
                         "w-8 h-8 transition-colors",
-                        star <= userRating ? "fill-chart-1 text-chart-1" : "text-muted-foreground hover:text-chart-1/50"
+                        star <= userRating ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground hover:text-yellow-400/50"
                       )}
                     />
                   </button>
