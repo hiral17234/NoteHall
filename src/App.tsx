@@ -8,8 +8,6 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { SavedNotesProvider } from "@/contexts/SavedNotesContext";
 import { SearchProvider } from "@/contexts/SearchContext";
 import { HelpRequestsProvider } from "@/contexts/HelpRequestsContext";
-import { firebaseReady } from "@/lib/firebase";
-import { FirebaseConfigError } from "@/components/FirebaseConfigError";
 import Index from "./pages/Index";
 import Upload from "./pages/Upload";
 import HelpDesk from "./pages/HelpDesk";
@@ -103,19 +101,7 @@ const AppRoutes = () => (
   </OnboardingWrapper>
 );
 
-// Main App with Firebase check
 const App = () => {
-  // Show config error if Firebase is not ready
-  if (!firebaseReady) {
-    return (
-      <QueryClientProvider client={queryClient}>
-        <TooltipProvider>
-          <FirebaseConfigError />
-        </TooltipProvider>
-      </QueryClientProvider>
-    );
-  }
-
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
