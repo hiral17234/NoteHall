@@ -113,6 +113,10 @@ export default function Profile() {
     }
   };
 
+  // Computed live stats
+  const [liveStats, setLiveStats] = useState({ uploads: 0, totalLikes: 0, totalViews: 0 });
+  const [helpedCount, setHelpedCount] = useState(0);
+
   // REAL-TIME PROFILE SUBSCRIPTION
   useEffect(() => {
     if (!targetUserId) {
@@ -130,18 +134,36 @@ export default function Profile() {
     return () => unsubscribe();
   }, [targetUserId]);
 
+  // REAL-TIME COMPUTED STATS (uploads, likes, views)
+  useEffect(() => {
+    if (!targetUserId) return;
+
+    const unsubStats = usersService.subscribeToComputedStats(targetUserId, (computed) => {
+      setLiveStats(computed);
+    });
+
+    const unsubHelped = usersService.subscribeToHelpedCount(targetUserId, (count) => {
+      setHelpedCount(count);
+    });
+
+    return () => {
+      unsubStats();
+      unsubHelped();
+    };
+  }, [targetUserId]);
+
   // REAL-TIME CONTENT SUBSCRIPTIONS
   useEffect(() => {
     if (!profileData?.id) return;
 
     // 1. Live Uploads
     const qUploads = query(
-      collection(db, "notes"), 
-      where("userId", "==", profileData.id), 
+      collection(db, "notes"),
+      where("authorId", "==", profileData.id),
       orderBy("createdAt", "desc")
     );
     const unsubUploads = onSnapshot(qUploads, (snap) => {
-      setUploadedNotes(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Note)));
+      setUploadedNotes(snap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as Note)));
     });
 
     // 2. Live Contributions
@@ -156,9 +178,7 @@ export default function Profile() {
     if (isOwnProfile) {
       // 3. Live Saved Notes (Requires fetching Note data for each ref)
       unsubSaved = usersService.subscribeToSavedNotes(profileData.id, async (savedRefs) => {
-        const notes = await Promise.all(
-          savedRefs.map(ref => notesService.getById(ref.noteId))
-        );
+        const notes = await Promise.all(savedRefs.map((ref) => notesService.getById(ref.noteId)));
         setSavedNotes(notes.filter((n): n is Note => n !== null));
       });
 
@@ -167,14 +187,14 @@ export default function Profile() {
         setDownloadedNotes(downloaded);
       });
 
-      // 5. Live My Requests (New Feature from Report)
+      // 5. Live My Requests
       const qRequests = query(
         collection(db, "requests"),
         where("requesterId", "==", profileData.id),
         orderBy("createdAt", "desc")
       );
       unsubRequests = onSnapshot(qRequests, (snap) => {
-        setUserRequests(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        setUserRequests(snap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() })));
       });
     }
 
@@ -189,14 +209,23 @@ export default function Profile() {
 
   const handleProfileSave = async (updatedProfile: any) => {
     await updateUserProfile(updatedProfile);
-    setProfileData(prev => prev ? { ...prev, ...updatedProfile } : null);
+    setProfileData((prev) => (prev ? { ...prev, ...updatedProfile } : null));
   };
 
-  const currentStreakBadge = streakBadges.filter(b => (profileData?.streak || 0) >= b.days).pop();
-  const stats = profileData?.stats || { uploads: 0, totalLikes: 0, totalViews: 0, helpedRequests: 0, contributionScore: 0 };
+  const currentStreakBadge = streakBadges.filter((b) => (profileData?.streak || 0) >= b.days).pop();
 
-  const earnedAchievementsList = profileData?.stats ? achievementsService.checkAchievements(profileData.stats, profileData.streak || 0) : [];
-  const displayAchievements: Achievement[] = earnedAchievementsList.map(a => ({
+  // Merge profile.stats with live computed stats for display
+  const storedStats = profileData?.stats || { uploads: 0, totalLikes: 0, totalViews: 0, helpedRequests: 0, contributionScore: 0 };
+  const stats = {
+    uploads: liveStats.uploads || storedStats.uploads,
+    totalLikes: liveStats.totalLikes || storedStats.totalLikes,
+    totalViews: liveStats.totalViews || storedStats.totalViews,
+    helpedRequests: helpedCount || storedStats.helpedRequests,
+    contributionScore: storedStats.contributionScore,
+  };
+
+  const earnedAchievementsList = achievementsService.checkAchievements(stats, profileData?.streak || 0);
+  const displayAchievements: Achievement[] = earnedAchievementsList.map((a) => ({
     id: a.id,
     title: a.label,
     description: a.description,
