@@ -37,6 +37,7 @@ import {
   onSnapshot, 
   orderBy, 
   addDoc, 
+  deleteDoc,
   serverTimestamp, 
   updateDoc, 
   doc, 
@@ -235,6 +236,16 @@ export function RequestCard({ request, onHelp, onMarkFulfilled }: RequestCardPro
     }
   };
 
+  const handleDeleteComment = async (commentId: string) => {
+    if (!userProfile) return;
+    try {
+      await deleteDoc(doc(db, "requests", request.id, "comments", commentId));
+      toast({ title: "Deleted", description: "Comment removed." });
+    } catch (e) {
+      toast({ title: "Error", description: "Failed to delete comment.", variant: "destructive" });
+    }
+  };
+
   const handleViewProfile = (userId: string) => {
     navigate(`/profile/${userId}`);
   };
@@ -369,7 +380,7 @@ export function RequestCard({ request, onHelp, onMarkFulfilled }: RequestCardPro
                   <Upload className="w-4 h-4" />
                   Help
                 </Button>
-                {isOwner && liveContributions.length > 0 && (
+                {isOwner && (
                   <Button
                     variant="outline"
                     size="sm"
@@ -463,16 +474,28 @@ export function RequestCard({ request, onHelp, onMarkFulfilled }: RequestCardPro
           <div className="space-y-4 mt-4 max-h-64 overflow-y-auto">
             {liveComments.length === 0 && <p className="text-sm text-center text-muted-foreground">No comments yet.</p>}
             {liveComments.map((comment) => (
-              <div key={comment.id} className="flex gap-3">
+              <div key={comment.id} className="flex gap-3 group">
                 <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                   <User className="w-4 h-4 text-primary" />
                 </div>
                 <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium text-sm text-foreground">{comment.author}</span>
-                    <span className="text-[10px] text-muted-foreground">
-                      {comment.createdAt?.seconds ? new Date(comment.createdAt.seconds * 1000).toLocaleTimeString() : "Just now"}
-                    </span>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-sm text-foreground">{comment.author}</span>
+                      <span className="text-[10px] text-muted-foreground">
+                        {comment.createdAt?.seconds ? new Date(comment.createdAt.seconds * 1000).toLocaleTimeString() : "Just now"}
+                      </span>
+                    </div>
+                    {comment.userId === userProfile?.id && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive hover:bg-destructive/10"
+                        onClick={() => handleDeleteComment(comment.id)}
+                      >
+                        <X className="w-3 h-3" />
+                      </Button>
+                    )}
                   </div>
                   <p className="text-sm text-muted-foreground mt-1">{comment.text}</p>
                 </div>
