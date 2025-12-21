@@ -12,6 +12,7 @@ import {
 import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import { auth, db, googleProvider, githubProvider, getServerTimestamp } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
+import { fcmService } from "@/services/fcmService";
 
 // Types
 export interface UserProfile {
@@ -157,6 +158,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (profile) {
           setUserProfile(profile);
           setNeedsOnboarding(!profile.onboardingComplete);
+          
+          // Initialize FCM for push notifications
+          try {
+            await fcmService.requestPermission(user.uid);
+          } catch (error) {
+            console.log("FCM initialization skipped:", error);
+          }
         } else {
           setNeedsOnboarding(true);
         }

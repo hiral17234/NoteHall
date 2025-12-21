@@ -67,6 +67,8 @@ export interface HelpRequest {
   requesterUsername: string;
   status: 'open' | 'in_progress' | 'fulfilled' | 'closed';
   contributionsCount: number;
+  likes?: string[];
+  commentsCount?: number;
   createdAt: any;
   updatedAt: any;
 }

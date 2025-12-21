@@ -1,8 +1,8 @@
-import { FileText, Inbox, Search, Bookmark, HelpCircle } from "lucide-react";
+import { FileText, Inbox, Search, Bookmark, HelpCircle, Bell } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface EmptyStateProps {
-  type: "notes" | "requests" | "search" | "saved" | "helped";
+  type: "notes" | "requests" | "search" | "saved" | "helped" | "notifications";
   title?: string;
   description?: string;
   className?: string;
@@ -33,6 +33,11 @@ const emptyStateConfig = {
     icon: Inbox,
     title: "No helped requests",
     description: "Help others by uploading requested materials.",
+  },
+  notifications: {
+    icon: Bell,
+    title: "No notifications",
+    description: "When you get likes, comments, or contributions, they'll show up here.",
   },
 };
 

@@ -108,6 +108,7 @@ export function RequestCard({ request, onHelp }: RequestCardProps) {
   // Real-time Data States
   const [liveContributions, setLiveContributions] = useState<Contribution[]>([]);
   const [liveComments, setLiveComments] = useState<any[]>([]);
+  const [liveLikes, setLiveLikes] = useState<string[]>(request.likes || []);
   const [newComment, setNewComment] = useState("");
   const [helpData, setHelpData] = useState({
     file: null as File | null,
@@ -115,8 +116,20 @@ export function RequestCard({ request, onHelp }: RequestCardProps) {
     message: "",
   });
 
-  const liked = request.likes?.includes(userProfile?.id || "");
-  const likeCount = request.likes?.length || 0;
+  const liked = liveLikes.includes(userProfile?.id || "");
+  const likeCount = liveLikes.length;
+
+  // Real-time Listener for Request doc (for likes)
+  useEffect(() => {
+    const requestRef = doc(db, "requests", request.id);
+    const unsubscribe = onSnapshot(requestRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setLiveLikes(data.likes || []);
+      }
+    });
+    return () => unsubscribe();
+  }, [request.id]);
 
   // Real-time Listener for Contributions
   useEffect(() => {

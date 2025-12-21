@@ -361,7 +361,7 @@ export default function Profile() {
                         <h3 className="font-bold text-lg">{req.title}</h3>
                         <p className="text-sm text-muted-foreground">{req.subject} • Status: <span className="capitalize text-primary font-medium">{req.status}</span></p>
                       </div>
-                      <Button variant="ghost" size="sm" onClick={() => navigate(`/help-desk?id=${req.id}`)}>View</Button>
+                      <Button variant="ghost" size="sm" onClick={() => navigate(`/helpdesk?id=${req.id}`)}>View</Button>
                     </div>
                   </Card>
                 ))}
