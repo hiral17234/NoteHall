@@ -1,8 +1,9 @@
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from "react";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { auth } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
 import { helpRequestsService, HelpRequest } from "@/services/firestoreService";
+import { collection, query, orderBy, onSnapshot } from "firebase/firestore";
 
 // Re-export HelpRequest type
 export type { HelpRequest } from "@/services/firestoreService";
@@ -23,96 +24,88 @@ export function HelpRequestsProvider({ children }: { children: ReactNode }) {
   const [requests, setRequests] = useState<HelpRequest[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Load requests from Firestore
-  const fetchRequests = useCallback(async () => {
-    try {
-      const fetchedRequests = await helpRequestsService.getAll();
-      setRequests(fetchedRequests);
-    } catch (error: any) {
-      console.error("Error loading help requests:", error);
-      // Don't show error toast for permission denied - this is a Firebase rules issue
-      if (error?.code !== 'permission-denied') {
+  // Real-time subscription to requests
+  useEffect(() => {
+    const q = query(collection(db, "requests"), orderBy("createdAt", "desc"));
+    
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const fetchedRequests = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        })) as HelpRequest[];
+        setRequests(fetchedRequests);
+        setLoading(false);
+      },
+      (error) => {
+        console.error("Error subscribing to requests:", error);
+        if (error?.code !== "permission-denied") {
+          toast({
+            title: "Error loading requests",
+            description: "Please try again later.",
+            variant: "destructive",
+          });
+        }
+        setLoading(false);
+      }
+    );
+
+    return () => unsubscribe();
+  }, []);
+
+  const addRequest = useCallback(
+    async (request: { title: string; description: string; subject: string; branch: string; year: string }) => {
+      const currentUser = auth.currentUser;
+
+      if (!userProfile && !currentUser) {
         toast({
-          title: "Error loading requests",
-          description: "Please try again later.",
+          title: "Please log in",
+          description: "You need to be logged in to create a request.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      try {
+        const requesterId = userProfile?.id || currentUser?.uid || "";
+        const requesterName = userProfile?.name || currentUser?.displayName || "Anonymous";
+        const requesterUsername = userProfile?.username || currentUser?.email?.split("@")[0] || "user";
+
+        if (!requesterId) {
+          throw new Error("User ID not found");
+        }
+
+        await helpRequestsService.create({
+          ...request,
+          requesterId,
+          requesterName,
+          requesterUsername,
+        });
+
+        // No need to manually update state - onSnapshot will pick it up
+        toast({
+          title: "Request created!",
+          description: "Your request has been posted. Others can now help you.",
+        });
+      } catch (error: any) {
+        console.error("Error creating request:", error);
+        toast({
+          title: "Error",
+          description: error?.message?.includes("permission")
+            ? "Permission denied. Please check Firebase Security Rules."
+            : "Failed to create request. Please try again.",
           variant: "destructive",
         });
       }
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchRequests();
-  }, [fetchRequests]);
-
-  const addRequest = useCallback(async (request: { title: string; description: string; subject: string; branch: string; year: string }) => {
-    // Get current user from Firebase auth directly as fallback
-    const currentUser = auth.currentUser;
-    
-    if (!userProfile && !currentUser) {
-      toast({
-        title: "Please log in",
-        description: "You need to be logged in to create a request.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      // Use userProfile if available, otherwise use Firebase auth user data
-      const requesterId = userProfile?.id || currentUser?.uid || "";
-      const requesterName = userProfile?.name || currentUser?.displayName || "Anonymous";
-      const requesterUsername = userProfile?.username || currentUser?.email?.split("@")[0] || "user";
-
-      if (!requesterId) {
-        throw new Error("User ID not found");
-      }
-
-      const requestId = await helpRequestsService.create({
-        ...request,
-        requesterId,
-        requesterName,
-        requesterUsername,
-      });
-      
-      // Fetch the new request and add to state
-      const newRequest: HelpRequest = {
-        id: requestId,
-        ...request,
-        requesterId,
-        requesterName,
-        requesterUsername,
-        status: 'open',
-        contributionsCount: 0,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-      
-      setRequests(prev => [newRequest, ...prev]);
-      toast({
-        title: "Request created!",
-        description: "Your request has been posted. Others can now help you.",
-      });
-    } catch (error: any) {
-      console.error("Error creating request:", error);
-      toast({
-        title: "Error",
-        description: error?.message?.includes("permission") 
-          ? "Permission denied. Please check Firebase Security Rules."
-          : "Failed to create request. Please try again.",
-        variant: "destructive",
-      });
-    }
-  }, [userProfile]);
+    },
+    [userProfile]
+  );
 
   const closeRequest = useCallback(async (requestId: string) => {
     try {
       await helpRequestsService.updateStatus(requestId, "fulfilled");
-      setRequests(prev => prev.map(r => 
-        r.id === requestId ? { ...r, status: "fulfilled" as const } : r
-      ));
+      // No need to manually update state - onSnapshot will pick it up
       toast({
         title: "Request closed",
         description: "Your request has been marked as fulfilled.",
@@ -127,14 +120,17 @@ export function HelpRequestsProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const getUserRequests = useCallback((userId: string) => {
-    return requests.filter(r => r.requesterId === userId);
-  }, [requests]);
+  const getUserRequests = useCallback(
+    (userId: string) => {
+      return requests.filter((r) => r.requesterId === userId);
+    },
+    [requests]
+  );
 
   const refreshRequests = useCallback(async () => {
-    setLoading(true);
-    await fetchRequests();
-  }, [fetchRequests]);
+    // With onSnapshot, data is always live - this is a no-op now
+    // but kept for backwards compatibility
+  }, []);
 
   return (
     <HelpRequestsContext.Provider value={{ requests, loading, addRequest, closeRequest, getUserRequests, refreshRequests }}>

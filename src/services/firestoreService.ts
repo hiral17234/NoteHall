@@ -585,12 +585,12 @@ export const usersService = {
 
     const snapshot = await getDocs(collection(db, 'users'));
     const users: UserProfile[] = [];
-    
-    snapshot.docs.forEach(d => {
+
+    snapshot.docs.forEach((d) => {
       const data = d.data();
       const username = (data.username || '').toLowerCase();
       const name = (data.name || '').toLowerCase();
-      
+
       if (username.includes(q) || name.includes(q)) {
         users.push({ id: d.id, ...data } as UserProfile);
       }
@@ -601,29 +601,89 @@ export const usersService = {
 
   subscribeToProfile(userId: string, callback: (profile: UserProfile | null) => void): () => void {
     if (!userId) return () => {};
-    return onSnapshot(doc(db, 'users', userId), (snap) => {
-      if (snap.exists()) {
-        callback({ id: snap.id, ...snap.data() } as UserProfile);
-      } else {
+    return onSnapshot(
+      doc(db, 'users', userId),
+      (snap) => {
+        if (snap.exists()) {
+          callback({ id: snap.id, ...snap.data() } as UserProfile);
+        } else {
+          callback(null);
+        }
+      },
+      (error) => {
+        console.error('Error subscribing to profile:', error);
         callback(null);
       }
-    }, (error) => {
-      console.error('Error subscribing to profile:', error);
-      callback(null);
-    });
+    );
   },
 
   subscribeToSavedNotes(userId: string, callback: (notes: any[]) => void): () => void {
     if (!userId) return () => {};
     return onSnapshot(collection(db, 'users', userId, 'savedNotes'), (snapshot) => {
-      callback(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+      callback(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
     });
   },
 
   subscribeToDownloadedNotes(userId: string, callback: (notes: any[]) => void): () => void {
     if (!userId) return () => {};
     return onSnapshot(collection(db, 'users', userId, 'downloadedNotes'), (snapshot) => {
-      callback(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+      callback(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
     });
+  },
+
+  /**
+   * Recomputes live stats from the user's notes.
+   * Subscribes to the user's notes and aggregates likes/views/uploads.
+   * Returns an unsubscribe function.
+   */
+  subscribeToComputedStats(
+    userId: string,
+    callback: (stats: { uploads: number; totalLikes: number; totalViews: number }) => void
+  ): () => void {
+    if (!userId) {
+      callback({ uploads: 0, totalLikes: 0, totalViews: 0 });
+      return () => {};
+    }
+
+    const q = query(collection(db, 'notes'), where('authorId', '==', userId));
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        let totalLikes = 0;
+        let totalViews = 0;
+        snapshot.docs.forEach((d) => {
+          const data = d.data();
+          totalLikes += data.likes ?? 0;
+          totalViews += data.views ?? 0;
+        });
+        callback({ uploads: snapshot.size, totalLikes, totalViews });
+      },
+      (error) => {
+        console.error('Error subscribing to computed stats:', error);
+        callback({ uploads: 0, totalLikes: 0, totalViews: 0 });
+      }
+    );
+  },
+
+  /**
+   * Subscribes to the user's contributions count (helpedRequests).
+   */
+  subscribeToHelpedCount(userId: string, callback: (count: number) => void): () => void {
+    if (!userId) {
+      callback(0);
+      return () => {};
+    }
+
+    const q = query(collection(db, 'contributions'), where('contributorId', '==', userId));
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        callback(snapshot.size);
+      },
+      (error) => {
+        console.error('Error subscribing to helped count:', error);
+        callback(0);
+      }
+    );
   },
 };
