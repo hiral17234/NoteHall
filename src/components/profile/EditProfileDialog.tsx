@@ -28,13 +28,29 @@ interface ProfileData {
 interface EditProfileDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  profile: ProfileData;
+  profile: ProfileData | null;
   onSave: (profile: ProfileData) => void;
 }
 
+const defaultProfile: ProfileData = {
+  name: "",
+  bio: "",
+  college: "",
+  branch: "",
+  year: "",
+  degree: "",
+  avatar: "",
+  github: "",
+  linkedin: "",
+  portfolio: "",
+  instagram: "",
+  twitter: "",
+};
+
 export function EditProfileDialog({ open, onOpenChange, profile, onSave }: EditProfileDialogProps) {
-  const [formData, setFormData] = useState<ProfileData>(profile);
-  const [previewAvatar, setPreviewAvatar] = useState<string>(profile.avatar);
+  const safeProfile = profile ?? defaultProfile;
+  const [formData, setFormData] = useState<ProfileData>(safeProfile);
+  const [previewAvatar, setPreviewAvatar] = useState<string>(safeProfile.avatar);
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
