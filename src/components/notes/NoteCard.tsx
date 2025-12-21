@@ -85,6 +85,16 @@ export function NoteCard({ note, onAskAI, onExpand }: NoteCardProps) {
   const [likes, setLikes] = useState(note.likes || 0);
   const [dislikes, setDislikes] = useState(note.dislikes || 0);
   const [views, setViews] = useState(note.views || 0);
+  // --- ADD THIS NEW BLOCK HERE ---
+  useEffect(() => {
+    if (note.id) {
+      // Small delay so we don't count accidental scrolls as views
+      const timer = setTimeout(() => {
+        notesService.incrementViews(note.id);
+      }, 2000); 
+      return () => clearTimeout(timer);
+    }
+  }, [note.id]);
   
   // Animation States
   const [likeAnimating, setLikeAnimating] = useState(false);
@@ -106,6 +116,7 @@ export function NoteCard({ note, onAskAI, onExpand }: NoteCardProps) {
   const FileIcon = fileTypeIcons[note.fileType] || FileText;
 
   // REAL-TIME DATABASE SYNC
+// REAL-TIME DATABASE SYNC
   useEffect(() => {
     if (!note.id) return;
     const unsubscribe = onSnapshot(doc(db, "notes", note.id), (docSnap) => {
@@ -113,7 +124,10 @@ export function NoteCard({ note, onAskAI, onExpand }: NoteCardProps) {
         const data = docSnap.data();
         setLikes(data.likes || 0);
         setDislikes(data.dislikes || 0);
-        setViews(data.views || 0);
+        
+        // --- ADD/EDIT THIS LINE BELOW ---
+        setViews(data.views || 0); 
+        
         setCurrentRating(data.ratings?.average || 0);
         setRatingCount(data.ratings?.count || 0);
         
