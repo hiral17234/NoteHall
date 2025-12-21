@@ -1,12 +1,13 @@
 // /api/gemini.ts
-// Vercel Node Serverless Function for Gemini AI
-// API key is read from process.env.GEMINI_API_KEY (set in Vercel dashboard)
+// Vercel Serverless Function for Gemini AI
+// API key is read ONLY from process.env.GEMINI_API_KEY
 
 import type { VercelRequest, VercelResponse } from "@vercel/node";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
-const GEMINI_API_URL =
-  "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
-
+/* ============================
+   SYSTEM PROMPT
+============================ */
 const SYSTEM_PROMPT = `You are Gemini, an AI study assistant integrated into NoteHall - a platform for college students to share and find academic notes.
 
 Your personality:
@@ -22,14 +23,18 @@ Your capabilities:
 5. Exam Preparation
 
 Rules:
-- Keep responses focused and actionable for students
-- Use markdown formatting
+- Keep responses focused and actionable
+- Use markdown formatting when helpful
 - NEVER ask for personal data
 
 Response formatting:
-- Use bullet points when helpful
-- Be concise unless detail is requested`;
+- Use bullet points when useful
+- Be concise unless user asks for detail
+`;
 
+/* ============================
+   TYPES
+============================ */
 interface RequestBody {
   prompt: string;
   context?: {
@@ -42,126 +47,95 @@ interface RequestBody {
   history?: Array<{ role: "user" | "model"; content: string }>;
 }
 
+/* ============================
+   HANDLER
+============================ */
 export default async function handler(
   req: VercelRequest,
   res: VercelResponse
 ) {
-  // Only allow POST
+  /* ---------- Method Check ---------- */
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
+  /* ---------- API Key ---------- */
   const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-
   if (!GEMINI_API_KEY) {
-    console.error("GEMINI_API_KEY is not configured");
+    console.error("❌ GEMINI_API_KEY missing");
     return res.status(500).json({
       error: "Gemini API key is not configured on server",
     });
   }
 
+  /* ---------- Parse Body ---------- */
+  let body: RequestBody;
   try {
-    const body: RequestBody = req.body;
-    const { prompt, context, history } = body;
+    body = req.body;
+  } catch {
+    return res.status(400).json({ error: "Invalid JSON body" });
+  }
 
-    if (!prompt || typeof prompt !== "string" || !prompt.trim()) {
-      return res.status(400).json({
-        error: "Prompt is required and must be a non-empty string",
-      });
-    }
+  const { prompt, context, history } = body;
 
-    // Build context string
-    const contextParts: string[] = [];
-    if (context?.subject) contextParts.push(`Subject: ${context.subject}`);
-    if (context?.noteTitle) contextParts.push(`Note: "${context.noteTitle}"`);
-    if (context?.userBranch) contextParts.push(`User's branch: ${context.userBranch}`);
-    if (context?.userYear) contextParts.push(`User's year: ${context.userYear}`);
-    if (context?.noteContent)
-      contextParts.push(`Note content:\n${context.noteContent}`);
+  if (!prompt || typeof prompt !== "string" || !prompt.trim()) {
+    return res.status(400).json({
+      error: "Prompt is required and must be a non-empty string",
+    });
+  }
 
-    const contextString =
-      contextParts.length > 0
-        ? `\n\nContext:\n${contextParts.join("\n")}`
-        : "";
+  /* ---------- Build Context ---------- */
+  const contextLines: string[] = [];
+  if (context?.subject) contextLines.push(`Subject: ${context.subject}`);
+  if (context?.noteTitle) contextLines.push(`Note: ${context.noteTitle}`);
+  if (context?.userBranch) contextLines.push(`Branch: ${context.userBranch}`);
+  if (context?.userYear) contextLines.push(`Year: ${context.userYear}`);
+  if (context?.noteContent)
+    contextLines.push(`Note Content:\n${context.noteContent}`);
 
-    // Build Gemini contents
-    const contents: any[] = [
-      {
-        role: "user",
-        parts: [{ text: SYSTEM_PROMPT + contextString }],
-      },
-      {
-        role: "model",
-        parts: [
-          {
-            text:
-              "I understand. I'm Gemini, your AI study assistant for NoteHall. How can I help you?",
-          },
-        ],
-      },
-    ];
+  const contextBlock =
+    contextLines.length > 0
+      ? `\n\nContext:\n${contextLines.join("\n")}`
+      : "";
 
-    // Add conversation history
-    if (history && Array.isArray(history)) {
-      for (const msg of history) {
-        contents.push({
-          role: msg.role === "user" ? "user" : "model",
-          parts: [{ text: msg.content }],
-        });
-      }
-    }
+  /* ---------- Build Final Prompt ---------- */
+  let finalPrompt = `${SYSTEM_PROMPT}${contextBlock}\n\nUser Question:\n${prompt}`;
 
-    // Add current prompt
-    contents.push({
-      role: "user",
-      parts: [{ text: prompt }],
+  if (history && Array.isArray(history)) {
+    const historyText = history
+      .map((h) => `${h.role === "user" ? "User" : "Assistant"}: ${h.content}`)
+      .join("\n");
+    finalPrompt = `${SYSTEM_PROMPT}${contextBlock}\n\nConversation so far:\n${historyText}\n\nUser Question:\n${prompt}`;
+  }
+
+  /* ---------- Gemini Call ---------- */
+  try {
+    const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+    const model = genAI.getGenerativeModel({
+      model: "gemini-pro",
     });
 
-    const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents,
-        generationConfig: {
-          temperature: 0.7,
-          topK: 40,
-          topP: 0.95,
-          maxOutputTokens: 2048,
-        },
-        safetySettings: [
-          { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
-          { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
-          { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
-          { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
-        ],
-      }),
-    });
+    const result = await model.generateContent(finalPrompt);
+    const text = result.response.text();
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-
-      if (response.status === 429) {
-        return res.status(429).json({
-          error: "Rate limit exceeded. Please try again later.",
-        });
-      }
-
+    if (!text) {
       return res.status(500).json({
-        error: "Gemini API error",
-        details: errorData,
+        error: "Empty response from Gemini",
       });
     }
-
-    const data = await response.json();
-    const text =
-      data?.candidates?.[0]?.content?.parts?.[0]?.text ||
-      "No response from Gemini";
 
     return res.status(200).json({ text });
-  } catch (error) {
-    console.error("Server error:", error);
+  } catch (error: any) {
+    console.error("🔥 Gemini API Error:", error);
+
+    if (error?.message?.includes("quota")) {
+      return res.status(429).json({
+        error: "Rate limit exceeded. Please try again later.",
+      });
+    }
+
     return res.status(500).json({
-      error: "Internal server error",
+      error: "Gemini failed to generate a response",
     });
   }
 }
