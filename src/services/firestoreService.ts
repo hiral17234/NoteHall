@@ -14,6 +14,7 @@ import {
   increment,
   arrayUnion,
   arrayRemove,
+  onSnapshot,
 } from 'firebase/firestore';
 import { db, getServerTimestamp } from '@/lib/firebase';
 import { createNotification } from '@/services/notificationService';
@@ -94,6 +95,34 @@ export interface Achievement {
   points: number;
 }
 
+export interface UserProfile {
+  id: string;
+  name: string;
+  username: string;
+  email: string;
+  avatar?: string;
+  bio?: string;
+  college?: string;
+  branch?: string;
+  year?: string;
+  streak?: number;
+  stats: {
+    uploads: number;
+    totalLikes: number;
+    totalViews: number;
+    helpedRequests: number;
+    contributionScore: number;
+  };
+}
+
+export interface SearchResult {
+  id: string;
+  type: 'note' | 'user';
+  title: string;
+  subtitle: string;
+  data: Note | UserProfile;
+}
+
 // ==================== NOTES SERVICE ====================
 
 export const notesService = {
@@ -162,7 +191,9 @@ export const notesService = {
       await updateDoc(authorRef, { 'stats.totalLikes': increment(-1), 'stats.contributionScore': increment(-5) });
     } else {
       await updateDoc(noteRef, { likes: increment(1), likedBy: arrayUnion(userId), dislikedBy: arrayRemove(userId) });
-      if (note.authorId !== userId) await createNotification.like(note.authorId, userId, userName, note.title, noteId);
+      if (note.authorId !== userId) {
+        await createNotification.like(note.authorId, userId, userName, note.title, noteId);
+      }
       await updateDoc(authorRef, { 'stats.totalLikes': increment(1), 'stats.contributionScore': increment(5) });
     }
   },
@@ -191,19 +222,39 @@ export const notesService = {
     return notes;
   },
 
-  async downloadNote(noteId: string, userId: string, note: any): Promise<void> {
-    await setDoc(doc(db, 'users', userId, 'downloadedNotes', noteId), { ...note, downloadedAt: getServerTimestamp() });
+  // Fixed download with Blob approach for Chrome
+  async downloadNote(noteId: string, userId: string, note: { title: string; subject: string; fileUrl: string }): Promise<void> {
+    // Store download history in Firestore
+    await setDoc(doc(db, 'users', userId, 'downloadedNotes', noteId), { 
+      noteId,
+      title: note.title,
+      subject: note.subject,
+      fileUrl: note.fileUrl,
+      downloadedAt: getServerTimestamp() 
+    });
     await updateDoc(doc(db, 'users', userId), { 'stats.contributionScore': increment(1) });
-    const response = await fetch(note.fileUrl);
-    const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `${note.title.replace(/\s+/g, '_')}.pdf`);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.URL.revokeObjectURL(url);
+    
+    // Use Blob approach to bypass Chrome's security blocks
+    try {
+      const response = await fetch(note.fileUrl);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `${note.title.replace(/\s+/g, '_')}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      // Fallback to window.open if fetch fails (CORS)
+      window.open(note.fileUrl, '_blank');
+    }
+  },
+
+  async getDownloadedNotes(userId: string): Promise<any[]> {
+    const snapshot = await getDocs(collection(db, 'users', userId, 'downloadedNotes'));
+    return snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
   },
 
   async rateNote(noteId: string, userId: string, rating: number, difficulty: string): Promise<void> {
@@ -225,14 +276,63 @@ export const notesService = {
     }
   },
 
+  // Enhanced search that includes both notes and users
   async search(searchQuery: string): Promise<Note[]> {
     const allNotes = await this.getAll();
     const q = searchQuery.toLowerCase();
-    return allNotes.filter(n => n.title.toLowerCase().includes(q) || n.subject.toLowerCase().includes(q));
+    return allNotes.filter(n => 
+      n.title.toLowerCase().includes(q) || 
+      n.subject.toLowerCase().includes(q) ||
+      n.authorName.toLowerCase().includes(q) ||
+      (n.topic && n.topic.toLowerCase().includes(q)) ||
+      n.branch.toLowerCase().includes(q)
+    );
+  },
+
+  // Combined search for notes and users
+  async searchAll(searchQuery: string): Promise<SearchResult[]> {
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return [];
+
+    const results: SearchResult[] = [];
+
+    // Search notes
+    const allNotes = await this.getAll();
+    const noteResults = allNotes.filter(n => 
+      n.title.toLowerCase().includes(q) || 
+      n.subject.toLowerCase().includes(q) ||
+      n.authorName.toLowerCase().includes(q) ||
+      (n.topic && n.topic.toLowerCase().includes(q)) ||
+      n.branch.toLowerCase().includes(q)
+    ).slice(0, 10);
+
+    noteResults.forEach(note => {
+      results.push({
+        id: note.id,
+        type: 'note',
+        title: note.title,
+        subtitle: `${note.subject} • ${note.authorName}`,
+        data: note,
+      });
+    });
+
+    // Search users by username and name
+    const userResults = await usersService.search(searchQuery);
+    userResults.forEach(user => {
+      results.push({
+        id: user.id,
+        type: 'user',
+        title: user.name,
+        subtitle: `@${user.username} • ${user.college || 'Student'}`,
+        data: user,
+      });
+    });
+
+    return results;
   },
 };
 
-// ==================== HELP REQUESTS SERVICE (FIXED/MERGED) ====================
+// ==================== HELP REQUESTS SERVICE ====================
 
 export const helpRequestsService = {
   async getAll(): Promise<HelpRequest[]> {
@@ -241,9 +341,25 @@ export const helpRequestsService = {
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as HelpRequest));
   },
 
-  async create(data: any): Promise<string> {
+  async create(data: {
+    title: string;
+    description: string;
+    subject: string;
+    branch: string;
+    year: string;
+    requesterId: string;
+    requesterName: string;
+    requesterUsername: string;
+  }): Promise<string> {
     const docRef = await addDoc(collection(db, 'requests'), {
-      ...data,
+      title: data.title,
+      description: data.description,
+      subject: data.subject,
+      branch: data.branch,
+      year: data.year,
+      requesterId: data.requesterId,
+      requesterName: data.requesterName,
+      requesterUsername: data.requesterUsername,
       status: 'open',
       contributionsCount: 0,
       createdAt: getServerTimestamp(),
@@ -283,6 +399,18 @@ export const contributionsService = {
       'stats.contributionScore': increment(50),
       updatedAt: getServerTimestamp(),
     });
+    
+    // Send notification to requester
+    if (data.requesterId && data.requesterId !== data.contributorId) {
+      await createNotification.contribution(
+        data.requesterId,
+        data.contributorId,
+        data.contributorName,
+        data.requestTitle || 'your request',
+        data.requestId
+      );
+    }
+    
     return docRef.id;
   },
 };
@@ -379,16 +507,65 @@ export const achievementsService = {
 // ==================== USERS SERVICE ====================
 
 export const usersService = {
-  async getById(userId: string): Promise<any | null> {
+  async getById(userId: string): Promise<UserProfile | null> {
     const snap = await getDoc(doc(db, 'users', userId));
-    return snap.exists() ? ({ id: snap.id, ...snap.data() } as any) : null;
+    return snap.exists() ? ({ id: snap.id, ...snap.data() } as UserProfile) : null;
   },
 
-  async getByUsername(username: string): Promise<any | null> {
+  async getByUsername(username: string): Promise<UserProfile | null> {
     const q = query(collection(db, 'users'), where('username', '==', username), limit(1));
     const snapshot = await getDocs(q);
     if (snapshot.empty) return null;
     const d = snapshot.docs[0];
-    return { id: d.id, ...d.data() } as any;
+    return { id: d.id, ...d.data() } as UserProfile;
+  },
+
+  // Search users by username and name
+  async search(queryText: string): Promise<UserProfile[]> {
+    const q = queryText.toLowerCase().trim();
+    if (!q) return [];
+
+    // Get all users and filter client-side (Firestore doesn't support OR queries on different fields)
+    const snapshot = await getDocs(collection(db, 'users'));
+    const users: UserProfile[] = [];
+    
+    snapshot.docs.forEach(d => {
+      const data = d.data();
+      const username = (data.username || '').toLowerCase();
+      const name = (data.name || '').toLowerCase();
+      
+      if (username.includes(q) || name.includes(q)) {
+        users.push({ id: d.id, ...data } as UserProfile);
+      }
+    });
+
+    return users.slice(0, 10);
+  },
+
+  // Subscribe to real-time user profile updates
+  subscribeToProfile(userId: string, callback: (profile: UserProfile | null) => void): () => void {
+    return onSnapshot(doc(db, 'users', userId), (snap) => {
+      if (snap.exists()) {
+        callback({ id: snap.id, ...snap.data() } as UserProfile);
+      } else {
+        callback(null);
+      }
+    }, (error) => {
+      console.error('Error subscribing to profile:', error);
+      callback(null);
+    });
+  },
+
+  // Get counts for saved, liked notes in real-time
+  subscribeToSavedNotes(userId: string, callback: (notes: any[]) => void): () => void {
+    return onSnapshot(collection(db, 'users', userId, 'savedNotes'), (snapshot) => {
+      callback(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+  },
+
+  subscribeToDownloadedNotes(userId: string, callback: (notes: any[]) => void): () => void {
+    return onSnapshot(collection(db, 'users', userId, 'downloadedNotes'), (snapshot) => {
+      callback(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
   },
 };

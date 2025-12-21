@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { 
   MessageSquare, 
@@ -19,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useUser } from "@/contexts/UserContext";
+import { useSidebar } from "./MainLayout";
 import logo from "@/assets/logo.png";
 
 const ecosystemItems = [
@@ -41,7 +41,7 @@ const mainNavItems = [
 ];
 
 export function Sidebar() {
-  const [collapsed, setCollapsed] = useState(false);
+  const { collapsed, setCollapsed } = useSidebar();
   const location = useLocation();
   const { user, privacy } = useUser();
 
@@ -69,7 +69,7 @@ export function Sidebar() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => setCollapsed(!collapsed)}
+            onClick={() => setCollapsed(true)}
             className="hover:bg-muted"
           >
             <ChevronLeft className="w-4 h-4" />
@@ -81,7 +81,7 @@ export function Sidebar() {
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => setCollapsed(!collapsed)}
+          onClick={() => setCollapsed(false)}
           className="mx-auto mt-2 hover:bg-muted"
         >
           <ChevronRight className="w-4 h-4" />

@@ -8,7 +8,7 @@ import { EditProfileDialog } from "@/components/profile/EditProfileDialog";
 import { ContributionCard, Contribution } from "@/components/helpdesk/ContributionCard";
 import { StatDetailModal, AchievementsSection, Achievement } from "@/components/profile/StatDetailModal";
 import { useAuth, UserProfile } from "@/contexts/AuthContext";
-import { usersService, notesService, Note, contributionsService, helpRequestsService, achievementsService } from "@/services/firestoreService";
+import { usersService, notesService, Note, contributionsService, achievementsService, UserProfile as FirestoreUserProfile } from "@/services/firestoreService";
 import { mapFirestoreNoteToCardNote } from "@/lib/noteCard";
 import { parseSocialLink } from "@/lib/socialLinks";
 import { Button } from "@/components/ui/button";
@@ -70,49 +70,39 @@ export default function Profile() {
   const isOwnProfile = !userId || userId === "current-user" || userId === currentUser?.id;
   const targetUserId = isOwnProfile ? currentUser?.id : userId;
 
-  // Load profile data
+  // Real-time profile subscription
   useEffect(() => {
-    const loadProfile = async () => {
-      setLoading(true);
-      try {
-        if (isOwnProfile && currentUser) {
-          setProfileData(currentUser);
-        } else if (targetUserId) {
-          let profile = await usersService.getById(targetUserId);
-          if (!profile) {
-            profile = await usersService.getByUsername(targetUserId);
-          }
-          setProfileData(profile);
-        }
-      } catch (error) {
-        console.error("Error loading profile:", error);
+    if (!targetUserId) {
+      setLoading(false);
+      return;
+    }
+
+    // Use onSnapshot for real-time profile updates
+    const unsubscribe = usersService.subscribeToProfile(targetUserId, (profile) => {
+      if (profile) {
+        setProfileData(profile as unknown as UserProfile);
+      } else if (!isOwnProfile) {
+        // Try by username if not found by ID
+        usersService.getByUsername(targetUserId).then((p) => setProfileData(p as unknown as UserProfile));
       }
-    };
+    });
 
-    loadProfile();
-  }, [isOwnProfile, currentUser, targetUserId]);
+    return () => unsubscribe();
+  }, [targetUserId, isOwnProfile]);
 
-  // Load user content
+  // Load user content with real-time subscriptions for own profile
   useEffect(() => {
-    const loadContent = async () => {
-      if (!profileData?.id) return;
+    if (!profileData?.id) return;
 
+    const loadContent = async () => {
       try {
-        const [notes, saved, contribs] = await Promise.all([
+        const [notes, contribs] = await Promise.all([
           notesService.getByUser(profileData.id),
-          isOwnProfile ? notesService.getSavedNotes(profileData.id) : Promise.resolve([]),
           contributionsService.getByUser(profileData.id),
         ]);
 
         setUploadedNotes(notes);
-        setSavedNotes(saved);
         setContributions(contribs);
-        
-        // Load downloaded notes from localStorage (only for own profile)
-        if (isOwnProfile) {
-          const downloaded = JSON.parse(localStorage.getItem("notehall_downloaded_notes") || "[]");
-          setDownloadedNotes(downloaded);
-        }
       } catch (error) {
         console.error("Error loading content:", error);
       } finally {
@@ -121,6 +111,27 @@ export default function Profile() {
     };
 
     loadContent();
+
+    // Real-time subscriptions for saved/downloaded notes (own profile only)
+    if (isOwnProfile) {
+      const unsubSaved = usersService.subscribeToSavedNotes(profileData.id, async (savedRefs) => {
+        const notes: Note[] = [];
+        for (const ref of savedRefs) {
+          const note = await notesService.getById(ref.noteId);
+          if (note) notes.push(note);
+        }
+        setSavedNotes(notes);
+      });
+
+      const unsubDownloaded = usersService.subscribeToDownloadedNotes(profileData.id, (downloaded) => {
+        setDownloadedNotes(downloaded);
+      });
+
+      return () => {
+        unsubSaved();
+        unsubDownloaded();
+      };
+    }
   }, [profileData?.id, isOwnProfile]);
 
   const handleProfileSave = async (updatedProfile: any) => {
@@ -297,7 +308,7 @@ export default function Profile() {
           </CardContent>
         </Card>
 
-        {/* Stats Cards */}
+        {/* Stats Cards - Real-time from profileData */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
           {loading ? (
             <>
@@ -429,12 +440,13 @@ export default function Profile() {
               {loading ? (
                 <div className="grid gap-4">
                   <NoteCardSkeleton />
+                  <NoteCardSkeleton />
                 </div>
               ) : savedNotes.length === 0 ? (
                 <EmptyState
-                  type="saved"
+                  type="notes"
                   title="No saved notes"
-                  description="Save notes you want to revisit later!"
+                  description="Notes you save will appear here for quick access."
                 />
               ) : (
                 <div className="grid gap-4">
@@ -449,82 +461,88 @@ export default function Profile() {
             </TabsContent>
           )}
 
+          {isOwnProfile && (
+            <TabsContent value="downloaded">
+              {loading ? (
+                <div className="grid gap-4">
+                  <NoteCardSkeleton />
+                  <NoteCardSkeleton />
+                </div>
+              ) : downloadedNotes.length === 0 ? (
+                <EmptyState
+                  type="notes"
+                  title="No downloaded notes"
+                  description="Notes you download will appear here."
+                />
+              ) : (
+                <div className="grid gap-4">
+                  {downloadedNotes.map((item) => (
+                    <Card key={item.id} className="bg-card border-border p-4">
+                      <div className="flex items-center gap-4">
+                        <div className="p-2 rounded-lg bg-primary/10">
+                          <Download className="w-5 h-5 text-primary" />
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="font-medium text-foreground">{item.title}</h3>
+                          <p className="text-sm text-muted-foreground">{item.subject}</p>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => window.open(item.fileUrl, '_blank')}
+                        >
+                          Open
+                        </Button>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+          )}
+
           <TabsContent value="contributions">
             {loading ? (
-              <div className="space-y-4">
+              <div className="grid gap-4">
+                <NoteCardSkeleton />
                 <NoteCardSkeleton />
               </div>
             ) : contributions.length === 0 ? (
               <EmptyState
                 type="helped"
                 title="No contributions yet"
-                description={isOwnProfile ? "Help others by contributing to help requests!" : "This user hasn't contributed yet."}
+                description={isOwnProfile ? "Help others by contributing to their requests!" : "This user hasn't made any contributions yet."}
               />
             ) : (
-              <div className="space-y-4">
-                {contributions.map((contrib) => {
-                  const contribution: Contribution = {
-                    id: contrib.id,
-                    type: contrib.type,
-                    message: contrib.content,
-                    contributorId: contrib.contributorId,
-                    contributorName: contrib.contributorName,
-                    timestamp: contrib.createdAt?.toDate?.()?.toLocaleDateString() || "Recently",
-                    likes: 0,
-                    fileName: contrib.fileUrl ? "Attached file" : undefined,
-                    link: contrib.type === 'link' ? contrib.content : undefined,
-                  };
-                  return (
-                    <ContributionCard
-                      key={contrib.id}
-                      contribution={contribution}
-                      onViewProfile={(id) => navigate(`/profile/${id}`)}
-                    />
-                  );
-                })}
+              <div className="grid gap-4">
+                {contributions.map((contribution) => (
+                  <ContributionCard
+                    key={contribution.id}
+                    contribution={contribution as Contribution}
+                  />
+                ))}
               </div>
             )}
           </TabsContent>
         </Tabs>
 
         {/* Modals */}
-        {profileData && (
+        {isOwnProfile && (
           <EditProfileDialog
             open={editDialogOpen}
             onOpenChange={setEditDialogOpen}
-            profile={{
-              name: profileData.name,
-              bio: profileData.bio,
-              college: profileData.college,
-              branch: profileData.branch,
-              year: profileData.year,
-              degree: profileData.degree,
-              avatar: profileData.avatar,
-              github: profileData.github,
-              linkedin: profileData.linkedin,
-              portfolio: profileData.portfolio,
-              instagram: profileData.instagram,
-              twitter: profileData.twitter,
-            }}
+            profile={profileData}
             onSave={handleProfileSave}
           />
         )}
 
-        {statModalOpen && (
-          <StatDetailModal
-            open={!!statModalOpen}
-            onClose={() => setStatModalOpen(null)}
-            statType={statModalOpen}
-            value={
-              statModalOpen === "uploads" ? stats.uploads :
-              statModalOpen === "likes" ? stats.totalLikes :
-              statModalOpen === "views" ? stats.totalViews :
-              statModalOpen === "helped" ? stats.helpedRequests :
-              stats.contributionScore
-            }
-            isOwner={isOwnProfile}
-          />
-        )}
+        <StatDetailModal
+          open={statModalOpen !== null}
+          onClose={() => setStatModalOpen(null)}
+          statType={statModalOpen || "uploads"}
+          value={stats[statModalOpen === "likes" ? "totalLikes" : statModalOpen === "views" ? "totalViews" : statModalOpen === "helped" ? "helpedRequests" : statModalOpen === "score" ? "contributionScore" : "uploads"] || 0}
+          isOwner={isOwnProfile}
+        />
       </div>
     </MainLayout>
   );
