@@ -1,11 +1,13 @@
-import { useState } from "react";
-import { X, Send, Bot, FileText, Brain, ListChecks, HelpCircle, Loader2, Lightbulb, GraduationCap, ClipboardList, Mic, Sparkles } from "lucide-react";
+import { useState, useRef } from "react";
+import { X, Send, FileText, Brain, ListChecks, HelpCircle, Loader2, Lightbulb, GraduationCap, ClipboardList, Mic, Sparkles, Camera, ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useUser } from "@/contexts/UserContext";
+import { geminiService } from "@/services/geminiService";
+import { toast } from "@/hooks/use-toast";
 
 interface AIAssistantPanelProps {
   open: boolean;
@@ -19,6 +21,7 @@ interface Message {
   content: string;
   role: "user" | "assistant";
   timestamp: Date;
+  imageUrl?: string;
 }
 
 const basicActions = [
@@ -35,178 +38,12 @@ const advancedActions = [
   { id: "beginner", label: "Explain Simple", icon: GraduationCap, color: "bg-chart-2/20 text-chart-2" },
 ];
 
-const mockResponses: Record<string, string> = {
-  greeting: `Hello! 👋 I'm Gemini, your AI study assistant. I can see you're interested in learning - that's great! 
-
-I can help you with:
-• **Summarizing** your notes
-• **Explaining** complex topics simply
-• **Creating** revision points and MCQs
-• **Preparing** for vivas
-
-What would you like to work on today?`,
-  summarize: `📝 **Summary**
-
-This note covers the fundamental concepts with the following key points:
-
-• **Introduction**: Basic definitions and terminology
-• **Core Concepts**: Main theories and principles explained
-• **Applications**: Real-world use cases and examples
-• **Important Formulas**: Key equations to remember
-
-The content is well-structured and covers approximately 80% of the syllabus for this topic.`,
-  explain: `🧠 **Explanation**
-
-Let me break this down in simple terms:
-
-**What is it?**
-This concept refers to the fundamental principle that governs how systems interact and process information.
-
-**How does it work?**
-Think of it like a pipeline where data flows through different stages, each performing a specific transformation.
-
-**Why is it important?**
-Understanding this helps you grasp more advanced topics and solve real-world problems efficiently.
-
-**Example:**
-Imagine you're organizing a library - this concept is like the system that determines which shelf each book goes to.`,
-  revision: `📋 **Revision Points**
-
-Here are the key points to remember:
-
-1. **Definition**: Memorize the exact technical definition
-2. **Types**: There are 4 main types - A, B, C, and D
-3. **Properties**: 
-   - Property 1: Always true for type A
-   - Property 2: Conditionally applies
-   - Property 3: Exception cases
-4. **Formulas**:
-   - Main formula: X = Y + Z
-   - Derived formula: A = B × C
-5. **Applications**: Used in networking, databases, and AI
-6. **Common Mistakes**: Don't confuse Type A with Type B
-7. **Exam Tips**: Focus on numerical problems and diagrams`,
-  mcq: `❓ **Practice MCQs**
-
-**Q1.** What is the primary purpose of this concept?
-a) Data storage
-b) Data processing ✓
-c) Data deletion
-d) Data encryption
-
-**Q2.** Which type is most commonly used in real applications?
-a) Type A
-b) Type B ✓
-c) Type C
-d) Type D
-
-**Q3.** The time complexity of the main algorithm is:
-a) O(1)
-b) O(n) ✓
-c) O(n²)
-d) O(log n)
-
-**Q4.** Which of the following is NOT a characteristic?
-a) Scalability
-b) Reliability
-c) Immutability ✓
-d) Efficiency`,
-  viva: `🎤 **Viva Questions**
-
-Here are important viva questions you should prepare:
-
-**Q1.** Define the concept in your own words.
-*Expected Answer: Focus on the core principle and its purpose.*
-
-**Q2.** What are the advantages and disadvantages?
-*Expected Answer: List at least 3 advantages and 2 disadvantages.*
-
-**Q3.** How does this differ from similar concepts?
-*Expected Answer: Compare with related topics, highlight key differences.*
-
-**Q4.** Can you give a real-world application?
-*Expected Answer: Mention 2-3 practical uses in industry.*
-
-💡 **Tip**: Always explain with examples and diagrams when possible!`,
-  cheatsheet: `📑 **Quick Cheat Sheet**
-
-━━━━━━━━━━━━━━━━━━━━━
-📌 **KEY DEFINITIONS**
-━━━━━━━━━━━━━━━━━━━━━
-• Term A → Definition in 5 words
-• Term B → Definition in 5 words
-• Term C → Definition in 5 words
-
-━━━━━━━━━━━━━━━━━━━━━
-🔢 **IMPORTANT FORMULAS**
-━━━━━━━━━━━━━━━━━━━━━
-• Formula 1: X = A + B
-• Formula 2: Y = C × D
-
-━━━━━━━━━━━━━━━━━━━━━
-⚡ **QUICK FACTS**
-━━━━━━━━━━━━━━━━━━━━━
-• 4 Types: A, B, C, D
-• Time Complexity: O(n)
-• Space Complexity: O(1)
-
-Print this and stick it on your desk! 📎`,
-  examples: `💡 **Explained with Examples**
-
-Let me explain this concept using real-world analogies:
-
-**Example 1: Library System**
-Imagine a library where books need to be organized:
-- Input: Unsorted pile of books
-- Process: Categorize by genre, author, year
-- Output: Organized shelves
-This is exactly how our algorithm works!
-
-**Example 2: Restaurant Kitchen**
-Think of a busy restaurant:
-- Orders come in (input queue)
-- Chef processes them (algorithm)
-- Dishes go out (output)
-The "process" follows our concept's principles.
-
-Now you can visualize how it all connects! 🎯`,
-  beginner: `👶 **Explain Like I'm in 1st Year**
-
-Okay, let's make this SUPER simple!
-
-**What is it?**
-Think of it like sorting your clothes:
-- You have a messy pile (unsorted data)
-- You want to organize them (sorting)
-- Now they're easy to find! (efficient access)
-
-**Why do we need it?**
-Imagine finding your favorite shirt in a messy room vs. organized wardrobe. That's why!
-
-**How does it work?**
-Step 1: 👀 Look at the first item
-Step 2: 🤔 Compare with others
-Step 3: 📦 Put it in the right place
-Step 4: 🔁 Repeat until done!
-
-**One-liner to remember:**
-"Organize once, find fast forever!" 🚀
-
-Does this make sense? Ask me if anything is confusing! 😊`,
-  default: `I'd be happy to help you understand this topic better! Based on what you've shared, here are some key insights:
-
-1. **Main Concept**: The fundamental idea revolves around efficient data organization
-2. **Key Takeaway**: Focus on understanding the relationships between components
-3. **Study Tip**: Practice with examples to solidify your understanding
-
-Would you like me to elaborate on any specific aspect?`,
-};
-
 export function AIAssistantPanel({ open, onClose, initialPrompt, noteContext }: AIAssistantPanelProps) {
   const { user } = useUser();
   const userName = user?.name?.split(" ")[0] || "there";
   const userBranch = user?.branch || "";
   const userYear = user?.year || "";
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -220,56 +57,41 @@ export function AIAssistantPanel({ open, onClose, initialPrompt, noteContext }: 
   ]);
   const [input, setInput] = useState(initialPrompt || "");
   const [isTyping, setIsTyping] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
 
-  const handleSend = (text?: string) => {
+  // Set context for Gemini service
+  geminiService.setContext({
+    userBranch: user?.branch,
+    userYear: user?.year,
+    noteTitle: noteContext,
+  });
+
+  const handleSend = async (text?: string) => {
     const messageText = text || input;
-    if (!messageText.trim()) return;
+    if (!messageText.trim() && !selectedImage) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
-      content: messageText,
+      content: messageText || (selectedImage ? "Analyze this image" : ""),
       role: "user",
       timestamp: new Date(),
+      imageUrl: selectedImage ? URL.createObjectURL(selectedImage) : undefined,
     };
 
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
+    setSelectedImage(null);
     setIsTyping(true);
 
-    // Determine response type
-    const lowerText = messageText.toLowerCase();
-    let responseKey = "default";
-    
-    // Check for greetings
-    if (lowerText.match(/^(hi|hello|hey|howdy|how are you|what's up|sup)/)) {
-      responseKey = "greeting";
-    } else if (lowerText.includes("summarize") || lowerText.includes("summary")) {
-      responseKey = "summarize";
-    } else if (lowerText.includes("explain") || lowerText.includes("what is")) {
-      responseKey = "explain";
-    } else if (lowerText.includes("revision") || lowerText.includes("points") || lowerText.includes("remember")) {
-      responseKey = "revision";
-    } else if (lowerText.includes("mcq") || lowerText.includes("question") || lowerText.includes("quiz")) {
-      responseKey = "mcq";
-    } else if (lowerText.includes("viva") || lowerText.includes("oral")) {
-      responseKey = "viva";
-    } else if (lowerText.includes("cheat") || lowerText.includes("sheet") || lowerText.includes("quick")) {
-      responseKey = "cheatsheet";
-    } else if (lowerText.includes("example") || lowerText.includes("analogy")) {
-      responseKey = "examples";
-    } else if (lowerText.includes("simple") || lowerText.includes("beginner") || lowerText.includes("1st year") || lowerText.includes("easy")) {
-      responseKey = "beginner";
-    }
+    try {
+      // Build the prompt with image context if present
+      let fullPrompt = messageText;
+      if (selectedImage) {
+        fullPrompt = `[User has shared an image] ${messageText || "Please analyze this image and help me understand it."}`;
+      }
 
-    // Personalize responses
-    let response = mockResponses[responseKey];
-    if (user?.name) {
-      response = response.replace(/\{name\}/g, userName);
-    }
-
-    // Mock AI response with typing delay
-    setTimeout(() => {
-      setIsTyping(false);
+      const response = await geminiService.sendMessage(fullPrompt);
+      
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
         content: response,
@@ -277,7 +99,25 @@ export function AIAssistantPanel({ open, onClose, initialPrompt, noteContext }: 
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, aiMessage]);
-    }, 1500);
+    } catch (error: any) {
+      console.error("AI error:", error);
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        content: error?.message?.includes("API") 
+          ? "I'm having trouble connecting to the AI service. Please make sure the Gemini API key is configured correctly."
+          : "Sorry, I encountered an error. Please try again.",
+        role: "assistant",
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, errorMessage]);
+      toast({
+        title: "AI Error",
+        description: error?.message || "Failed to get AI response",
+        variant: "destructive",
+      });
+    } finally {
+      setIsTyping(false);
+    }
   };
 
   const handleActionClick = (actionId: string) => {
@@ -292,6 +132,21 @@ export function AIAssistantPanel({ open, onClose, initialPrompt, noteContext }: 
       beginner: "Explain like I'm in 1st year - make it super simple",
     };
     handleSend(actionMessages[actionId]);
+  };
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        toast({
+          title: "Image too large",
+          description: "Please select an image under 5MB",
+          variant: "destructive",
+        });
+        return;
+      }
+      setSelectedImage(file);
+    }
   };
 
   return (
@@ -330,8 +185,9 @@ export function AIAssistantPanel({ open, onClose, initialPrompt, noteContext }: 
                 <button
                   key={action.id}
                   onClick={() => handleActionClick(action.id)}
+                  disabled={isTyping}
                   className={cn(
-                    "flex items-center gap-2 p-2.5 rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98]",
+                    "flex items-center gap-2 p-2.5 rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50",
                     action.color
                   )}
                 >
@@ -347,8 +203,9 @@ export function AIAssistantPanel({ open, onClose, initialPrompt, noteContext }: 
                 <button
                   key={action.id}
                   onClick={() => handleActionClick(action.id)}
+                  disabled={isTyping}
                   className={cn(
-                    "flex items-center gap-2 p-2.5 rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98]",
+                    "flex items-center gap-2 p-2.5 rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50",
                     action.color
                   )}
                 >
@@ -396,6 +253,13 @@ export function AIAssistantPanel({ open, onClose, initialPrompt, noteContext }: 
                     : "bg-primary text-primary-foreground"
                 )}
               >
+                {message.imageUrl && (
+                  <img 
+                    src={message.imageUrl} 
+                    alt="Shared image" 
+                    className="max-w-full rounded-lg mb-2"
+                  />
+                )}
                 <p className="text-sm whitespace-pre-wrap">{message.content}</p>
               </div>
             </div>
@@ -417,9 +281,47 @@ export function AIAssistantPanel({ open, onClose, initialPrompt, noteContext }: 
         </div>
       </ScrollArea>
 
+      {/* Selected Image Preview */}
+      {selectedImage && (
+        <div className="px-4 py-2 border-t border-border bg-muted/50">
+          <div className="flex items-center gap-2">
+            <img 
+              src={URL.createObjectURL(selectedImage)} 
+              alt="Selected" 
+              className="w-12 h-12 rounded-lg object-cover"
+            />
+            <span className="text-xs text-muted-foreground flex-1 truncate">{selectedImage.name}</span>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-6 w-6"
+              onClick={() => setSelectedImage(null)}
+            >
+              <X className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Input */}
       <div className="p-4 border-t border-border">
         <div className="flex gap-2">
+          <input
+            type="file"
+            ref={fileInputRef}
+            accept="image/*"
+            onChange={handleImageSelect}
+            className="hidden"
+          />
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isTyping}
+            className="flex-shrink-0"
+          >
+            <Camera className="w-4 h-4" />
+          </Button>
           <Input
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -431,7 +333,7 @@ export function AIAssistantPanel({ open, onClose, initialPrompt, noteContext }: 
           <Button 
             onClick={() => handleSend()} 
             className="bg-primary hover:bg-primary/90"
-            disabled={isTyping || !input.trim()}
+            disabled={isTyping || (!input.trim() && !selectedImage)}
           >
             <Send className="w-4 h-4" />
           </Button>
