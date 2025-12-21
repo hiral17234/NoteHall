@@ -377,24 +377,48 @@ export default function Settings() {
                 <div className="space-y-4">
                   <h4 className="font-medium text-foreground flex items-center gap-2">
                     <AlertTriangle className="w-4 h-4 text-destructive" />
+                    Account Actions
+                  </h4>
+                  
+                  {/* Logout Button */}
+                  <Button 
+                    variant="outline" 
+                    className="w-full gap-2"
+                    onClick={async () => {
+                      try {
+                        await auth.signOut();
+                        toast({ title: "Logged out", description: "You have been signed out successfully." });
+                        navigate("/login");
+                      } catch (error) {
+                        toast({ title: "Error", description: "Failed to log out.", variant: "destructive" });
+                      }
+                    }}
+                  >
+                    <LogOut className="w-4 h-4" />
+                    Log Out
+                  </Button>
+
+                  <Separator />
+
+                  <h4 className="font-medium text-foreground flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-destructive" />
                     Danger Zone
                   </h4>
                   <p className="text-sm text-muted-foreground">
-                    Deleting your account will deactivate it. You can log back in anytime to reactivate.
+                    Deleting your account will permanently remove all your data including notes and contributions.
                   </p>
                   <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
                     <DialogTrigger asChild>
                       <Button variant="destructive" className="gap-2">
-                        <LogOut className="w-4 h-4" />
-                        Delete Account
+                        <AlertTriangle className="w-4 h-4" />
+                        Delete Account Permanently
                       </Button>
                     </DialogTrigger>
                     <DialogContent>
                       <DialogHeader>
-                        <DialogTitle>Deactivate Account?</DialogTitle>
+                        <DialogTitle>Delete Account Permanently?</DialogTitle>
                         <DialogDescription>
-                          Your account will be deactivated but not permanently deleted. 
-                          You can log back in anytime to reactivate your account and access your data.
+                          This action cannot be undone. All your notes, contributions, and profile data will be permanently deleted.
                         </DialogDescription>
                       </DialogHeader>
                       <DialogFooter>
@@ -402,7 +426,7 @@ export default function Settings() {
                           Cancel
                         </Button>
                         <Button variant="destructive" onClick={handleDeleteAccount}>
-                          Deactivate Account
+                          Delete Permanently
                         </Button>
                       </DialogFooter>
                     </DialogContent>

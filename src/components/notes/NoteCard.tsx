@@ -151,7 +151,18 @@ export function NoteCard({ note, onAskAI, onExpand }: NoteCardProps) {
     setLikeAnimating(true);
     setTimeout(() => setLikeAnimating(false), 400);
     try {
-      await notesService.toggleLike(note.id, auth.currentUser.uid, auth.currentUser.displayName || "User", liked);
+      const noteRef = doc(db, "notes", note.id);
+      if (liked) {
+        // Remove like
+        await updateDoc(noteRef, { likes: increment(-1), likedBy: arrayRemove(auth.currentUser.uid) });
+      } else {
+        // Add like and remove dislike if exists
+        await updateDoc(noteRef, { 
+          likes: increment(1), 
+          likedBy: arrayUnion(auth.currentUser.uid),
+          ...(disliked ? { dislikes: increment(-1), dislikedBy: arrayRemove(auth.currentUser.uid) } : {})
+        });
+      }
     } catch (error) {
       console.error(error);
     }
@@ -159,19 +170,27 @@ export function NoteCard({ note, onAskAI, onExpand }: NoteCardProps) {
 
   const handleDislike = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!auth.currentUser) return;
+    if (!auth.currentUser) {
+      toast({ title: "Login Required", description: "Please sign in to dislike notes", variant: "destructive" });
+      return;
+    }
     setDislikeAnimating(true);
     setTimeout(() => setDislikeAnimating(false), 400);
-    // Dislike logic (simple local increment for UI feedback)
-    const noteRef = doc(db, "notes", note.id);
-    if (disliked) {
-      await updateDoc(noteRef, { dislikes: increment(-1), dislikedBy: arrayRemove(auth.currentUser.uid) });
-    } else {
-      await updateDoc(noteRef, { 
-        dislikes: increment(1), 
-        dislikedBy: arrayUnion(auth.currentUser.uid),
-        ...(liked ? { likes: increment(-1), likedBy: arrayRemove(auth.currentUser.uid) } : {})
-      });
+    try {
+      const noteRef = doc(db, "notes", note.id);
+      if (disliked) {
+        // Remove dislike
+        await updateDoc(noteRef, { dislikes: increment(-1), dislikedBy: arrayRemove(auth.currentUser.uid) });
+      } else {
+        // Add dislike and remove like if exists
+        await updateDoc(noteRef, { 
+          dislikes: increment(1), 
+          dislikedBy: arrayUnion(auth.currentUser.uid),
+          ...(liked ? { likes: increment(-1), likedBy: arrayRemove(auth.currentUser.uid) } : {})
+        });
+      }
+    } catch (error) {
+      console.error(error);
     }
   };
 
@@ -357,7 +376,7 @@ export function NoteCard({ note, onAskAI, onExpand }: NoteCardProps) {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48 animate-in fade-in zoom-in duration-200">
                 <DropdownMenuItem onClick={handleShare}><Share2 className="w-4 h-4 mr-2" /> Share Link</DropdownMenuItem>
-                <DropdownMenuItem onClick={handleDownload}><Download className="w-4 h-4 mr-2" /> Download PDF</DropdownMenuItem>
+                <DropdownMenuItem onClick={handleDownload}><Download className="w-4 h-4 mr-2" /> {note.fileType === 'pdf' ? 'Download PDF' : note.fileType === 'image' ? 'Download Image' : note.fileType === 'video' ? 'Download Video' : 'Open Link'}</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setRatingDialogOpen(true)}><Star className="w-4 h-4 mr-2" /> Rate Quality</DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={onExpand}><Expand className="w-4 h-4 mr-2" /> Full Details</DropdownMenuItem>

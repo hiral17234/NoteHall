@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { GeminiChat } from "@/components/GeminiChat";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -61,7 +62,29 @@ const examplePrompts = [
 
 export default function Gemini() {
   const { userProfile } = useAuth();
+  const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState("chat");
+  const [noteContext, setNoteContext] = useState<{
+    title?: string;
+    subject?: string;
+    fileUrl?: string;
+  } | undefined>(undefined);
+
+  // Check for note context from URL params
+  useEffect(() => {
+    const noteId = searchParams.get('noteId');
+    const title = searchParams.get('title');
+    const subject = searchParams.get('subject');
+    const fileUrl = searchParams.get('fileUrl');
+
+    if (title) {
+      setNoteContext({
+        title: decodeURIComponent(title),
+        subject: subject ? decodeURIComponent(subject) : undefined,
+        fileUrl: fileUrl ? decodeURIComponent(fileUrl) : undefined,
+      });
+    }
+  }, [searchParams]);
 
   // Set user context for personalized responses
   useEffect(() => {
@@ -109,7 +132,7 @@ export default function Gemini() {
             <div className="grid lg:grid-cols-3 gap-6">
               {/* Main Chat */}
               <div className="lg:col-span-2">
-                <GeminiChat className="h-[600px]" />
+                <GeminiChat className="h-[600px]" noteContext={noteContext} />
               </div>
 
               {/* Sidebar */}
@@ -128,7 +151,6 @@ export default function Gemini() {
                         key={i}
                         className="w-full text-left text-sm p-2 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
                         onClick={() => {
-                          // This would ideally communicate with the chat
                           setActiveTab("chat");
                         }}
                       >

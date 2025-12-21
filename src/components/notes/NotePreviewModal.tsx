@@ -1,3 +1,5 @@
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -15,10 +17,16 @@ import {
   Bot,
   Download,
   Share2,
-  User
+  User,
+  ExternalLink,
+  Loader2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NoteCommentsSection } from "./NoteCommentsSection";
+import { notesService } from "@/services/firestoreService";
+import { useSavedNotes } from "@/contexts/SavedNotesContext";
+import { auth } from "@/lib/firebase";
+import { toast } from "@/hooks/use-toast";
 
 interface Note {
   id: string;
@@ -58,17 +66,132 @@ const fileTypeColors = {
   link: "bg-secondary/20 text-secondary",
 };
 
-const mockContent = {
-  pdf: "This is a comprehensive PDF document covering all the essential topics. The content includes detailed explanations, diagrams, and examples to help you understand the subject better.",
-  image: "High-quality diagram illustrating the key concepts. The image includes annotations and labels for easy understanding.",
-  video: "A detailed video tutorial explaining the topic step by step. Duration: 15 minutes. Covers basics to advanced concepts.",
-  link: "External resource link to verified study materials from reputable educational sources.",
+const getDownloadLabel = (fileType: string) => {
+  switch (fileType) {
+    case "pdf": return "Download PDF";
+    case "image": return "Download Image";
+    case "video": return "Download Video";
+    case "link": return "Open Link";
+    default: return "Download";
+  }
 };
 
 export function NotePreviewModal({ note, open, onClose, onAskAI }: NotePreviewModalProps) {
+  const navigate = useNavigate();
+  const { isNoteSaved, toggleSave } = useSavedNotes();
+  const [isDownloading, setIsDownloading] = useState(false);
+
   if (!note) return null;
 
   const FileIcon = fileTypeIcons[note.fileType];
+  const saved = isNoteSaved(note.id);
+
+  const handleDownload = async () => {
+    if (!note.fileUrl) {
+      toast({ title: "No file available", description: "This note doesn't have a downloadable file.", variant: "destructive" });
+      return;
+    }
+
+    setIsDownloading(true);
+    try {
+      if (note.fileType === "link") {
+        window.open(note.fileUrl, '_blank');
+      } else if (auth.currentUser) {
+        await notesService.downloadNote(note.id, auth.currentUser.uid, {
+          title: note.title,
+          subject: note.subject,
+          fileUrl: note.fileUrl,
+        });
+        toast({ title: "Download Started", description: "Your file is being prepared." });
+      } else {
+        window.open(note.fileUrl, '_blank');
+      }
+    } catch (error) {
+      console.error("Download error:", error);
+      window.open(note.fileUrl, '_blank');
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  const handleSave = () => {
+    toggleSave(note as any);
+    toast({ 
+      title: saved ? "Removed from saved" : "Saved!", 
+      description: saved ? "Note removed from your collection" : "Note added to your collection" 
+    });
+  };
+
+  const handleShare = async () => {
+    const url = `${window.location.origin}/notes/${note.id}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: note.title, url });
+      } catch (err) { console.error(err); }
+    } else {
+      await navigator.clipboard.writeText(url);
+      toast({ title: "Link Copied", description: "Share it with your friends!" });
+    }
+  };
+
+  const handleAskAI = () => {
+    // Navigate to Gemini with note context
+    navigate(`/gemini?noteId=${note.id}&title=${encodeURIComponent(note.title)}&subject=${encodeURIComponent(note.subject)}&fileUrl=${encodeURIComponent(note.fileUrl || '')}`);
+    onClose();
+  };
+
+  const renderMediaPreview = () => {
+    if (!note.fileUrl) return null;
+
+    switch (note.fileType) {
+      case "image":
+        return (
+          <div className="mt-4 rounded-xl overflow-hidden border border-border">
+            <img 
+              src={note.fileUrl} 
+              alt={note.title} 
+              className="w-full max-h-[300px] object-contain bg-muted"
+            />
+          </div>
+        );
+      case "video":
+        return (
+          <div className="mt-4 aspect-video rounded-xl overflow-hidden border border-border">
+            <video 
+              src={note.fileUrl} 
+              controls 
+              className="w-full h-full bg-muted"
+            />
+          </div>
+        );
+      case "pdf":
+        return (
+          <div className="mt-4 rounded-xl overflow-hidden border border-border">
+            <iframe 
+              src={`${note.fileUrl}#view=FitH`}
+              title={note.title}
+              className="w-full h-[400px]"
+            />
+          </div>
+        );
+      case "link":
+        return (
+          <div className="mt-4 p-4 bg-muted/50 rounded-xl border border-border">
+            <a 
+              href={note.fileUrl} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 text-primary hover:underline"
+            >
+              <ExternalLink className="w-4 h-4" />
+              Open External Resource
+            </a>
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -112,25 +235,8 @@ export function NotePreviewModal({ note, open, onClose, onAskAI }: NotePreviewMo
               )}
             </div>
 
-            {/* Preview Content */}
-            <div className="bg-muted/50 rounded-xl p-4">
-              <h4 className="text-sm font-medium text-foreground mb-2">Preview</h4>
-              <p className="text-sm text-muted-foreground">
-                {mockContent[note.fileType]}
-              </p>
-              
-              {note.fileType === "image" && (
-                <div className="mt-4 aspect-video bg-muted rounded-lg flex items-center justify-center">
-                  <Image className="w-12 h-12 text-muted-foreground" />
-                </div>
-              )}
-              
-              {note.fileType === "video" && (
-                <div className="mt-4 aspect-video bg-muted rounded-lg flex items-center justify-center">
-                  <Video className="w-12 h-12 text-muted-foreground" />
-                </div>
-              )}
-            </div>
+            {/* Media Preview */}
+            {renderMediaPreview()}
 
             {/* Stats */}
             <div className="flex items-center gap-6 text-sm text-muted-foreground">
@@ -161,21 +267,35 @@ export function NotePreviewModal({ note, open, onClose, onAskAI }: NotePreviewMo
 
         {/* Actions */}
         <div className="p-6 pt-0 flex flex-wrap gap-2 border-t border-border mt-auto">
-          <Button className="bg-primary hover:bg-primary/90 text-primary-foreground gap-2 flex-1">
-            <Download className="w-4 h-4" />
-            Download
+          <Button 
+            onClick={handleDownload}
+            disabled={isDownloading}
+            className="bg-primary hover:bg-primary/90 text-primary-foreground gap-2 flex-1"
+          >
+            {isDownloading ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : note.fileType === "link" ? (
+              <ExternalLink className="w-4 h-4" />
+            ) : (
+              <Download className="w-4 h-4" />
+            )}
+            {getDownloadLabel(note.fileType)}
           </Button>
-          <Button variant="outline" className="gap-2 flex-1">
-            <Bookmark className="w-4 h-4" />
-            Save
+          <Button 
+            variant="outline" 
+            onClick={handleSave}
+            className={cn("gap-2 flex-1", saved && "text-primary border-primary/30")}
+          >
+            <Bookmark className={cn("w-4 h-4", saved && "fill-current")} />
+            {saved ? "Saved" : "Save"}
           </Button>
-          <Button variant="outline" className="gap-2 flex-1">
+          <Button variant="outline" onClick={handleShare} className="gap-2 flex-1">
             <Share2 className="w-4 h-4" />
             Share
           </Button>
           <Button 
             variant="outline" 
-            onClick={onAskAI}
+            onClick={handleAskAI}
             className="gap-2 flex-1 border-primary/30 text-primary hover:bg-primary hover:text-primary-foreground"
           >
             <Bot className="w-4 h-4" />

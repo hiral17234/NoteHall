@@ -3,7 +3,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useGemini, ChatMessage } from "@/hooks/useGemini";
 import { 
@@ -15,17 +14,19 @@ import {
   FileText,
   Lightbulb,
   Loader2,
-  AlertCircle,
-  Bot
+  ImageIcon,
+  X
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
+import { toast } from "@/hooks/use-toast";
 
 interface GeminiChatProps {
   noteContext?: {
     title?: string;
     content?: string;
     subject?: string;
+    fileUrl?: string;
   };
   className?: string;
 }
@@ -39,8 +40,11 @@ const quickActions = [
 
 export function GeminiChat({ noteContext, className }: GeminiChatProps) {
   const [input, setInput] = useState("");
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { 
     messages, 
     isLoading, 
@@ -59,6 +63,11 @@ export function GeminiChat({ noteContext, className }: GeminiChatProps) {
         noteContent: noteContext.content,
         selectedSubject: noteContext.subject,
       });
+      // If we have note context, add an initial message about it
+      if (noteContext.title && messages.length <= 1) {
+        const contextMessage = `I'm asking about the note: "${noteContext.title}" (${noteContext.subject || 'Unknown subject'})`;
+        setInput(contextMessage);
+      }
     }
   }, [noteContext, setContext]);
 
@@ -69,10 +78,44 @@ export function GeminiChat({ noteContext, className }: GeminiChatProps) {
     }
   }, [messages]);
 
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (!file.type.startsWith('image/')) {
+        toast({ title: "Invalid file", description: "Please select an image file.", variant: "destructive" });
+        return;
+      }
+      setSelectedImage(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const clearImage = () => {
+    setSelectedImage(null);
+    setImagePreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
   const handleSend = async () => {
-    if (!input.trim() || isLoading) return;
-    const message = input;
+    if ((!input.trim() && !selectedImage) || isLoading) return;
+    
+    let message = input;
+    
+    // If we have an image, include it in the message context
+    if (selectedImage && imagePreview) {
+      message = `[Image attached: ${selectedImage.name}]\n${input || "Please analyze this image."}`;
+      // Note: For actual image analysis, the backend would need to handle the image
+      // For now, we'll just indicate that an image was attached
+    }
+    
     setInput("");
+    clearImage();
     await sendMessage(message);
     inputRef.current?.focus();
   };
@@ -87,9 +130,6 @@ export function GeminiChat({ noteContext, className }: GeminiChatProps) {
   const handleQuickAction = (prompt: string) => {
     sendMessage(prompt);
   };
-
-  // Gemini is always configured via backend API
-  // No need to check for API key on frontend
 
   return (
     <Card className={cn("bg-card border-border flex flex-col h-full", className)}>
@@ -109,8 +149,18 @@ export function GeminiChat({ noteContext, className }: GeminiChatProps) {
         </Button>
       </div>
 
+      {/* Note Context Banner */}
+      {noteContext?.title && (
+        <div className="px-4 py-2 bg-primary/5 border-b border-border">
+          <p className="text-xs text-muted-foreground">
+            Asking about: <span className="font-medium text-foreground">{noteContext.title}</span>
+            {noteContext.subject && <span className="text-primary ml-1">({noteContext.subject})</span>}
+          </p>
+        </div>
+      )}
+
       {/* Quick Actions */}
-      {messages.length <= 1 && (
+      {messages.length <= 1 && !noteContext?.title && (
         <div className="p-4 border-b border-border">
           <p className="text-xs text-muted-foreground mb-2">Quick actions:</p>
           <div className="flex flex-wrap gap-2">
@@ -140,9 +190,46 @@ export function GeminiChat({ noteContext, className }: GeminiChatProps) {
         </div>
       </ScrollArea>
 
+      {/* Image Preview */}
+      {imagePreview && (
+        <div className="px-4 py-2 border-t border-border">
+          <div className="relative inline-block">
+            <img 
+              src={imagePreview} 
+              alt="Selected" 
+              className="h-20 rounded-lg border border-border"
+            />
+            <Button
+              variant="destructive"
+              size="icon"
+              className="absolute -top-2 -right-2 h-6 w-6"
+              onClick={clearImage}
+            >
+              <X className="w-3 h-3" />
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Input */}
       <div className="p-4 border-t border-border">
         <div className="flex gap-2">
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleImageSelect}
+            accept="image/*"
+            className="hidden"
+          />
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isLoading}
+            title="Attach image"
+          >
+            <ImageIcon className="w-4 h-4" />
+          </Button>
           <Input
             ref={inputRef}
             placeholder="Ask Gemini anything..."
@@ -154,7 +241,7 @@ export function GeminiChat({ noteContext, className }: GeminiChatProps) {
           />
           <Button 
             onClick={handleSend} 
-            disabled={!input.trim() || isLoading}
+            disabled={(!input.trim() && !selectedImage) || isLoading}
             className="bg-primary hover:bg-primary/90"
           >
             {isLoading ? (
