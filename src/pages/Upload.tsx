@@ -337,12 +337,12 @@ export default function Upload() {
                       <SelectValue placeholder="Select subject" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="dsa">Data Structures</SelectItem>
-                      <SelectItem value="os">Operating Systems</SelectItem>
-                      <SelectItem value="dbms">DBMS</SelectItem>
-                      <SelectItem value="cn">Computer Networks</SelectItem>
-                      <SelectItem value="ml">Machine Learning</SelectItem>
-                      <SelectItem value="de">Digital Electronics</SelectItem>
+                      <SelectItem value="DSA">Data Structures</SelectItem>
+                      <SelectItem value="OS">Operating Systems</SelectItem>
+                      <SelectItem value="DBMS">DBMS</SelectItem>
+                      <SelectItem value="CN">Computer Networks</SelectItem>
+                      <SelectItem value="ML">Machine Learning</SelectItem>
+                      <SelectItem value="DE">Digital Electronics</SelectItem>
                       <SelectItem value="other">Other</SelectItem>
                     </SelectContent>
                   </Select>
@@ -359,11 +359,12 @@ export default function Upload() {
                       <SelectValue placeholder="Select branch" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="cse">CSE</SelectItem>
-                      <SelectItem value="ece">ECE</SelectItem>
-                      <SelectItem value="eee">EEE</SelectItem>
-                      <SelectItem value="me">ME</SelectItem>
-                      <SelectItem value="ce">CE</SelectItem>
+                      <SelectItem value="CSE">CSE</SelectItem>
+                      <SelectItem value="ECE">ECE</SelectItem>
+                      <SelectItem value="EEE">EEE</SelectItem>
+                      <SelectItem value="ME">ME</SelectItem>
+                      <SelectItem value="CE">CE</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -379,10 +380,11 @@ export default function Upload() {
                       <SelectValue placeholder="Select year" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="1">1st Year</SelectItem>
-                      <SelectItem value="2">2nd Year</SelectItem>
-                      <SelectItem value="3">3rd Year</SelectItem>
-                      <SelectItem value="4">4th Year</SelectItem>
+                      <SelectItem value="1st Year">1st Year</SelectItem>
+                      <SelectItem value="2nd Year">2nd Year</SelectItem>
+                      <SelectItem value="3rd Year">3rd Year</SelectItem>
+                      <SelectItem value="4th Year">4th Year</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

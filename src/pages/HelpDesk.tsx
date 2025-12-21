@@ -131,11 +131,12 @@ export default function HelpDesk() {
                       <SelectValue placeholder="Subject" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="dsa">DSA</SelectItem>
-                      <SelectItem value="os">OS</SelectItem>
-                      <SelectItem value="dbms">DBMS</SelectItem>
-                      <SelectItem value="cn">CN</SelectItem>
-                      <SelectItem value="ml">ML</SelectItem>
+                      <SelectItem value="DSA">DSA</SelectItem>
+                      <SelectItem value="OS">OS</SelectItem>
+                      <SelectItem value="DBMS">DBMS</SelectItem>
+                      <SelectItem value="CN">CN</SelectItem>
+                      <SelectItem value="ML">ML</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
                     </SelectContent>
                   </Select>
 
@@ -147,10 +148,12 @@ export default function HelpDesk() {
                       <SelectValue placeholder="Branch" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="cse">CSE</SelectItem>
-                      <SelectItem value="ece">ECE</SelectItem>
-                      <SelectItem value="eee">EEE</SelectItem>
-                      <SelectItem value="me">ME</SelectItem>
+                      <SelectItem value="CSE">CSE</SelectItem>
+                      <SelectItem value="ECE">ECE</SelectItem>
+                      <SelectItem value="EEE">EEE</SelectItem>
+                      <SelectItem value="ME">ME</SelectItem>
+                      <SelectItem value="CE">CE</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
                     </SelectContent>
                   </Select>
 
@@ -166,6 +169,7 @@ export default function HelpDesk() {
                       <SelectItem value="2">2nd Year</SelectItem>
                       <SelectItem value="3">3rd Year</SelectItem>
                       <SelectItem value="4">4th Year</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

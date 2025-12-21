@@ -33,14 +33,24 @@ export default function HelpedPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!userProfile?.id) return;
-
-    const unsubscribe = contributionsService.subscribeToUserContributions(userProfile.id, (data) => {
-      setContributions(data);
+    if (!userProfile?.id) {
       setLoading(false);
-    });
+      return;
+    }
 
-    return () => unsubscribe();
+    try {
+      const unsubscribe = contributionsService.subscribeToUserContributions(
+        userProfile.id, 
+        (data) => {
+          setContributions(data);
+          setLoading(false);
+        }
+      );
+      return () => unsubscribe();
+    } catch (error) {
+      console.error("Error fetching contributions:", error);
+      setLoading(false);
+    }
   }, [userProfile?.id]);
 
   return (

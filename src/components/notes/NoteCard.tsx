@@ -86,14 +86,19 @@ export function NoteCard({ note, onAskAI, onExpand }: NoteCardProps) {
   const [likes, setLikes] = useState(note.likes || 0);
   const [dislikes, setDislikes] = useState(note.dislikes || 0);
   const [views, setViews] = useState(note.views || 0);
-  // --- ADD THIS NEW BLOCK HERE ---
+  // Session-based unique view tracking - only count once per session
   useEffect(() => {
     if (note.id) {
-      // Small delay so we don't count accidental scrolls as views
-      const timer = setTimeout(() => {
-        notesService.incrementViews(note.id);
-      }, 2000); 
-      return () => clearTimeout(timer);
+      const viewedKey = `viewed_${note.id}`;
+      const hasViewed = sessionStorage.getItem(viewedKey);
+      
+      if (!hasViewed) {
+        const timer = setTimeout(() => {
+          notesService.incrementViews(note.id);
+          sessionStorage.setItem(viewedKey, 'true');
+        }, 2000);
+        return () => clearTimeout(timer);
+      }
     }
   }, [note.id]);
   
