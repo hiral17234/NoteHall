@@ -23,26 +23,31 @@ interface SavedNotesContextType {
 const SavedNotesContext = createContext<SavedNotesContextType | undefined>(undefined);
 
 export function SavedNotesProvider({ children }: { children: ReactNode }) {
-  const { userProfile } = useAuth();
+  // Extracting user to ensure we have the UID for Firestore paths
+  const { userProfile, user } = useAuth();
   const [savedNotes, setSavedNotes] = useState<SavedNote[]>([]);
   const [loading, setLoading] = useState(false);
+
+  // Determine the correct ID to use (checks both profile and base auth user)
+  const currentUserId = userProfile?.id || userProfile?.uid || user?.uid;
 
   // Load saved notes from Firestore when user changes
   useEffect(() => {
     const loadSavedNotes = async () => {
-      if (!userProfile?.id) {
+      if (!currentUserId) {
         setSavedNotes([]);
         return;
       }
 
       setLoading(true);
       try {
-        const notes = await notesService.getSavedNotes(userProfile.id);
+        const notes = await notesService.getSavedNotes(currentUserId);
         setSavedNotes(notes.map(n => ({
           id: n.id,
           title: n.title,
           subject: n.subject,
-          savedAt: n.createdAt?.toDate?.()?.toISOString() || new Date().toISOString(),
+          // Safely handle Firebase Timestamps
+          savedAt: n.createdAt?.toDate?.()?.toISOString() || n.savedAt || new Date().toISOString(),
         })));
       } catch (error) {
         console.error("Error loading saved notes:", error);
@@ -52,7 +57,7 @@ export function SavedNotesProvider({ children }: { children: ReactNode }) {
     };
 
     loadSavedNotes();
-  }, [userProfile?.id]);
+  }, [currentUserId]);
 
   const savedNoteIds = savedNotes.map(n => n.id);
 
@@ -61,7 +66,7 @@ export function SavedNotesProvider({ children }: { children: ReactNode }) {
   }, [savedNoteIds]);
 
   const saveNote = useCallback(async (note: { id: string; title: string; subject: string }) => {
-    if (!userProfile?.id) {
+    if (!currentUserId) {
       toast({
         title: "Please log in",
         description: "You need to be logged in to save notes",
@@ -71,7 +76,7 @@ export function SavedNotesProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      await notesService.saveNote(note.id, userProfile.id);
+      await notesService.saveNote(note.id, currentUserId);
       setSavedNotes(prev => {
         if (prev.some(n => n.id === note.id)) return prev;
         return [...prev, { ...note, savedAt: new Date().toISOString() }];
@@ -88,13 +93,13 @@ export function SavedNotesProvider({ children }: { children: ReactNode }) {
         variant: "destructive",
       });
     }
-  }, [userProfile?.id]);
+  }, [currentUserId]);
 
   const unsaveNote = useCallback(async (noteId: string) => {
-    if (!userProfile?.id) return;
+    if (!currentUserId) return;
 
     try {
-      await notesService.unsaveNote(noteId, userProfile.id);
+      await notesService.unsaveNote(noteId, currentUserId);
       setSavedNotes(prev => prev.filter(n => n.id !== noteId));
       toast({
         title: "Removed",
@@ -108,7 +113,7 @@ export function SavedNotesProvider({ children }: { children: ReactNode }) {
         variant: "destructive",
       });
     }
-  }, [userProfile?.id]);
+  }, [currentUserId]);
 
   const toggleSave = useCallback(async (note: { id: string; title: string; subject: string }) => {
     if (isNoteSaved(note.id)) {
