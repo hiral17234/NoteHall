@@ -42,15 +42,24 @@ export default function Index() {
   const toCardNote = (note: Note) => mapFirestoreNoteToCardNote(note);
 
   const filteredNotes = notes.filter((note) => {
-    if (selectedBranch !== "all" && note.branch !== selectedBranch) return false;
-    if (selectedYear !== "all" && note.year !== selectedYear) return false;
+    if (selectedBranch !== "all" && selectedBranch !== "other") {
+      if (note.branch?.toUpperCase() !== selectedBranch?.toUpperCase()) return false;
+    }
+    if (selectedYear !== "all" && selectedYear !== "other") {
+      if (note.year !== selectedYear) return false;
+    }
     return true;
   });
 
   // Sort notes based on active tab
   const sortedNotes = [...filteredNotes].sort((a, b) => {
-    if (activeTab === "trending") return b.views - a.views;
-    if (activeTab === "top") return b.likes - a.likes;
+    if (activeTab === "trending") return (b.views || 0) - (a.views || 0);
+    if (activeTab === "top") {
+      // Top rated = likes minus dislikes, highest first
+      const scoreA = (a.likes || 0) - (a.dislikes || 0);
+      const scoreB = (b.likes || 0) - (b.dislikes || 0);
+      return scoreB - scoreA;
+    }
     if (activeTab === "latest") {
       const dateA = a.createdAt?.toDate?.() ?? new Date(0);
       const dateB = b.createdAt?.toDate?.() ?? new Date(0);

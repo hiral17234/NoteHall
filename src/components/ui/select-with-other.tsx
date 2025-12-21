@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { X } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface SelectWithOtherProps {
   value: string;
@@ -25,20 +27,22 @@ export function SelectWithOther({
   const [isOther, setIsOther] = useState(false);
   const [customValue, setCustomValue] = useState("");
 
-  // Check if current value is one of the predefined options
+  // Check if current value is one of the predefined options or if it was custom
   useEffect(() => {
     const isPredefined = options.some(opt => opt.value === value);
-    if (value && !isPredefined && value !== "__other__") {
+    if (value && !isPredefined && value !== "__other__" && value !== "other") {
       setIsOther(true);
       setCustomValue(value);
+    } else if (value === "other" || value === "__other__") {
+      setIsOther(true);
     }
   }, [value, options]);
 
   const handleSelectChange = (newValue: string) => {
-    if (newValue === "__other__") {
+    if (newValue === "__other__" || newValue === "other") {
       setIsOther(true);
       setCustomValue("");
-      onValueChange("");
+      // Don't call onValueChange yet - wait for user input
     } else {
       setIsOther(false);
       setCustomValue("");
@@ -49,31 +53,38 @@ export function SelectWithOther({
   const handleCustomChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     setCustomValue(val);
-    onValueChange(val);
+    if (val.trim()) {
+      onValueChange(val);
+    }
+  };
+
+  const handleCancelOther = () => {
+    setIsOther(false);
+    setCustomValue("");
+    onValueChange("");
   };
 
   if (isOther) {
     return (
-      <div className="flex gap-2">
+      <div className="flex gap-2 items-center">
         <Input
           value={customValue}
           onChange={handleCustomChange}
           placeholder={inputPlaceholder}
           disabled={disabled}
           className={cn("flex-1 bg-background", className)}
+          autoFocus
         />
-        <button
+        <Button
           type="button"
-          onClick={() => {
-            setIsOther(false);
-            setCustomValue("");
-            onValueChange("");
-          }}
-          className="text-xs text-muted-foreground hover:text-foreground px-2"
+          variant="ghost"
+          size="icon"
+          onClick={handleCancelOther}
+          className="h-9 w-9 shrink-0"
           disabled={disabled}
         >
-          ✕
-        </button>
+          <X className="w-4 h-4" />
+        </Button>
       </div>
     );
   }
@@ -83,13 +94,13 @@ export function SelectWithOther({
       <SelectTrigger className={cn("bg-background", className)}>
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
-      <SelectContent>
+      <SelectContent className="bg-popover z-50">
         {options.map((option) => (
           <SelectItem key={option.value} value={option.value}>
             {option.label}
           </SelectItem>
         ))}
-        <SelectItem value="__other__">Other...</SelectItem>
+        <SelectItem value="__other__">Other (specify)</SelectItem>
       </SelectContent>
     </Select>
   );

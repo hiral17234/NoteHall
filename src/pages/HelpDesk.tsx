@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SelectWithOther } from "@/components/ui/select-with-other";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
@@ -43,7 +43,7 @@ export default function HelpDesk() {
         description: formData.description,
         subject: formData.subject.toUpperCase(),
         branch: formData.branch.toUpperCase(),
-        year: formData.year === "1" ? "1st Year" : formData.year === "2" ? "2nd Year" : formData.year === "3" ? "3rd Year" : "4th Year",
+        year: formData.year,
       });
       
       setDialogOpen(false);
@@ -123,55 +123,46 @@ export default function HelpDesk() {
                 </div>
 
                 <div className="grid grid-cols-3 gap-2">
-                  <Select
+                  <SelectWithOther
                     value={formData.subject}
                     onValueChange={(value) => setFormData({ ...formData, subject: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Subject" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="DSA">DSA</SelectItem>
-                      <SelectItem value="OS">OS</SelectItem>
-                      <SelectItem value="DBMS">DBMS</SelectItem>
-                      <SelectItem value="CN">CN</SelectItem>
-                      <SelectItem value="ML">ML</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    placeholder="Subject"
+                    inputPlaceholder="Enter subject..."
+                    options={[
+                      { value: "DSA", label: "DSA" },
+                      { value: "OS", label: "OS" },
+                      { value: "DBMS", label: "DBMS" },
+                      { value: "CN", label: "CN" },
+                      { value: "ML", label: "ML" },
+                    ]}
+                  />
 
-                  <Select
+                  <SelectWithOther
                     value={formData.branch}
                     onValueChange={(value) => setFormData({ ...formData, branch: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Branch" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="CSE">CSE</SelectItem>
-                      <SelectItem value="ECE">ECE</SelectItem>
-                      <SelectItem value="EEE">EEE</SelectItem>
-                      <SelectItem value="ME">ME</SelectItem>
-                      <SelectItem value="CE">CE</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    placeholder="Branch"
+                    inputPlaceholder="Enter branch..."
+                    options={[
+                      { value: "CSE", label: "CSE" },
+                      { value: "ECE", label: "ECE" },
+                      { value: "EEE", label: "EEE" },
+                      { value: "ME", label: "ME" },
+                      { value: "CE", label: "CE" },
+                    ]}
+                  />
 
-                  <Select
+                  <SelectWithOther
                     value={formData.year}
                     onValueChange={(value) => setFormData({ ...formData, year: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Year" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1">1st Year</SelectItem>
-                      <SelectItem value="2">2nd Year</SelectItem>
-                      <SelectItem value="3">3rd Year</SelectItem>
-                      <SelectItem value="4">4th Year</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    placeholder="Year"
+                    inputPlaceholder="Enter year..."
+                    options={[
+                      { value: "1st Year", label: "1st Year" },
+                      { value: "2nd Year", label: "2nd Year" },
+                      { value: "3rd Year", label: "3rd Year" },
+                      { value: "4th Year", label: "4th Year" },
+                    ]}
+                  />
                 </div>
 
                 <Button 

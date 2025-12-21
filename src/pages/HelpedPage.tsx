@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useAuth } from "@/contexts/AuthContext";
-import { contributionsService, Contribution } from "@/services/firestoreService";
+import { db } from "@/lib/firebase";
+import { collection, query, where, getDocs, orderBy } from "firebase/firestore";
 import { 
   HandHelping, 
   FileText, 
@@ -19,11 +20,21 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
-const typeIcons = {
+interface Contribution {
+  id: string;
+  type: string;
+  content: string;
+  fileUrl?: string;
+  createdAt: any;
+  requestId?: string;
+}
+
+const typeIcons: Record<string, any> = {
   pdf: FileText,
   image: Image,
   video: Video,
   link: Link,
+  explanation: FileText,
 };
 
 export default function HelpedPage() {
@@ -31,6 +42,7 @@ export default function HelpedPage() {
   const navigate = useNavigate();
   const [contributions, setContributions] = useState<Contribution[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!userProfile?.id) {
@@ -38,20 +50,51 @@ export default function HelpedPage() {
       return;
     }
 
-    try {
-      const unsubscribe = contributionsService.subscribeToUserContributions(
-        userProfile.id, 
-        (data) => {
-          setContributions(data);
-          setLoading(false);
-        }
-      );
-      return () => unsubscribe();
-    } catch (error) {
-      console.error("Error fetching contributions:", error);
-      setLoading(false);
-    }
+    const fetchContributions = async () => {
+      try {
+        const q = query(
+          collection(db, "contributions"),
+          where("contributorId", "==", userProfile.id)
+        );
+        const snapshot = await getDocs(q);
+        const data = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as Contribution[];
+        
+        // Sort by createdAt descending
+        data.sort((a, b) => {
+          const dateA = a.createdAt?.toDate?.()?.getTime() || 0;
+          const dateB = b.createdAt?.toDate?.()?.getTime() || 0;
+          return dateB - dateA;
+        });
+        
+        setContributions(data);
+        setError(null);
+      } catch (err: any) {
+        console.error("Error fetching contributions:", err);
+        setError(err?.code === 'permission-denied' 
+          ? "Permission denied. Please check Firestore rules." 
+          : "Failed to load contributions.");
+        setContributions([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchContributions();
   }, [userProfile?.id]);
+
+  if (!userProfile) {
+    return (
+      <MainLayout>
+        <div className="max-w-3xl mx-auto text-center py-12">
+          <p className="text-muted-foreground">Please login to view your contributions.</p>
+          <Button onClick={() => navigate("/login")} className="mt-4">Login</Button>
+        </div>
+      </MainLayout>
+    );
+  }
 
   return (
     <MainLayout>
@@ -100,6 +143,13 @@ export default function HelpedPage() {
                   <div key={i} className="h-20 bg-muted animate-pulse rounded-xl" />
                 ))}
               </div>
+            ) : error ? (
+              <div className="p-6 text-center">
+                <p className="text-destructive mb-4">{error}</p>
+                <Button variant="outline" onClick={() => window.location.reload()}>
+                  Try Again
+                </Button>
+              </div>
             ) : contributions.length === 0 ? (
               <EmptyState 
                 type="helped" 
@@ -110,7 +160,7 @@ export default function HelpedPage() {
               <ScrollArea className="h-[400px] pr-4">
                 <div className="space-y-4">
                   {contributions.map((contribution) => {
-                    const TypeIcon = typeIcons[contribution.type as keyof typeof typeIcons] || Link;
+                    const TypeIcon = typeIcons[contribution.type] || Link;
                     return (
                       <div 
                         key={contribution.id} 
@@ -121,7 +171,7 @@ export default function HelpedPage() {
                             <TypeIcon className="w-5 h-5" />
                           </div>
                           <div>
-                            <p className="font-medium text-foreground">{contribution.content}</p>
+                            <p className="font-medium text-foreground">{contribution.content || 'Contribution'}</p>
                             <p className="text-sm text-muted-foreground">
                               {contribution.type} • {contribution.createdAt?.toDate?.()?.toLocaleDateString() || 'Recently'}
                             </p>
