@@ -18,6 +18,7 @@ import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import Placeholder from "./pages/Placeholder";
 import NotFound from "./pages/NotFound";
+import Notifications from "./pages/Notifications";
 import { OnboardingDialog } from "@/components/onboarding/OnboardingDialog";
 
 const queryClient = new QueryClient();
@@ -86,6 +87,7 @@ function AuthenticatedApp() {
               <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
               <Route path="/upload" element={<ProtectedRoute><Upload /></ProtectedRoute>} />
               <Route path="/helpdesk" element={<ProtectedRoute><HelpDesk /></ProtectedRoute>} />
+              <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
               <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
               <Route path="/profile/:userId" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
               <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />

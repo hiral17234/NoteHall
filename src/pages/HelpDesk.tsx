@@ -61,7 +61,7 @@ export default function HelpDesk() {
     subject: request.subject,
     branch: request.branch,
     year: request.year,
-    requestType: "pdf" as const, // Default type since we removed it from the model
+    requestType: "pdf" as const,
     status:
       request.status === "in_progress"
         ? ("open" as const)
@@ -72,8 +72,8 @@ export default function HelpDesk() {
     requestedById: request.requesterId,
     timestamp: request.createdAt,
     helpersCount: request.contributionsCount,
-    likes: [],
-    commentsCount: 0,
+    likes: request.likes || [],
+    commentsCount: request.commentsCount || 0,
   });
 
   return (
