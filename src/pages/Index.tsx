@@ -160,7 +160,7 @@ export default function Index() {
         <div className="flex items-center gap-4 mb-4 text-sm text-muted-foreground">
           <div className="flex items-center gap-1">
             <Award className="w-4 h-4 text-primary" />
-            <span>Trusted Contributor</span>
+            <span>Verified Notes</span>
           </div>
           <div className="flex items-center gap-1">
             <BookOpen className="w-4 h-4" />
