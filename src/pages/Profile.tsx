@@ -70,6 +70,23 @@ export default function Profile() {
   const isOwnProfile = !userId || userId === "current-user" || userId === currentUser?.id;
   const targetUserId = isOwnProfile ? currentUser?.id : userId;
 
+  // Show loading if viewing own profile but currentUser not yet loaded
+  if (isOwnProfile && !currentUser && loading) {
+    return (
+      <MainLayout>
+        <div className="max-w-4xl mx-auto">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+            <ProfileStatsSkeleton />
+            <ProfileStatsSkeleton />
+            <ProfileStatsSkeleton />
+            <ProfileStatsSkeleton />
+            <ProfileStatsSkeleton />
+          </div>
+        </div>
+      </MainLayout>
+    );
+  }
+
   // Real-time profile subscription
   useEffect(() => {
     if (!targetUserId) {
