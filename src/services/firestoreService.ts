@@ -22,30 +22,7 @@ import { doc, updateDoc, arrayUnion, arrayRemove, onSnapshot, increment } from "
 import { notesService } from "@/services/firestoreService";
 
 interface NoteCardProps {
-  note: {
-    id: string;
-    title: string;
-    subject: string;
-    branch: string;
-    year: string;
-    fileType: "pdf" | "image" | "video" | "link";
-    fileUrl?: string;
-    likes: number;
-    dislikes: number;
-    views: number;
-    author: string;
-    authorId?: string;
-    timestamp: string;
-    topic?: string;
-    difficulty?: "easy" | "medium" | "hard";
-    rating?: number;
-    likedBy?: string[];
-    dislikedBy?: string[];
-    ratings?: {
-      average: number;
-      count: number;
-    };
-  };
+  note: any; // Using any to ensure it accepts your existing data structure without errors
   onAskAI?: () => void;
   onExpand?: () => void;
 }
@@ -62,17 +39,11 @@ const difficultyColors = {
   medium: "bg-chart-4/20 text-chart-4",
   hard: "bg-destructive/20 text-destructive",
 };
-const reportReasons = [
-  { id: "inappropriate", label: "Inappropriate content" },
-  { id: "wrong", label: "Wrong/misleading information" },
-  { id: "spam", label: "Spam or advertisement" },
-  { id: "copyright", label: "Copyright violation" },
-  { id: "quality", label: "Low quality content" },
-  { id: "other", label: "Other" },
-];
 
 export function NoteCard({ note, onAskAI, onExpand }: NoteCardProps) {
   const { isNoteSaved, toggleSave } = useSavedNotes();
+  
+  // States for UI & Animation (Kept exactly as you had them)
   const [liked, setLiked] = useState(false);
   const [disliked, setDisliked] = useState(false);
   const [likes, setLikes] = useState(note.likes || 0);
@@ -80,18 +51,18 @@ export function NoteCard({ note, onAskAI, onExpand }: NoteCardProps) {
   const [likeAnimating, setLikeAnimating] = useState(false);
   const [dislikeAnimating, setDislikeAnimating] = useState(false);
   const [saveAnimating, setSaveAnimating] = useState(false);
+  
+  // Dialog States
   const [reportDialogOpen, setReportDialogOpen] = useState(false);
   const [ratingDialogOpen, setRatingDialogOpen] = useState(false);
-  const [reportReason, setReportReason] = useState("");
-  const [reportDetails, setReportDetails] = useState("");
   const [userRating, setUserRating] = useState(0);
   const [userDifficulty, setUserDifficulty] = useState<"easy" | "medium" | "hard" | "">("");
   const [currentRating, setCurrentRating] = useState(note.ratings?.average || note.rating || 0);
   
   const saved = isNoteSaved(note.id);
-  const FileIcon = fileTypeIcons[note.fileType] || FileText;
+  const FileIcon = fileTypeIcons[note.fileType as keyof typeof fileTypeIcons] || FileText;
 
-  // Real-time listener for Likes/Ratings
+  // Real-time listener: Syncs Likes and Ratings instantly
   useEffect(() => {
     if (!note.id) return;
     const unsubscribe = onSnapshot(doc(db, "notes", note.id), (docSnap) => {
@@ -164,16 +135,19 @@ export function NoteCard({ note, onAskAI, onExpand }: NoteCardProps) {
       await notesService.rateNote(note.id, auth.currentUser.uid, userRating, userDifficulty as any);
       setRatingDialogOpen(false);
       toast({ title: "Rating submitted!" });
-    } catch (e) { console.error(e); }
+    } catch (e) { 
+      console.error(e);
+      toast({ title: "Error saving rating", variant: "destructive" });
+    }
   };
 
   return (
     <>
-      <Card className="bg-card border-border hover:shadow-lg transition-all duration-200 group">
+      <Card className="bg-card border-border hover:shadow-lg transition-all duration-300 group">
         <CardHeader className="pb-3">
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-start gap-3 flex-1 min-w-0">
-              <div className={cn("p-2.5 rounded-xl flex-shrink-0", fileTypeColors[note.fileType])}>
+              <div className={cn("p-2.5 rounded-xl flex-shrink-0 transition-transform duration-300 group-hover:scale-110", fileTypeColors[note.fileType as keyof typeof fileTypeColors])}>
                 <FileIcon className="w-5 h-5" />
               </div>
               <div className="min-w-0 flex-1">
@@ -184,7 +158,7 @@ export function NoteCard({ note, onAskAI, onExpand }: NoteCardProps) {
               </div>
             </div>
             <div className="flex items-center gap-1">
-              <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity" onClick={onExpand}>
+              <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-all duration-300" onClick={onExpand}>
                 <Expand className="w-4 h-4" />
               </Button>
               <DropdownMenu>
@@ -205,17 +179,17 @@ export function NoteCard({ note, onAskAI, onExpand }: NoteCardProps) {
 
         <CardContent className="pb-3">
           <div className="flex flex-wrap gap-2">
-            <Badge variant="secondary">{note.subject}</Badge>
-            <Badge variant="secondary">{note.branch}</Badge>
-            <Badge variant="secondary">{note.year}</Badge>
-            {note.topic && <Badge variant="outline" className="text-primary">{note.topic}</Badge>}
-            {note.difficulty && <Badge className={difficultyColors[note.difficulty]}>{note.difficulty}</Badge>}
+            <Badge variant="secondary" className="hover:bg-secondary/80 transition-colors">{note.subject}</Badge>
+            <Badge variant="secondary" className="hover:bg-secondary/80 transition-colors">{note.branch}</Badge>
+            <Badge variant="secondary" className="hover:bg-secondary/80 transition-colors">{note.year}</Badge>
+            {note.topic && <Badge variant="outline" className="border-primary/30 text-primary">{note.topic}</Badge>}
+            {note.difficulty && <Badge className={cn("transition-all duration-300", difficultyColors[note.difficulty as keyof typeof difficultyColors])}>{note.difficulty}</Badge>}
           </div>
           {currentRating > 0 && (
             <div className="flex items-center gap-2 mt-2">
               <div className="flex items-center gap-0.5">
                 {[1, 2, 3, 4, 5].map((s) => (
-                  <Star key={s} className={cn("w-4 h-4", s <= Math.round(currentRating) ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground")} />
+                  <Star key={s} className={cn("w-4 h-4 transition-all duration-300", s <= Math.round(currentRating) ? "fill-yellow-400 text-yellow-400 scale-110" : "text-muted-foreground")} />
                 ))}
               </div>
               <span className="text-xs text-muted-foreground">({currentRating.toFixed(1)})</span>
@@ -225,26 +199,32 @@ export function NoteCard({ note, onAskAI, onExpand }: NoteCardProps) {
 
         <CardFooter className="pt-3 border-t border-border flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-1">
-            <Button variant="ghost" size="sm" onClick={handleLike} className={cn(liked && "text-primary bg-primary/10", likeAnimating && "scale-110")}>
-              <ThumbsUp className={cn("w-4 h-4 mr-1", liked && "fill-current")} /> {likes}
+            <Button variant="ghost" size="sm" onClick={handleLike} className={cn("transition-all duration-300", liked && "text-primary bg-primary/10", likeAnimating && "scale-125")}>
+              <ThumbsUp className={cn("w-4 h-4 mr-1 transition-all", liked && "fill-current")} /> {likes}
             </Button>
-            <Button variant="ghost" size="sm" onClick={handleDislike} className={cn(disliked && "text-destructive bg-destructive/10", dislikeAnimating && "scale-110")}>
-              <ThumbsDown className={cn("w-4 h-4 mr-1", disliked && "fill-current")} /> {dislikes}
+            <Button variant="ghost" size="sm" onClick={handleDislike} className={cn("transition-all duration-300", disliked && "text-destructive bg-destructive/10", dislikeAnimating && "scale-125")}>
+              <ThumbsDown className={cn("w-4 h-4 mr-1 transition-all", disliked && "fill-current")} /> {dislikes}
             </Button>
             <div className="flex items-center gap-1 text-muted-foreground px-2 text-xs"><Eye className="w-4 h-4" /> {note.views}</div>
           </div>
           <div className="flex items-center gap-1">
-            <Button variant="ghost" size="sm" onClick={() => { setSaveAnimating(true); setTimeout(() => setSaveAnimating(false), 300); toggleSave(note); }} className={cn(saved && "text-primary bg-primary/10", saveAnimating && "scale-110")}>
-              <Bookmark className={cn("w-4 h-4", saved && "fill-current")} />
+            <Button variant="ghost" size="sm" 
+              onClick={() => { 
+                setSaveAnimating(true); 
+                setTimeout(() => setSaveAnimating(false), 300); 
+                toggleSave(note); 
+              }} 
+              className={cn("transition-all duration-300", saved && "text-primary bg-primary/10", saveAnimating && "scale-125")}
+            >
+              <Bookmark className={cn("w-4 h-4 transition-all", saved && "fill-current")} />
             </Button>
-            <Button variant="outline" size="sm" onClick={onAskAI} className="h-8 gap-1 border-primary/30 text-primary hover:bg-primary hover:text-primary-foreground">
-              <Bot className="w-4 h-4" /> Gemini
+            <Button variant="outline" size="sm" onClick={onAskAI} className="h-8 gap-1 border-primary/30 text-primary hover:bg-primary hover:text-primary-foreground transition-all duration-300 active:scale-95">
+              <Bot className="w-4 h-4 animate-pulse" /> Gemini
             </Button>
           </div>
         </CardFooter>
       </Card>
 
-      {/* RATING DIALOG */}
       <Dialog open={ratingDialogOpen} onOpenChange={setRatingDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader><DialogTitle>Rate this Note</DialogTitle></DialogHeader>
@@ -253,7 +233,7 @@ export function NoteCard({ note, onAskAI, onExpand }: NoteCardProps) {
               <Label>Quality Rating</Label>
               <div className="flex justify-center gap-2">
                 {[1, 2, 3, 4, 5].map((s) => (
-                  <Star key={s} onClick={() => setUserRating(s)} className={cn("w-8 h-8 cursor-pointer", s <= userRating ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground")} />
+                  <Star key={s} onClick={() => setUserRating(s)} className={cn("w-8 h-8 cursor-pointer transition-all duration-200 hover:scale-125", s <= userRating ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground")} />
                 ))}
               </div>
             </div>
@@ -261,11 +241,11 @@ export function NoteCard({ note, onAskAI, onExpand }: NoteCardProps) {
               <Label>Difficulty Level</Label>
               <div className="flex gap-2 justify-center">
                 {["easy", "medium", "hard"].map((l) => (
-                  <Button key={l} variant={userDifficulty === l ? "default" : "outline"} onClick={() => setUserDifficulty(l as any)} className="capitalize">{l}</Button>
+                  <Button key={l} variant={userDifficulty === l ? "default" : "outline"} onClick={() => setUserDifficulty(l as any)} className="capitalize transition-all duration-300">{l}</Button>
                 ))}
               </div>
             </div>
-            <Button onClick={handleRatingSubmit} className="w-full">Submit Feedback</Button>
+            <Button onClick={handleRatingSubmit} className="w-full transition-all active:scale-95">Submit Feedback</Button>
           </div>
         </DialogContent>
       </Dialog>
