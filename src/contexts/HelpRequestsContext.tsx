@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from "react";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { auth } from "@/lib/firebase";
 import { helpRequestsService, HelpRequest } from "@/services/firestoreService";
 
 // Re-export HelpRequest type
@@ -27,8 +28,16 @@ export function HelpRequestsProvider({ children }: { children: ReactNode }) {
     try {
       const fetchedRequests = await helpRequestsService.getAll();
       setRequests(fetchedRequests);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error loading help requests:", error);
+      // Don't show error toast for permission denied - this is a Firebase rules issue
+      if (error?.code !== 'permission-denied') {
+        toast({
+          title: "Error loading requests",
+          description: "Please try again later.",
+          variant: "destructive",
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -39,7 +48,10 @@ export function HelpRequestsProvider({ children }: { children: ReactNode }) {
   }, [fetchRequests]);
 
   const addRequest = useCallback(async (request: { title: string; description: string; subject: string; branch: string; year: string }) => {
-    if (!userProfile) {
+    // Get current user from Firebase auth directly as fallback
+    const currentUser = auth.currentUser;
+    
+    if (!userProfile && !currentUser) {
       toast({
         title: "Please log in",
         description: "You need to be logged in to create a request.",
@@ -49,20 +61,29 @@ export function HelpRequestsProvider({ children }: { children: ReactNode }) {
     }
 
     try {
+      // Use userProfile if available, otherwise use Firebase auth user data
+      const requesterId = userProfile?.id || currentUser?.uid || "";
+      const requesterName = userProfile?.name || currentUser?.displayName || "Anonymous";
+      const requesterUsername = userProfile?.username || currentUser?.email?.split("@")[0] || "user";
+
+      if (!requesterId) {
+        throw new Error("User ID not found");
+      }
+
       const requestId = await helpRequestsService.create({
         ...request,
-        requesterId: userProfile.id,
-        requesterName: userProfile.name,
-        requesterUsername: userProfile.username,
+        requesterId,
+        requesterName,
+        requesterUsername,
       });
       
       // Fetch the new request and add to state
       const newRequest: HelpRequest = {
         id: requestId,
         ...request,
-        requesterId: userProfile.id,
-        requesterName: userProfile.name,
-        requesterUsername: userProfile.username,
+        requesterId,
+        requesterName,
+        requesterUsername,
         status: 'open',
         contributionsCount: 0,
         createdAt: new Date(),
@@ -74,11 +95,13 @@ export function HelpRequestsProvider({ children }: { children: ReactNode }) {
         title: "Request created!",
         description: "Your request has been posted. Others can now help you.",
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating request:", error);
       toast({
         title: "Error",
-        description: "Failed to create request. Please try again.",
+        description: error?.message?.includes("permission") 
+          ? "Permission denied. Please check Firebase Security Rules."
+          : "Failed to create request. Please try again.",
         variant: "destructive",
       });
     }

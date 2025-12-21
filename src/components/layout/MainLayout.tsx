@@ -45,9 +45,9 @@ export function MainLayout({ children }: MainLayoutProps) {
       <div className="min-h-screen bg-background">
         <Sidebar />
         
-        {/* Main Content - dynamic margin based on sidebar state */}
+        {/* Main Content - dynamic margin based on sidebar state with smooth transition */}
         <div className={cn(
-          "transition-all duration-300",
+          "transition-all duration-300 ease-in-out flex flex-col min-h-screen",
           sidebarCollapsed ? "ml-16" : "ml-64"
         )}>
           {/* Top Bar */}
@@ -75,8 +75,8 @@ export function MainLayout({ children }: MainLayoutProps) {
             </div>
           </header>
 
-          {/* Page Content */}
-          <main className="p-6">
+          {/* Page Content - flex-1 ensures it takes remaining space */}
+          <main className="flex-1 p-6 w-full">
             {children}
           </main>
         </div>
