@@ -1,60 +1,40 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { NoteCard } from "@/components/notes/NoteCard";
 import { NoteCardSkeleton, ProfileStatsSkeleton } from "@/components/ui/skeleton-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { EditProfileDialog } from "@/components/profile/EditProfileDialog";
-import { ContributionCard, Contribution } from "@/components/helpdesk/ContributionCard";
-import { StatDetailModal, AchievementsSection, Achievement } from "@/components/profile/StatDetailModal";
-import { useAuth, UserProfile } from "@/contexts/AuthContext";
-import { usersService, notesService, Note, contributionsService, achievementsService } from "@/services/firestoreService";
+import { ContributionCard } from "@/components/helpdesk/ContributionCard";
+import { StatDetailModal, AchievementsSection } from "@/components/profile/StatDetailModal";
+import { useAuth } from "@/contexts/AuthContext";
+import { 
+  usersService, 
+  notesService, 
+  Note, 
+  contributionsService, 
+  achievementsService, 
+  UserProfile,
+  Contribution,
+  AchievementBadge
+} from "@/services/firestoreService";
 import { mapFirestoreNoteToCardNote } from "@/lib/noteCard";
 import { parseSocialLink } from "@/lib/socialLinks";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { db } from "@/lib/firebase";
-import { collection, query, where, onSnapshot, orderBy } from "firebase/firestore";
+import { collection, query, where, onSnapshot, orderBy, limit } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { 
-  Edit2, 
-  Github, 
-  Linkedin, 
-  Globe, 
-  FileText, 
-  Bookmark, 
-  HandHelping, 
-  BarChart3,
-  ThumbsUp,
-  Eye,
-  TrendingUp,
-  Award,
-  Star,
-  Zap,
-  Instagram,
-  Twitter,
-  Flame,
-  Share2,
-  ArrowLeft,
-  Download,
-  MessageSquare
+  Edit2, Github, Linkedin, Globe, FileText, HandHelping, BarChart3,
+  ThumbsUp, Eye, Award, Flame, ArrowLeft, Share2, Calendar, MapPin,
+  History, Star, TrendingUp, ShieldCheck, Trophy, ExternalLink
 } from "lucide-react";
-
-const getBadgeIcon = (iconName: string) => {
-  const icons: Record<string, any> = { Award, Star, Zap, Flame };
-  return icons[iconName] || Award;
-};
-
-const streakBadges = [
-  { days: 7, label: "7 Day Streak", color: "bg-orange-500/20 text-orange-500" },
-  { days: 14, label: "14 Day Streak", color: "bg-red-500/20 text-red-500" },
-  { days: 30, label: "30 Day Streak", color: "bg-purple-500/20 text-purple-500" },
-  { days: 50, label: "50 Day Streak", color: "bg-primary/20 text-primary" },
-  { days: 100, label: "100 Day Legend", color: "bg-chart-1/20 text-chart-1" },
-];
 
 export default function Profile() {
   const { userId } = useParams();
@@ -62,261 +42,200 @@ export default function Profile() {
   const { toast } = useToast();
   const { userProfile: currentUser, updateUserProfile } = useAuth();
   
+  // --- STATE MANAGEMENT ---
   const [loading, setLoading] = useState(true);
   const [profileData, setProfileData] = useState<UserProfile | null>(null);
   const [uploadedNotes, setUploadedNotes] = useState<Note[]>([]);
   const [savedNotes, setSavedNotes] = useState<Note[]>([]);
   const [downloadedNotes, setDownloadedNotes] = useState<any[]>([]);
-  const [userRequests, setUserRequests] = useState<any[]>([]);
-  const [contributions, setContributions] = useState<any[]>([]);
+  const [contributions, setContributions] = useState<Contribution[]>([]);
+  const [activeTab, setActiveTab] = useState("uploads");
+  
+  // Dialog/Modal States
   const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [statModalOpen, setStatModalOpen] = useState<"uploads" | "likes" | "views" | "helped" | "score" | null>(null);
-
-  const isOwnProfile = !userId || userId === "current-user" || userId === currentUser?.id;
-  const targetUserId = isOwnProfile ? currentUser?.id : userId;
-
-  // SECURE BLOB DOWNLOAD LOGIC
-  const handleSecureDownload = async (item: any) => {
-    try {
-      toast({
-        title: "Preparing download",
-        description: "Fetching secure file stream...",
-      });
-
-      let fileUrl = item.fileUrl;
-      // Inject Cloudinary attachment flag for direct download
-      if (fileUrl.includes('cloudinary.com') && !fileUrl.includes('fl_attachment')) {
-        fileUrl = fileUrl.replace('/upload/', '/upload/fl_attachment/');
-      }
-
-      const response = await fetch(fileUrl);
-      if (!response.ok) throw new Error("Failed to fetch file");
-      
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${item.title || 'note'}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-    } catch (error) {
-      console.error("Download error:", error);
-      toast({
-        title: "Download failed",
-        description: "Redirecting to direct link...",
-        variant: "destructive"
-      });
-      window.open(item.fileUrl, '_blank');
-    }
-  };
-
-  // Computed live stats
+  const [statModalOpen, setStatModalOpen] = useState<string | null>(null);
+  
+  // Live Computed Stats
   const [liveStats, setLiveStats] = useState({ uploads: 0, totalLikes: 0, totalViews: 0 });
   const [helpedCount, setHelpedCount] = useState(0);
 
-  // REAL-TIME PROFILE SUBSCRIPTION
-  useEffect(() => {
-    if (!targetUserId) {
-      setLoading(false);
-      return;
-    }
+  const isOwnProfile = useMemo(() => 
+    !userId || userId === "current-user" || userId === currentUser?.id, 
+    [userId, currentUser?.id]
+  );
+  
+  const targetUserId = isOwnProfile ? currentUser?.id : userId;
 
-    const unsubscribe = usersService.subscribeToProfile(targetUserId, (profile) => {
-      if (profile) {
-        setProfileData(profile as unknown as UserProfile);
-      }
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, [targetUserId]);
-
-  // REAL-TIME COMPUTED STATS (uploads, likes, views)
+  // --- REAL-TIME SUBSCRIPTIONS ---
   useEffect(() => {
     if (!targetUserId) return;
 
-    const unsubStats = usersService.subscribeToComputedStats(targetUserId, (computed) => {
-      setLiveStats(computed);
+    setLoading(true);
+
+    // 1. Subscribe to User Document (Name, Bio, Streak)
+    const unsubProfile = usersService.subscribeToProfile(targetUserId, (data) => {
+      if (data) setProfileData(data);
+      setLoading(false);
     });
 
+    // 2. Subscribe to Live Aggregate Stats (Auto-calculates from all notes)
+    const unsubComputed = usersService.subscribeToComputedStats(targetUserId, (stats) => {
+      setLiveStats(stats);
+    });
+
+    // 3. Subscribe to Help Contributions Count
     const unsubHelped = usersService.subscribeToHelpedCount(targetUserId, (count) => {
       setHelpedCount(count);
     });
 
-    return () => {
-      unsubStats();
-      unsubHelped();
-    };
-  }, [targetUserId]);
-
-  // REAL-TIME CONTENT SUBSCRIPTIONS
-  useEffect(() => {
-    if (!profileData?.id) return;
-
-    // 1. Live Uploads
-    const qUploads = query(
-      collection(db, "notes"),
-      where("authorId", "==", profileData.id),
+    // 4. Subscribe to Uploaded Notes
+    const qNotes = query(
+      collection(db, "notes"), 
+      where("authorId", "==", targetUserId), 
       orderBy("createdAt", "desc")
     );
-    const unsubUploads = onSnapshot(qUploads, (snap) => {
-      setUploadedNotes(snap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as Note)));
+    const unsubNotes = onSnapshot(qNotes, (snap) => {
+      setUploadedNotes(snap.docs.map(d => ({ id: d.id, ...d.data() } as Note)));
     });
 
-    // 2. Live Contributions
-    const unsubContribs = contributionsService.subscribeToUserContributions(profileData.id, (contribs) => {
-      setContributions(contribs);
+    // 5. Subscribe to Contributions (Help Desk interactions)
+    const unsubContribs = contributionsService.subscribeToUserContributions(targetUserId, (data) => {
+      setContributions(data);
     });
 
+    // 6. User-Specific Private Data
     let unsubSaved = () => {};
-    let unsubDownloaded = () => {};
-    let unsubRequests = () => {};
+    let unsubDownloads = () => {};
 
     if (isOwnProfile) {
-      // 3. Live Saved Notes (Requires fetching Note data for each ref)
-      unsubSaved = usersService.subscribeToSavedNotes(profileData.id, async (savedRefs) => {
-        const notes = await Promise.all(savedRefs.map((ref) => notesService.getById(ref.noteId)));
-        setSavedNotes(notes.filter((n): n is Note => n !== null));
+      unsubSaved = usersService.subscribeToSavedNotes(targetUserId, async (refs) => {
+        const notePromises = refs.map(r => notesService.getById(r.noteId));
+        const results = await Promise.all(notePromises);
+        setSavedNotes(results.filter((n): n is Note => n !== null));
       });
 
-      // 4. Live Download History
-      unsubDownloaded = usersService.subscribeToDownloadedNotes(profileData.id, (downloaded) => {
-        setDownloadedNotes(downloaded);
-      });
-
-      // 5. Live My Requests
-      const qRequests = query(
-        collection(db, "requests"),
-        where("requesterId", "==", profileData.id),
-        orderBy("createdAt", "desc")
-      );
-      unsubRequests = onSnapshot(qRequests, (snap) => {
-        setUserRequests(snap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() })));
+      unsubDownloads = usersService.subscribeToDownloadedNotes(targetUserId, (data) => {
+        const sorted = data.sort((a, b) => 
+          (b.downloadedAt?.seconds || 0) - (a.downloadedAt?.seconds || 0)
+        );
+        setDownloadedNotes(sorted);
       });
     }
 
     return () => {
-      unsubUploads();
+      unsubProfile();
+      unsubComputed();
+      unsubHelped();
+      unsubNotes();
       unsubContribs();
       unsubSaved();
-      unsubDownloaded();
-      unsubRequests();
+      unsubDownloads();
     };
-  }, [profileData?.id, isOwnProfile]);
+  }, [targetUserId, isOwnProfile]);
 
-  const handleProfileSave = async (updatedProfile: any) => {
-    await updateUserProfile(updatedProfile);
-    setProfileData((prev) => (prev ? { ...prev, ...updatedProfile } : null));
-  };
-
-  const currentStreakBadge = streakBadges.filter((b) => (profileData?.streak || 0) >= b.days).pop();
-
-  // Merge profile.stats with live computed stats for display
-  const storedStats = profileData?.stats || { uploads: 0, totalLikes: 0, totalViews: 0, helpedRequests: 0, contributionScore: 0 };
+  // --- LOGIC HELPER ---
   const stats = {
-    uploads: liveStats.uploads || storedStats.uploads,
-    totalLikes: liveStats.totalLikes || storedStats.totalLikes,
-    totalViews: liveStats.totalViews || storedStats.totalViews,
-    helpedRequests: helpedCount || storedStats.helpedRequests,
-    contributionScore: storedStats.contributionScore,
+    uploads: liveStats.uploads,
+    totalLikes: liveStats.totalLikes,
+    totalViews: liveStats.totalViews,
+    helpedRequests: helpedCount,
+    contributionScore: profileData?.stats?.contributionScore || 0,
   };
 
-  const earnedAchievementsList = achievementsService.checkAchievements(stats, profileData?.streak || 0);
-  const displayAchievements: Achievement[] = earnedAchievementsList.map((a) => ({
-    id: a.id,
-    title: a.label,
-    description: a.description,
-    icon: a.icon,
-    color: a.color,
-    earnedAt: new Date().toISOString(),
-  }));
+  const earnedAchievements = achievementsService.checkAchievements(stats, profileData?.streak || 0);
 
-  if (loading) {
-    return (
-      <MainLayout>
-        <div className="max-w-4xl mx-auto px-4">
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-            <ProfileStatsSkeleton />
-            <ProfileStatsSkeleton />
-            <ProfileStatsSkeleton />
-            <ProfileStatsSkeleton />
-            <ProfileStatsSkeleton />
-          </div>
-        </div>
-      </MainLayout>
-    );
-  }
+  const handleShare = async () => {
+    const url = window.location.href;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: `${profileData?.name}'s Profile`, url });
+      } catch (err) { console.error(err); }
+    } else {
+      navigator.clipboard.writeText(url);
+      toast({ title: "Copied!", description: "Profile link copied to clipboard." });
+    }
+  };
+
+  // --- RENDER ---
+  if (loading) return <MainLayout><div className="max-w-5xl mx-auto px-4 pt-12"><ProfileStatsSkeleton /></div></MainLayout>;
+  if (!profileData) return <MainLayout><EmptyState type="search" title="User Not Found" description="This profile may have been removed." /></MainLayout>;
 
   return (
     <MainLayout>
-      <div className="max-w-4xl mx-auto px-4 pb-20">
-        {!isOwnProfile && (
-          <Button variant="ghost" size="sm" className="mb-4 gap-2" onClick={() => navigate(-1)}>
-            <ArrowLeft className="w-4 h-4" /> Back
-          </Button>
-        )}
+      <div className="max-w-5xl mx-auto px-4 pb-24 pt-6">
+        
+        {/* Header Navigation */}
+        <div className="flex justify-between items-center mb-8">
+          {!isOwnProfile ? (
+            <Button variant="ghost" onClick={() => navigate(-1)} className="hover:bg-secondary/50">
+              <ArrowLeft className="w-4 h-4 mr-2" /> Back
+            </Button>
+          ) : <div />}
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={handleShare} className="rounded-full shadow-sm">
+              <Share2 className="w-4 h-4 mr-2" /> Share
+            </Button>
+          </div>
+        </div>
 
-        {/* Profile Header */}
-        <Card className="bg-card border-border mb-6 overflow-hidden">
-          <CardContent className="pt-8 px-6">
-            <div className="flex flex-col sm:flex-row gap-6 items-center sm:items-start text-center sm:text-left">
-              <div className="relative">
-                <Avatar className="w-28 h-28 border-4 border-primary/10 shadow-xl">
-                  <AvatarImage src={profileData?.avatar} />
-                  <AvatarFallback className="bg-primary text-primary-foreground text-3xl">
-                    {profileData?.name?.[0] || "?"}
+        {/* Profile Info Card */}
+        <Card className="relative overflow-hidden border-none shadow-2xl bg-gradient-to-br from-card via-card to-primary/5 mb-8">
+          <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-primary via-blue-500 to-purple-500" />
+          <CardContent className="pt-10 pb-8 px-6 sm:px-10">
+            <div className="flex flex-col sm:flex-row items-center sm:items-start gap-8">
+              <div className="relative group">
+                <Avatar className="w-36 h-36 border-4 border-background shadow-2xl transition-transform group-hover:scale-105 duration-300">
+                  <AvatarImage src={profileData.avatar} />
+                  <AvatarFallback className="bg-primary text-primary-foreground text-4xl font-bold">
+                    {profileData.name?.[0]}
                   </AvatarFallback>
                 </Avatar>
-                {isOwnProfile && (
-                  <Button 
-                    variant="secondary" 
-                    size="icon" 
-                    className="absolute bottom-0 right-0 rounded-full w-8 h-8 shadow-md"
-                    onClick={() => setEditDialogOpen(true)}
-                  >
-                    <Edit2 className="w-4 h-4" />
-                  </Button>
-                )}
+                <Badge className="absolute -bottom-2 right-4 px-3 py-1 bg-orange-500 hover:bg-orange-600 border-2 border-background shadow-lg flex items-center gap-1">
+                  <Flame className="w-3.5 h-3.5 fill-current" />
+                  <span className="font-bold">{profileData.streak || 0}</span>
+                </Badge>
               </div>
 
-              <div className="flex-1 w-full">
-                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 mb-2">
-                  <h1 className="text-3xl font-bold">{profileData?.name}</h1>
-                  {profileData?.badges?.map((badge: any) => {
-                    const IconComponent = getBadgeIcon(badge.icon);
-                    return (
-                      <Badge key={badge.id} className={`${badge.color} border-none`}>
-                        <IconComponent className="w-3 h-3 mr-1" />
-                        {badge.label}
-                      </Badge>
-                    );
-                  })}
-                </div>
-                
-                <p className="text-muted-foreground text-lg mb-4">{profileData?.bio || "Learning and sharing knowledge."}</p>
-                
-                <div className="flex flex-wrap justify-center sm:justify-start gap-y-2 gap-x-6 text-sm">
-                  <div className="flex items-center gap-1.5"><Globe className="w-4 h-4 text-primary" /> {profileData?.college || "Global Learner"}</div>
-                  <div className="flex items-center gap-1.5"><FileText className="w-4 h-4 text-primary" /> {profileData?.branch || "Student"}</div>
-                  {(profileData?.streak || 0) > 0 && (
-                    <div className="flex items-center gap-1.5 text-orange-500 font-bold">
-                      <Flame className="w-4 h-4 fill-orange-500" /> {profileData?.streak} Day Streak
+              <div className="flex-1 text-center sm:text-left space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-center sm:justify-start gap-2">
+                      <h1 className="text-4xl font-black tracking-tight">{profileData.name}</h1>
+                      {stats.contributionScore > 500 && <ShieldCheck className="w-6 h-6 text-blue-500" />}
                     </div>
+                    <p className="text-xl font-medium text-primary/80">@{profileData.username}</p>
+                  </div>
+                  {isOwnProfile && (
+                    <Button onClick={() => setEditDialogOpen(true)} className="rounded-full px-8 shadow-lg hover:shadow-primary/20 transition-all">
+                      <Edit2 className="w-4 h-4 mr-2" /> Edit Profile
+                    </Button>
                   )}
                 </div>
 
-                {/* Socials */}
-                <div className="flex flex-wrap justify-center sm:justify-start gap-3 mt-6">
-                  {profileData?.github && (
-                    <Button variant="outline" size="sm" onClick={() => window.open(parseSocialLink(profileData.github, 'github'), '_blank')}>
+                <p className="text-muted-foreground text-lg max-w-2xl leading-relaxed italic">
+                  "{profileData.bio || "Aspiring mind sharing knowledge on NoteHall."}"
+                </p>
+
+                <div className="flex flex-wrap justify-center sm:justify-start gap-6 text-sm font-medium">
+                  <span className="flex items-center gap-2 bg-secondary/50 px-3 py-1.5 rounded-full">
+                    <MapPin className="w-4 h-4 text-primary" /> {profileData.college || "Global Learner"}
+                  </span>
+                  <span className="flex items-center gap-2 bg-secondary/50 px-3 py-1.5 rounded-full">
+                    <Globe className="w-4 h-4 text-primary" /> {profileData.branch || "Academic"}
+                  </span>
+                  <span className="flex items-center gap-2 bg-secondary/50 px-3 py-1.5 rounded-full">
+                    <Calendar className="w-4 h-4 text-primary" /> {profileData.year || "Yearly"}
+                  </span>
+                </div>
+
+                <div className="flex gap-4 pt-4 justify-center sm:justify-start">
+                  {profileData.github && (
+                    <Button variant="outline" size="sm" className="h-10 px-5 rounded-full" onClick={() => window.open(parseSocialLink(profileData.github!, 'github'), '_blank')}>
                       <Github className="w-4 h-4 mr-2" /> GitHub
                     </Button>
                   )}
-                  {profileData?.linkedin && (
-                    <Button variant="outline" size="sm" onClick={() => window.open(parseSocialLink(profileData.linkedin, 'linkedin'), '_blank')}>
+                  {profileData.linkedin && (
+                    <Button variant="outline" size="sm" className="h-10 px-5 rounded-full" onClick={() => window.open(parseSocialLink(profileData.linkedin!, 'linkedin'), '_blank')}>
                       <Linkedin className="w-4 h-4 mr-2" /> LinkedIn
                     </Button>
                   )}
@@ -326,101 +245,183 @@ export default function Profile() {
           </CardContent>
         </Card>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
-          <StatItem icon={FileText} label="Uploads" value={stats.uploads} onClick={() => setStatModalOpen("uploads")} />
-          <StatItem icon={ThumbsUp} label="Likes" value={stats.totalLikes} onClick={() => setStatModalOpen("likes")} />
-          <StatItem icon={Eye} label="Views" value={stats.totalViews} onClick={() => setStatModalOpen("views")} />
-          <StatItem icon={HandHelping} label="Helped" value={stats.helpedRequests} onClick={() => setStatModalOpen("helped")} />
-          <StatItem icon={BarChart3} label="Score" value={stats.contributionScore} onClick={() => setStatModalOpen("score")} />
+        {/* Real-time Stats Section */}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-10">
+          <StatCard icon={FileText} label="Uploads" value={stats.uploads} color="bg-blue-500/10 text-blue-600" onClick={() => setStatModalOpen("uploads")} />
+          <StatCard icon={ThumbsUp} label="Likes" value={stats.totalLikes} color="bg-pink-500/10 text-pink-600" onClick={() => setStatModalOpen("likes")} />
+          <StatCard icon={Eye} label="Views" value={stats.totalViews} color="bg-indigo-500/10 text-indigo-600" onClick={() => setStatModalOpen("views")} />
+          <StatCard icon={HandHelping} label="Helped" value={stats.helpedRequests} color="bg-green-500/10 text-green-600" onClick={() => setStatModalOpen("helped")} />
+          <StatCard icon={BarChart3} label="Score" value={stats.contributionScore} color="bg-orange-500/10 text-orange-600" onClick={() => setStatModalOpen("score")} />
         </div>
 
-        <AchievementsSection achievements={displayAchievements} isOwner={isOwnProfile} />
+        {/* Achievements Component */}
+        <AchievementsSection achievements={earnedAchievements as any} isOwner={isOwnProfile} />
 
-        <Tabs defaultValue="uploads" className="w-full mt-8">
-          <TabsList className="w-full justify-start bg-transparent border-b rounded-none h-auto p-0 mb-6 space-x-6 overflow-x-auto no-scrollbar">
-            <TabsTrigger value="uploads" className="data-[state=active]:border-primary border-b-2 border-transparent rounded-none px-2 pb-3 bg-transparent">Uploads ({uploadedNotes.length})</TabsTrigger>
-            {isOwnProfile && <TabsTrigger value="requests" className="data-[state=active]:border-primary border-b-2 border-transparent rounded-none px-2 pb-3 bg-transparent">My Requests ({userRequests.length})</TabsTrigger>}
-            {isOwnProfile && <TabsTrigger value="saved" className="data-[state=active]:border-primary border-b-2 border-transparent rounded-none px-2 pb-3 bg-transparent">Saved ({savedNotes.length})</TabsTrigger>}
-            {isOwnProfile && <TabsTrigger value="downloaded" className="data-[state=active]:border-primary border-b-2 border-transparent rounded-none px-2 pb-3 bg-transparent">History ({downloadedNotes.length})</TabsTrigger>}
-            <TabsTrigger value="contributions" className="data-[state=active]:border-primary border-b-2 border-transparent rounded-none px-2 pb-3 bg-transparent">Help ({contributions.length})</TabsTrigger>
+        {/* Main Content Tabs */}
+        <Tabs defaultValue="uploads" onValueChange={setActiveTab} className="mt-12">
+          <TabsList className="w-full justify-start overflow-x-auto no-scrollbar bg-transparent border-b rounded-none h-auto p-0 mb-8 space-x-10">
+            <TabTrigger value="uploads" label="Uploads" count={uploadedNotes.length} />
+            {isOwnProfile && <TabTrigger value="saved" label="Saved" count={savedNotes.length} />}
+            <TabTrigger value="contributions" label="Contributions" count={contributions.length} />
+            {isOwnProfile && <TabTrigger value="activity" label="Activity" icon={History} />}
           </TabsList>
 
-          <TabsContent value="uploads">
-            {uploadedNotes.length === 0 ? <EmptyState type="notes" title="No uploads" description="Share notes to help others!" /> :
-              <div className="grid gap-4">{uploadedNotes.map(n => <NoteCard key={n.id} note={mapFirestoreNoteToCardNote(n)} />)}</div>}
-          </TabsContent>
-
-          <TabsContent value="requests">
-            <div className="grid gap-4">
-              {userRequests.length === 0 ? <EmptyState type="notes" title="No requests" description="Ask for help if you're stuck!" /> :
-                userRequests.map(req => (
-                  <Card key={req.id} className="p-5 border-l-4 border-l-primary hover:bg-accent/30 transition-colors">
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <h3 className="font-bold text-lg">{req.title}</h3>
-                        <p className="text-sm text-muted-foreground">{req.subject} • Status: <span className="capitalize text-primary font-medium">{req.status}</span></p>
-                      </div>
-                      <Button variant="ghost" size="sm" onClick={() => navigate(`/helpdesk?id=${req.id}`)}>View</Button>
-                    </div>
-                  </Card>
-                ))}
-            </div>
-          </TabsContent>
-
-          <TabsContent value="downloaded">
-            <div className="grid gap-4">
-              {downloadedNotes.length === 0 ? <EmptyState type="notes" title="No history" description="Downloaded notes appear here." /> :
-                downloadedNotes.map((item) => (
-                  <Card 
-                    key={item.id} 
-                    className="p-4 hover:border-primary/50 cursor-pointer transition-all flex items-center justify-between"
-                    onClick={() => handleSecureDownload(item)}
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="p-2.5 bg-primary/10 rounded-full"><Download className="w-5 h-5 text-primary" /></div>
-                      <div>
-                        <h4 className="font-semibold">{item.title}</h4>
-                        <p className="text-xs text-muted-foreground">Downloaded {new Date(item.downloadedAt?.seconds * 1000).toLocaleDateString()}</p>
-                      </div>
-                    </div>
-                    <Button variant="outline" size="sm">Open PDF</Button>
-                  </Card>
-                ))}
-            </div>
+          <TabsContent value="uploads" className="mt-0">
+            {uploadedNotes.length === 0 ? (
+              <EmptyState type="notes" title="No notes found" description={isOwnProfile ? "Start by uploading your study materials!" : "This user hasn't shared any notes yet."} />
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                {uploadedNotes.map(n => <NoteCard key={n.id} note={mapFirestoreNoteToCardNote(n)} />)}
+              </div>
+            )}
           </TabsContent>
 
           <TabsContent value="saved">
-             <div className="grid gap-4">{savedNotes.map(n => <NoteCard key={n.id} note={mapFirestoreNoteToCardNote(n)} />)}</div>
+            {savedNotes.length === 0 ? (
+              <EmptyState type="notes" title="Nothing saved" description="Notes you save for later will appear here." />
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                {savedNotes.map(n => <NoteCard key={n.id} note={mapFirestoreNoteToCardNote(n)} />)}
+              </div>
+            )}
           </TabsContent>
 
           <TabsContent value="contributions">
-            <div className="grid gap-4">{contributions.map(c => <ContributionCard key={c.id} contribution={c as Contribution} />)}</div>
+            {contributions.length === 0 ? (
+              <EmptyState type="help" title="No help given yet" description="Helping others with their requests boosts your score!" />
+            ) : (
+              <div className="grid grid-cols-1 gap-4">
+                {contributions.map(c => <ContributionCard key={c.id} contribution={c} />)}
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="activity">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <Card className="md:col-span-2">
+                <CardHeader>
+                  <CardTitle className="text-lg">Download History</CardTitle>
+                  <CardDescription>Recently downloaded study materials</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ScrollArea className="h-[400px] pr-4">
+                    {downloadedNotes.length === 0 ? <p className="text-sm text-muted-foreground">No recent downloads.</p> : (
+                      <div className="space-y-6">
+                        {downloadedNotes.map((item, idx) => (
+                          <div key={idx} className="flex items-center justify-between group">
+                            <div className="flex items-center gap-4">
+                              <div className="p-2.5 bg-secondary rounded-xl group-hover:bg-primary/10 transition-colors">
+                                <DownloadIcon className="w-5 h-5 text-primary" />
+                              </div>
+                              <div>
+                                <p className="font-bold text-sm leading-none mb-1">{item.title}</p>
+                                <p className="text-xs text-muted-foreground">{item.subject} • {new Date(item.downloadedAt?.seconds * 1000).toLocaleDateString()}</p>
+                              </div>
+                            </div>
+                            <Button variant="ghost" size="icon" onClick={() => window.open(item.fileUrl, '_blank')}>
+                              <ExternalLink className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </ScrollArea>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Summary</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                   <div className="p-4 bg-primary/5 rounded-2xl flex items-center justify-between">
+                      <div className="flex items-center gap-2 font-bold text-sm"><Star className="w-4 h-4 text-yellow-500 fill-yellow-500" /> Rank</div>
+                      <Badge variant="outline">#{(stats.contributionScore / 10).toFixed(0)} Learner</Badge>
+                   </div>
+                   <div className="p-4 bg-primary/5 rounded-2xl flex items-center justify-between">
+                      <div className="flex items-center gap-2 font-bold text-sm"><TrendingUp className="w-4 h-4 text-green-500" /> Growth</div>
+                      <span className="text-sm font-bold text-green-600">+{stats.uploads * 5}%</span>
+                   </div>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
         </Tabs>
 
-        {/* Modals */}
-        {isOwnProfile && <EditProfileDialog open={editDialogOpen} onOpenChange={setEditDialogOpen} profile={profileData} onSave={handleProfileSave} />}
+        {/* Modal Components */}
+        {isOwnProfile && profileData && (
+          <EditProfileDialog 
+            open={editDialogOpen} 
+            onOpenChange={setEditDialogOpen} 
+            profile={profileData} 
+            onSave={updateUserProfile} 
+          />
+        )}
+        
         <StatDetailModal 
           open={statModalOpen !== null} 
           onClose={() => setStatModalOpen(null)} 
           statType={statModalOpen || "uploads"} 
-          value={stats[statModalOpen === "likes" ? "totalLikes" : statModalOpen === "views" ? "totalViews" : statModalOpen === "helped" ? "helpedRequests" : statModalOpen === "score" ? "contributionScore" : "uploads"] || 0} 
+          value={(stats as any)[statModalOpen || "uploads"]}
           isOwner={isOwnProfile} 
         />
       </div>
+
+      <style>{`
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .tab-btn {
+          position: relative;
+          background: transparent !important;
+          border-radius: 0;
+          border-bottom: 2px solid transparent;
+          padding-bottom: 12px;
+          color: hsl(var(--muted-foreground));
+          transition: all 0.2s;
+        }
+        .tab-btn[data-state="active"] {
+          color: hsl(var(--primary));
+          border-bottom-color: hsl(var(--primary));
+          font-weight: 700;
+        }
+      `}</style>
     </MainLayout>
   );
 }
 
-function StatItem({ icon: Icon, label, value, onClick }: any) {
+// --- SUB-COMPONENTS ---
+
+function TabTrigger({ value, label, count, icon: Icon }: any) {
   return (
-    <Card className="bg-card border-border hover:border-primary/40 transition-all cursor-pointer shadow-sm group" onClick={onClick}>
-      <CardContent className="pt-5 pb-4 px-2 text-center">
-        <Icon className="w-7 h-7 mx-auto text-primary mb-2 group-hover:scale-110 transition-transform" />
-        <p className="text-2xl font-extrabold">{value.toLocaleString()}</p>
-        <p className="text-[10px] uppercase tracking-widest text-muted-foreground mt-1">{label}</p>
+    <TabsTrigger value={value} className="tab-btn px-0 gap-2 font-semibold">
+      {Icon && <Icon className="w-4 h-4" />}
+      {label}
+      {count !== undefined && (
+        <Badge variant="secondary" className="ml-1 text-[10px] h-4 px-1 rounded-sm opacity-70">
+          {count}
+        </Badge>
+      )}
+    </TabsTrigger>
+  );
+}
+
+function StatCard({ icon: Icon, label, value, color, onClick }: any) {
+  return (
+    <Card className="cursor-pointer border-none shadow-sm hover:shadow-md transition-all hover:-translate-y-1 bg-card/60" onClick={onClick}>
+      <CardContent className="p-5 text-center flex flex-col items-center">
+        <div className={`p-3 rounded-2xl mb-3 ${color}`}>
+          <Icon className="w-6 h-6" />
+        </div>
+        <p className="text-2xl font-black tracking-tight leading-tight">{value.toLocaleString()}</p>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mt-1">{label}</p>
       </CardContent>
     </Card>
+  );
+}
+
+function DownloadIcon(props: any) {
+  return (
+    <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/>
+    </svg>
   );
 }
