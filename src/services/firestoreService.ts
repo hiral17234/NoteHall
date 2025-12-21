@@ -108,6 +108,8 @@ export interface UserProfile {
   branch?: string;
   year?: string;
   streak?: number;
+  github?: string;
+  linkedin?: string;
   stats: {
     uploads: number;
     totalLikes: number;
@@ -194,7 +196,6 @@ export const notesService = {
     } else {
       await updateDoc(noteRef, { likes: increment(1), likedBy: arrayUnion(userId) });
       if (note.authorId !== userId) {
-        // Corrected to pass the user object as expected by the notification service
         await createNotification.like(note.authorId, { id: userId, name: userName }, note.title, noteId);
       }
       await updateDoc(authorRef, { 'stats.totalLikes': increment(1), 'stats.contributionScore': increment(5) });
@@ -218,8 +219,6 @@ export const notesService = {
     const noteIds = savedDocsSnap.docs.map(d => d.data().noteId);
     if (noteIds.length === 0) return [];
     
-    const notes: Note[] = [];
-    // Efficiently fetch notes in parallel
     const notePromises = noteIds.map(id => this.getById(id));
     const results = await Promise.all(notePromises);
     return results.filter((n): n is Note => n !== null);
@@ -246,7 +245,6 @@ export const notesService = {
     
     try {
       const response = await fetch(downloadUrl);
-      if (!response.ok) throw new Error('Fetch failed');
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -301,7 +299,6 @@ export const notesService = {
   async searchAll(searchQuery: string): Promise<SearchResult[]> {
     const q = searchQuery.toLowerCase().trim();
     if (!q) return [];
-
     const results: SearchResult[] = [];
     const allNotes = await this.getAll();
     const noteResults = allNotes.filter(n => 
@@ -313,26 +310,13 @@ export const notesService = {
     ).slice(0, 10);
 
     noteResults.forEach(note => {
-      results.push({
-        id: note.id,
-        type: 'note',
-        title: note.title,
-        subtitle: `${note.subject} • ${note.authorName}`,
-        data: note,
-      });
+      results.push({ id: note.id, type: 'note', title: note.title, subtitle: `${note.subject} • ${note.authorName}`, data: note });
     });
 
     const userResults = await usersService.search(searchQuery);
     userResults.forEach(user => {
-      results.push({
-        id: user.id,
-        type: 'user',
-        title: user.name,
-        subtitle: `@${user.username} • ${user.college || 'Student'}`,
-        data: user,
-      });
+      results.push({ id: user.id, type: 'user', title: user.name, subtitle: `@${user.username} • ${user.college || 'Student'}`, data: user });
     });
-
     return results;
   },
 };
@@ -346,25 +330,9 @@ export const helpRequestsService = {
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as HelpRequest));
   },
 
-  async create(data: {
-    title: string;
-    description: string;
-    subject: string;
-    branch: string;
-    year: string;
-    requesterId: string;
-    requesterName: string;
-    requesterUsername: string;
-  }): Promise<string> {
+  async create(data: any): Promise<string> {
     const docRef = await addDoc(collection(db, 'requests'), {
-      title: data.title,
-      description: data.description,
-      subject: data.subject,
-      branch: data.branch,
-      year: data.year,
-      requesterId: data.requesterId,
-      requesterName: data.requesterName,
-      requesterUsername: data.requesterUsername,
+      ...data,
       status: 'open',
       contributionsCount: 0,
       createdAt: getServerTimestamp(),
@@ -387,40 +355,17 @@ export const helpRequestsService = {
 
 export const contributionsService = {
   async getByUser(userId: string): Promise<Contribution[]> {
-    const q = query(
-      collection(db, 'contributions'),
-      where('contributorId', '==', userId),
-      orderBy('createdAt', 'desc')
-    );
+    const q = query(collection(db, 'contributions'), where('contributorId', '==', userId), orderBy('createdAt', 'desc'));
     const snapshot = await getDocs(q);
     return snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Contribution));
   },
 
-  subscribeToUserContributions(
-    userId: string,
-    callback: (contributions: Contribution[]) => void
-  ): () => void {
-    if (!userId) {
-      callback([]);
-      return () => {};
-    }
-
-    const q = query(
-      collection(db, 'contributions'),
-      where('contributorId', '==', userId),
-      orderBy('createdAt', 'desc')
-    );
-
-    return onSnapshot(
-      q,
-      (snapshot) => {
-        callback(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Contribution)));
-      },
-      (error) => {
-        console.error('Error subscribing to contributions:', error);
-        callback([]);
-      }
-    );
+  subscribeToUserContributions(userId: string, callback: (contributions: Contribution[]) => void): () => void {
+    if (!userId) { callback([]); return () => {}; }
+    const q = query(collection(db, 'contributions'), where('contributorId', '==', userId), orderBy('createdAt', 'desc'));
+    return onSnapshot(q, (snapshot) => {
+      callback(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Contribution)));
+    });
   },
 
   async create(data: any): Promise<string> {
@@ -433,36 +378,22 @@ export const contributionsService = {
     });
 
     if (data.requesterId && data.requesterId !== data.contributorId) {
-      await createNotification.contribution(
-        data.requesterId,
-        { id: data.contributorId, name: data.contributorName },
-        data.requestTitle || 'your request',
-        data.requestId
-      );
+      await createNotification.contribution(data.requesterId, { id: data.contributorId, name: data.contributorName }, data.requestTitle || 'your request', data.requestId);
     }
-
     return docRef.id;
   },
 
-  /**
-   * Backwards compatible helper used by RequestCard.
-   * Writes to both:
-   * - requests/{requestId}/contributions (so RequestCard live list updates)
-   * - contributions (so Profile "Help" tab can query by contributorId)
-   */
   async addContribution(requestId: string, data: any): Promise<string> {
     const requestRef = doc(db, 'requests', requestId);
     const requestSnap = await getDoc(requestRef);
     const request = requestSnap.exists() ? (requestSnap.data() as any) : null;
 
-    // 1) Ensure request-scoped realtime list updates
     await addDoc(collection(db, 'requests', requestId, 'contributions'), {
       ...data,
       requestId,
       createdAt: getServerTimestamp(),
     });
 
-    // 2) Ensure global contributions + stats + notification
     return this.create({
       requestId,
       requesterId: request?.requesterId,
@@ -491,15 +422,13 @@ export const commentsService = {
       userId, userName, text, createdAt: getServerTimestamp(),
     });
     await updateDoc(doc(db, 'users', userId), { 'stats.contributionScore': increment(2) });
-
-    // Added notification for comments
     if (ownerId && ownerId !== userId && itemTitle) {
       await createNotification.comment(ownerId, { id: userId, name: userName }, itemTitle, noteId, false);
     }
   }
 };
 
-// ==================== ACHIEVEMENTS DATA ====================
+// ==================== ACHIEVEMENTS ====================
 
 export const ACHIEVEMENTS: Achievement[] = [
   { id: '1', title: 'First Note', description: 'Upload your first study note', icon: 'FileText', requirement: { type: 'uploads', count: 1 }, points: 10 },
@@ -507,11 +436,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: '3', title: 'Helper', description: 'Help 1 student with their request', icon: 'HandHelping', requirement: { type: 'helped', count: 1 }, points: 20 },
 ];
 
-export type AchievementBadge = Achievement & {
-  label: string;
-  tier: 'bronze' | 'silver' | 'gold';
-  color: string;
-};
+export type AchievementBadge = Achievement & { label: string; tier: 'bronze' | 'silver' | 'gold'; color: string; };
 
 const getTier = (points: number): AchievementBadge['tier'] => {
   if (points >= 50) return 'gold';
@@ -525,43 +450,20 @@ const tierColor: Record<AchievementBadge['tier'], string> = {
   gold: 'bg-chart-2/15 text-chart-2',
 };
 
-const decorateAchievement = (a: Achievement): AchievementBadge => {
-  const tier = getTier(a.points);
-  return {
-    ...a,
-    label: a.title,
-    tier,
-    color: tierColor[tier],
-  };
-};
-
-const getAchievementCount = (stats: any, streak: number, type: Achievement['requirement']['type']) => {
-  switch (type) {
-    case 'uploads': return stats?.uploads ?? 0;
-    case 'helped': return stats?.helpedRequests ?? 0;
-    case 'likes': return stats?.totalLikes ?? 0;
-    case 'views': return stats?.totalViews ?? 0;
-    case 'streak': return streak ?? 0;
-    default: return 0;
-  }
-};
-
 export const achievementsService = {
   getAll(): AchievementBadge[] {
-    return ACHIEVEMENTS.map(decorateAchievement);
+    return ACHIEVEMENTS.map(a => ({ ...a, label: a.title, tier: getTier(a.points), color: tierColor[getTier(a.points)] }));
   },
-
   checkAchievements(stats: any, streak: number): AchievementBadge[] {
-    return this.getAll().filter(a => getAchievementCount(stats, streak, a.requirement.type) >= a.requirement.count);
-  },
-
-  getActiveAchievement(stats: any, streak: number): AchievementBadge | null {
-    const earned = new Set(this.checkAchievements(stats, streak).map(a => a.id));
-    const next = this.getAll()
-      .filter(a => !earned.has(a.id))
-      .sort((a, b) => a.requirement.count - b.requirement.count)[0];
-
-    return next || null;
+    const getCount = (type: string) => {
+      if (type === 'uploads') return stats?.uploads ?? 0;
+      if (type === 'helped') return stats?.helpedRequests ?? 0;
+      if (type === 'likes') return stats?.totalLikes ?? 0;
+      if (type === 'views') return stats?.totalViews ?? 0;
+      if (type === 'streak') return streak ?? 0;
+      return 0;
+    };
+    return this.getAll().filter(a => getCount(a.requirement.type) >= a.requirement.count);
   },
 };
 
@@ -584,39 +486,22 @@ export const usersService = {
   async search(queryText: string): Promise<UserProfile[]> {
     const q = queryText.toLowerCase().trim();
     if (!q) return [];
-
     const snapshot = await getDocs(collection(db, 'users'));
     const users: UserProfile[] = [];
-
     snapshot.docs.forEach((d) => {
       const data = d.data();
-      const username = (data.username || '').toLowerCase();
-      const name = (data.name || '').toLowerCase();
-
-      if (username.includes(q) || name.includes(q)) {
+      if ((data.username || '').toLowerCase().includes(q) || (data.name || '').toLowerCase().includes(q)) {
         users.push({ id: d.id, ...data } as UserProfile);
       }
     });
-
     return users.slice(0, 10);
   },
 
   subscribeToProfile(userId: string, callback: (profile: UserProfile | null) => void): () => void {
     if (!userId) return () => {};
-    return onSnapshot(
-      doc(db, 'users', userId),
-      (snap) => {
-        if (snap.exists()) {
-          callback({ id: snap.id, ...snap.data() } as UserProfile);
-        } else {
-          callback(null);
-        }
-      },
-      (error) => {
-        console.error('Error subscribing to profile:', error);
-        callback(null);
-      }
-    );
+    return onSnapshot(doc(db, 'users', userId), (snap) => {
+      callback(snap.exists() ? ({ id: snap.id, ...snap.data() } as UserProfile) : null);
+    });
   },
 
   subscribeToSavedNotes(userId: string, callback: (notes: any[]) => void): () => void {
@@ -633,59 +518,25 @@ export const usersService = {
     });
   },
 
-  /**
-   * Recomputes live stats from the user's notes.
-   * Subscribes to the user's notes and aggregates likes/views/uploads.
-   * Returns an unsubscribe function.
-   */
-  subscribeToComputedStats(
-    userId: string,
-    callback: (stats: { uploads: number; totalLikes: number; totalViews: number }) => void
-  ): () => void {
-    if (!userId) {
-      callback({ uploads: 0, totalLikes: 0, totalViews: 0 });
-      return () => {};
-    }
-
+  subscribeToComputedStats(userId: string, callback: (stats: { uploads: number; totalLikes: number; totalViews: number }) => void): () => void {
+    if (!userId) { callback({ uploads: 0, totalLikes: 0, totalViews: 0 }); return () => {}; }
     const q = query(collection(db, 'notes'), where('authorId', '==', userId));
-    return onSnapshot(
-      q,
-      (snapshot) => {
-        let totalLikes = 0;
-        let totalViews = 0;
-        snapshot.docs.forEach((d) => {
-          const data = d.data();
-          totalLikes += data.likes ?? 0;
-          totalViews += data.views ?? 0;
-        });
-        callback({ uploads: snapshot.size, totalLikes, totalViews });
-      },
-      (error) => {
-        console.error('Error subscribing to computed stats:', error);
-        callback({ uploads: 0, totalLikes: 0, totalViews: 0 });
-      }
-    );
+    return onSnapshot(q, (snapshot) => {
+      let totalLikes = 0, totalViews = 0;
+      snapshot.docs.forEach((d) => {
+        const data = d.data();
+        totalLikes += data.likes ?? 0;
+        totalViews += data.views ?? 0;
+      });
+      callback({ uploads: snapshot.size, totalLikes, totalViews });
+    });
   },
 
-  /**
-   * Subscribes to the user's contributions count (helpedRequests).
-   */
   subscribeToHelpedCount(userId: string, callback: (count: number) => void): () => void {
-    if (!userId) {
-      callback(0);
-      return () => {};
-    }
-
+    if (!userId) { callback(0); return () => {}; }
     const q = query(collection(db, 'contributions'), where('contributorId', '==', userId));
-    return onSnapshot(
-      q,
-      (snapshot) => {
-        callback(snapshot.size);
-      },
-      (error) => {
-        console.error('Error subscribing to helped count:', error);
-        callback(0);
-      }
-    );
+    return onSnapshot(q, (snapshot) => {
+      callback(snapshot.size);
+    });
   },
 };
