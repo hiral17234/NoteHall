@@ -2,6 +2,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
 import { 
   FileText, 
   Image, 
@@ -17,6 +18,7 @@ import {
   User
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { NoteCommentsSection } from "./NoteCommentsSection";
 
 interface Note {
   id: string;
@@ -29,8 +31,10 @@ interface Note {
   dislikes: number;
   views: number;
   author: string;
+  authorId?: string;
   timestamp: string;
   topic?: string;
+  fileUrl?: string;
 }
 
 interface NotePreviewModalProps {
@@ -68,7 +72,7 @@ export function NotePreviewModal({ note, open, onClose, onAskAI }: NotePreviewMo
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] p-0">
+      <DialogContent className="max-w-2xl max-h-[90vh] p-0 flex flex-col">
         <DialogHeader className="p-6 pb-0">
           <div className="flex items-start gap-4">
             <div className={cn("p-3 rounded-xl", fileTypeColors[note.fileType])}>
@@ -88,10 +92,10 @@ export function NotePreviewModal({ note, open, onClose, onAskAI }: NotePreviewMo
           </div>
         </DialogHeader>
 
-        <ScrollArea className="max-h-[50vh]">
-          <div className="p-6 pt-4">
+        <ScrollArea className="flex-1 max-h-[50vh]">
+          <div className="p-6 pt-4 space-y-6">
             {/* Tags */}
-            <div className="flex flex-wrap gap-2 mb-4">
+            <div className="flex flex-wrap gap-2">
               <Badge variant="secondary" className="bg-muted text-foreground">
                 {note.subject}
               </Badge>
@@ -109,7 +113,7 @@ export function NotePreviewModal({ note, open, onClose, onAskAI }: NotePreviewMo
             </div>
 
             {/* Preview Content */}
-            <div className="bg-muted/50 rounded-xl p-4 mb-4">
+            <div className="bg-muted/50 rounded-xl p-4">
               <h4 className="text-sm font-medium text-foreground mb-2">Preview</h4>
               <p className="text-sm text-muted-foreground">
                 {mockContent[note.fileType]}
@@ -143,11 +147,20 @@ export function NotePreviewModal({ note, open, onClose, onAskAI }: NotePreviewMo
                 <span>{note.views} views</span>
               </div>
             </div>
+
+            <Separator />
+
+            {/* Comments Section */}
+            <NoteCommentsSection 
+              noteId={note.id}
+              ownerId={note.authorId}
+              noteTitle={note.title}
+            />
           </div>
         </ScrollArea>
 
         {/* Actions */}
-        <div className="p-6 pt-0 flex flex-wrap gap-2">
+        <div className="p-6 pt-0 flex flex-wrap gap-2 border-t border-border mt-auto">
           <Button className="bg-primary hover:bg-primary/90 text-primary-foreground gap-2 flex-1">
             <Download className="w-4 h-4" />
             Download
