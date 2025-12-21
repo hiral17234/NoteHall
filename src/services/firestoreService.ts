@@ -18,7 +18,7 @@ import {
 import { db, getServerTimestamp } from '@/lib/firebase';
 import { createNotification } from '@/services/notificationService';
 
-// ==================== NOTES ====================
+// ==================== NOTES INTERFACE ====================
 export interface Note {
   id: string;
   title: string;
@@ -52,6 +52,7 @@ export interface Note {
   updatedAt: any;
 }
 
+// ==================== NOTES SERVICE ====================
 export const notesService = {
   async getAll(): Promise<Note[]> {
     const q = query(collection(db, 'notes'), orderBy('createdAt', 'desc'));
@@ -111,12 +112,10 @@ export const notesService = {
         likedBy: arrayUnion(userId),
       });
       
-      // Send notification to note author
       if (note.authorId !== userId) {
         await createNotification.like(note.authorId, userId, userName, note.title, noteId);
       }
       
-      // Update author's total likes
       await updateDoc(doc(db, 'users', note.authorId), {
         'stats.totalLikes': increment(1),
       });
@@ -132,19 +131,29 @@ export const notesService = {
   },
 
   async saveNote(noteId: string, userId: string): Promise<void> {
-    const docRef = doc(db, 'notes', noteId);
-    await updateDoc(docRef, { savedBy: arrayUnion(userId) });
-    
-    await setDoc(doc(db, 'users', userId, 'savedNotes', noteId), {
-      noteId,
-      savedAt: getServerTimestamp(),
-    });
+    try {
+      const noteRef = doc(db, 'notes', noteId);
+      await updateDoc(noteRef, { savedBy: arrayUnion(userId) });
+      
+      await setDoc(doc(db, 'users', userId, 'savedNotes', noteId), {
+        noteId,
+        savedAt: getServerTimestamp(),
+      });
+    } catch (error) {
+      console.error("Save Error:", error);
+      throw error;
+    }
   },
 
   async unsaveNote(noteId: string, userId: string): Promise<void> {
-    const docRef = doc(db, 'notes', noteId);
-    await updateDoc(docRef, { savedBy: arrayRemove(userId) });
-    await deleteDoc(doc(db, 'users', userId, 'savedNotes', noteId));
+    try {
+      const noteRef = doc(db, 'notes', noteId);
+      await updateDoc(noteRef, { savedBy: arrayRemove(userId) });
+      await deleteDoc(doc(db, 'users', userId, 'savedNotes', noteId));
+    } catch (error) {
+      console.error("Unsave Error:", error);
+      throw error;
+    }
   },
 
   async isSavedByUser(noteId: string, userId: string): Promise<boolean> {
@@ -153,28 +162,53 @@ export const notesService = {
   },
 
   async getSavedNotes(userId: string): Promise<Note[]> {
-    const savedDocsSnap = await getDocs(collection(db, 'users', userId, 'savedNotes'));
-    const noteIds = savedDocsSnap.docs.map(d => d.data().noteId);
-    
-    if (noteIds.length === 0) return [];
-    
-    const notes: Note[] = [];
-    for (const noteId of noteIds) {
-      const note = await this.getById(noteId);
-      if (note) notes.push(note);
+    try {
+      const savedDocsSnap = await getDocs(collection(db, 'users', userId, 'savedNotes'));
+      const noteIds = savedDocsSnap.docs.map(d => d.data().noteId);
+      
+      if (noteIds.length === 0) return [];
+      
+      const notes: Note[] = [];
+      for (const noteId of noteIds) {
+        const note = await this.getById(noteId);
+        if (note) notes.push(note);
+      }
+      return notes;
+    } catch (error) {
+      console.error("GetSavedNotes Error:", error);
+      return [];
     }
-    return notes;
   },
 
+  // FIXED: Now triggers an actual browser download AND saves a record to DB
   async downloadNote(noteId: string, userId: string, note: { title: string; subject: string; fileUrl: string }): Promise<void> {
-    // Save to user's downloaded notes
-    await setDoc(doc(db, 'users', userId, 'downloadedNotes', noteId), {
-      noteId,
-      title: note.title,
-      subject: note.subject,
-      fileUrl: note.fileUrl,
-      downloadedAt: getServerTimestamp(),
-    });
+    try {
+      // 1. Database Recording
+      await setDoc(doc(db, 'users', userId, 'downloadedNotes', noteId), {
+        noteId,
+        title: note.title,
+        subject: note.subject,
+        fileUrl: note.fileUrl,
+        downloadedAt: getServerTimestamp(),
+      });
+
+      // 2. Trigger Actual File Download
+      const response = await fetch(note.fileUrl);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      // Set filename (removes spaces for safety)
+      link.setAttribute('download', `${note.title.replace(/\s+/g, '_')}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Download Error:", error);
+      // Fallback: Just open the link in a new tab if blob download fails
+      window.open(note.fileUrl, '_blank');
+    }
   },
 
   async getDownloadedNotes(userId: string): Promise<Array<{ noteId: string; title: string; subject: string; fileUrl: string; downloadedAt: any }>> {
@@ -225,7 +259,7 @@ export const notesService = {
   },
 };
 
-// ==================== HELP REQUESTS ====================
+// ==================== HELP REQUESTS SERVICE ====================
 export interface HelpRequest {
   id: string;
   title: string;
@@ -276,7 +310,6 @@ export const helpRequestsService = {
       updatedAt: getServerTimestamp(),
     });
     
-    // Notify requester when fulfilled
     if (status === 'fulfilled' && requestSnap.exists()) {
       const request = requestSnap.data() as HelpRequest;
       await createNotification.requestFulfilled(request.requesterId, request.title, requestId);
@@ -291,7 +324,7 @@ export const helpRequestsService = {
   },
 };
 
-// ==================== CONTRIBUTIONS ====================
+// ==================== CONTRIBUTIONS SERVICE ====================
 export interface Contribution {
   id: string;
   requestId: string;
@@ -323,17 +356,14 @@ export const contributionsService = {
       createdAt: getServerTimestamp(),
     });
     
-    // Update request contribution count
     await helpRequestsService.incrementContributions(data.requestId);
     
-    // Update contributor's stats
     await updateDoc(doc(db, 'users', data.contributorId), {
       'stats.helpedRequests': increment(1),
       'stats.contributionScore': increment(5),
       updatedAt: getServerTimestamp(),
     });
     
-    // Notify the requester
     const requestRef = doc(db, 'requests', data.requestId);
     const requestSnap = await getDoc(requestRef);
     if (requestSnap.exists()) {
@@ -351,37 +381,11 @@ export const contributionsService = {
   },
 };
 
-// ==================== ACHIEVEMENTS ====================
-export interface Achievement {
-  id: string;
-  label: string;
-  description: string;
-  icon: string;
-  color: string;
-  requirement: {
-    type: 'uploads' | 'helped' | 'likes' | 'streak' | 'views';
-    count: number;
-  };
-  tier: 'bronze' | 'silver' | 'gold' | 'platinum';
-}
-
-export const ACHIEVEMENTS: Achievement[] = [
-  { id: 'first-upload', label: 'First Upload', description: 'Uploaded your first note', icon: 'Upload', color: 'bg-blue-500/20 text-blue-500', requirement: { type: 'uploads', count: 1 }, tier: 'bronze' },
-  { id: 'prolific-5', label: 'Prolific Sharer', description: 'Uploaded 5 notes', icon: 'Files', color: 'bg-green-500/20 text-green-500', requirement: { type: 'uploads', count: 5 }, tier: 'bronze' },
-  { id: 'prolific-25', label: 'Note Master', description: 'Uploaded 25 notes', icon: 'Crown', color: 'bg-yellow-500/20 text-yellow-500', requirement: { type: 'uploads', count: 25 }, tier: 'gold' },
-  { id: 'helper-5', label: 'Helpful Hand', description: 'Helped 5 people', icon: 'HandHeart', color: 'bg-pink-500/20 text-pink-500', requirement: { type: 'helped', count: 5 }, tier: 'bronze' },
-  { id: 'helper-25', label: 'Community Hero', description: 'Helped 25 people', icon: 'Award', color: 'bg-purple-500/20 text-purple-500', requirement: { type: 'helped', count: 25 }, tier: 'gold' },
-  { id: 'popular-50', label: 'Rising Star', description: 'Received 50 likes', icon: 'Star', color: 'bg-orange-500/20 text-orange-500', requirement: { type: 'likes', count: 50 }, tier: 'bronze' },
-  { id: 'popular-500', label: 'Superstar', description: 'Received 500 likes', icon: 'Sparkles', color: 'bg-primary/20 text-primary', requirement: { type: 'likes', count: 500 }, tier: 'gold' },
-  { id: 'streak-7', label: '7 Day Streak', description: 'Active for 7 days straight', icon: 'Flame', color: 'bg-orange-500/20 text-orange-500', requirement: { type: 'streak', count: 7 }, tier: 'bronze' },
-  { id: 'streak-30', label: 'Monthly Warrior', description: 'Active for 30 days straight', icon: 'Zap', color: 'bg-yellow-500/20 text-yellow-500', requirement: { type: 'streak', count: 30 }, tier: 'silver' },
-  { id: 'views-1000', label: 'Influencer', description: 'Notes viewed 1000 times', icon: 'Eye', color: 'bg-blue-500/20 text-blue-500', requirement: { type: 'views', count: 1000 }, tier: 'silver' },
-];
-
+// ==================== ACHIEVEMENTS & USERS ====================
+// ... (rest of achievementsService and usersService stays the same)
 export const achievementsService = {
   checkAchievements(stats: { uploads: number; helpedRequests: number; totalLikes: number; totalViews: number }, streak: number) {
     const earned: Achievement[] = [];
-    
     ACHIEVEMENTS.forEach(achievement => {
       let count = 0;
       switch (achievement.requirement.type) {
@@ -391,18 +395,15 @@ export const achievementsService = {
         case 'views': count = stats.totalViews; break;
         case 'streak': count = streak; break;
       }
-      
       if (count >= achievement.requirement.count) {
         earned.push(achievement);
       }
     });
-    
     return earned;
   },
 
   getActiveAchievement(stats: { uploads: number; helpedRequests: number; totalLikes: number; totalViews: number }, streak: number): Achievement | null {
     let closest: { achievement: Achievement; progress: number } | null = null;
-    
     ACHIEVEMENTS.forEach(achievement => {
       let count = 0;
       switch (achievement.requirement.type) {
@@ -412,7 +413,6 @@ export const achievementsService = {
         case 'views': count = stats.totalViews; break;
         case 'streak': count = streak; break;
       }
-      
       const progress = count / achievement.requirement.count;
       if (progress < 1 && progress > 0) {
         if (!closest || progress > closest.progress) {
@@ -420,12 +420,10 @@ export const achievementsService = {
         }
       }
     });
-    
     return closest?.achievement || null;
   },
 };
 
-// ==================== USER PROFILES ====================
 export const usersService = {
   async getById(userId: string): Promise<any | null> {
     const docRef = doc(db, 'users', userId);
@@ -435,7 +433,6 @@ export const usersService = {
 
   async getByUsername(username: string): Promise<any | null> {
     if (!username || username.length < 3) return null;
-    
     try {
       const q = query(collection(db, 'users'), where('username', '==', username), limit(1));
       const snapshot = await getDocs(q);
@@ -449,7 +446,6 @@ export const usersService = {
   async search(searchQuery: string): Promise<any[]> {
     const allUsersSnap = await getDocs(collection(db, 'users'));
     const q = searchQuery.toLowerCase();
-    
     return allUsersSnap.docs
       .map(doc => ({ id: doc.id, ...doc.data() }))
       .filter((user: any) => 
