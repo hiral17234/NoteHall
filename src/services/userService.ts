@@ -1,79 +1,38 @@
-// User Service - Handles all user-related operations
-// TODO: Replace localStorage with API calls when backend is ready
+// Combined User Service - Points directly to firestoreService logic
+// This ensures no localStorage conflicts.
 
-const STORAGE_KEYS = {
-  USER: "notehall_user",
-  PREFERENCES: "notehall_preferences",
-  PRIVACY: "notehall_privacy",
-} as const;
-
-// Mock delay to simulate API calls
-const mockDelay = (ms: number = 300) => new Promise(resolve => setTimeout(resolve, ms));
+import { usersService } from './firestoreService';
+import { doc, updateDoc } from 'firebase/firestore';
+import { db, getServerTimestamp } from '@/lib/firebase';
 
 export const userService = {
-  // Get user profile from storage
-  async getUser(): Promise<any | null> {
-    await mockDelay();
-    const stored = localStorage.getItem(STORAGE_KEYS.USER);
-    return stored ? JSON.parse(stored) : null;
+  // Get user profile
+  async getUser(userId: string): Promise<any | null> {
+    return await usersService.getById(userId);
   },
 
-  // Save user profile to storage
-  async saveUser(user: any): Promise<void> {
-    await mockDelay();
-    localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
+  // Update user profile in Firestore
+  async updateUser(userId: string, updates: any): Promise<void> {
+    const userRef = doc(db, 'users', userId);
+    await updateDoc(userRef, {
+      ...updates,
+      updatedAt: getServerTimestamp()
+    });
   },
 
-  // Update user profile
-  async updateUser(updates: any): Promise<any> {
-    await mockDelay();
-    const current = await this.getUser();
-    const updated = { ...current, ...updates };
-    await this.saveUser(updated);
-    return updated;
+  // These can be added as simple fields in the User document in Firestore
+  async savePreferences(userId: string, prefs: any): Promise<void> {
+    const userRef = doc(db, 'users', userId);
+    await updateDoc(userRef, { preferences: prefs });
   },
 
-  // Get user preferences
-  async getPreferences(): Promise<any | null> {
-    await mockDelay();
-    const stored = localStorage.getItem(STORAGE_KEYS.PREFERENCES);
-    return stored ? JSON.parse(stored) : null;
+  async savePrivacySettings(userId: string, settings: any): Promise<void> {
+    const userRef = doc(db, 'users', userId);
+    await updateDoc(userRef, { privacy: settings });
   },
 
-  // Save user preferences
-  async savePreferences(prefs: any): Promise<void> {
-    await mockDelay();
-    localStorage.setItem(STORAGE_KEYS.PREFERENCES, JSON.stringify(prefs));
-  },
-
-  // Get privacy settings
-  async getPrivacySettings(): Promise<any | null> {
-    await mockDelay();
-    const stored = localStorage.getItem(STORAGE_KEYS.PRIVACY);
-    return stored ? JSON.parse(stored) : null;
-  },
-
-  // Save privacy settings
-  async savePrivacySettings(settings: any): Promise<void> {
-    await mockDelay();
-    localStorage.setItem(STORAGE_KEYS.PRIVACY, JSON.stringify(settings));
-  },
-
-  // Soft delete account (mark as inactive)
   async softDeleteAccount(userId: string): Promise<void> {
-    await mockDelay();
-    const user = await this.getUser();
-    if (user) {
-      await this.saveUser({ ...user, isActive: false, deletedAt: new Date().toISOString() });
-    }
-  },
-
-  // Reactivate account
-  async reactivateAccount(userId: string): Promise<void> {
-    await mockDelay();
-    const user = await this.getUser();
-    if (user) {
-      await this.saveUser({ ...user, isActive: true, deletedAt: undefined });
-    }
-  },
+    const userRef = doc(db, 'users', userId);
+    await updateDoc(userRef, { isActive: false, deletedAt: getServerTimestamp() });
+  }
 };
