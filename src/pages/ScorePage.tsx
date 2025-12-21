@@ -3,9 +3,9 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { useAuth } from "@/contexts/AuthContext";
-import { usersService } from "@/services/firestoreService";
+import { db } from "@/lib/firebase";
+import { collection, query, where, getDocs } from "firebase/firestore";
 import { 
   BarChart3, 
   TrendingUp, 
@@ -32,22 +32,59 @@ export default function ScorePage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!userProfile?.id) return;
+    if (!userProfile?.id) {
+      setLoading(false);
+      return;
+    }
 
     const fetchStats = async () => {
       try {
-        const profile = await usersService.getById(userProfile.id);
-        if (profile) {
-          setStats(profile.stats || {
-            uploads: 0,
-            totalLikes: 0,
-            totalViews: 0,
-            helpedRequests: 0,
-            contributionScore: 0,
-          });
-        }
+        // Calculate stats from notes
+        const notesQuery = query(
+          collection(db, "notes"),
+          where("authorId", "==", userProfile.id)
+        );
+        const notesSnap = await getDocs(notesQuery);
+        
+        let uploads = 0;
+        let totalLikes = 0;
+        let totalViews = 0;
+        
+        notesSnap.docs.forEach(doc => {
+          const data = doc.data();
+          uploads++;
+          totalLikes += data.likes || 0;
+          totalViews += data.views || 0;
+        });
+
+        // Count contributions
+        const contribQuery = query(
+          collection(db, "contributions"),
+          where("contributorId", "==", userProfile.id)
+        );
+        const contribSnap = await getDocs(contribQuery);
+        const helpedRequests = contribSnap.size;
+
+        // Calculate score
+        const contributionScore = 
+          (uploads * 10) + 
+          (totalLikes * 5) + 
+          Math.floor(totalViews / 10) + 
+          (helpedRequests * 50);
+
+        setStats({
+          uploads,
+          totalLikes,
+          totalViews,
+          helpedRequests,
+          contributionScore,
+        });
       } catch (error) {
         console.error("Error fetching stats:", error);
+        // Use profile stats as fallback
+        if (userProfile.stats) {
+          setStats(userProfile.stats);
+        }
       } finally {
         setLoading(false);
       }
@@ -73,6 +110,17 @@ export default function ScorePage() {
 
   const rank = getRank(stats.contributionScore);
 
+  if (!userProfile) {
+    return (
+      <MainLayout>
+        <div className="max-w-3xl mx-auto text-center py-12">
+          <p className="text-muted-foreground">Please login to view your score.</p>
+          <Button onClick={() => navigate("/login")} className="mt-4">Login</Button>
+        </div>
+      </MainLayout>
+    );
+  }
+
   return (
     <MainLayout>
       <div className="max-w-3xl mx-auto">
@@ -86,90 +134,99 @@ export default function ScorePage() {
           </div>
         </div>
 
-        {/* Total Score Card */}
-        <Card className="bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20 mb-6">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-16 h-16 rounded-2xl bg-primary/20 flex items-center justify-center">
-                  <BarChart3 className="w-8 h-8 text-primary" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Total Score</p>
-                  <p className="text-4xl font-black text-foreground">{stats.contributionScore}</p>
-                </div>
-              </div>
-              <div className="text-right">
-                <Badge className={`${rank.color} text-primary-foreground px-4 py-1`}>
-                  <Trophy className="w-4 h-4 mr-1" />
-                  {rank.title}
-                </Badge>
-                <p className="text-xs text-muted-foreground mt-2">Your current rank</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Score Breakdown */}
-        <Card className="bg-card border-border mb-6">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="w-5 h-5 text-primary" />
-              Score Breakdown
-            </CardTitle>
-            <CardDescription>How your contributions earn points</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {scoreBreakdown.map((item) => (
-                <div key={item.label} className="flex items-center justify-between p-4 bg-muted/50 rounded-xl">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-xl bg-background flex items-center justify-center ${item.color}`}>
-                      <item.icon className="w-5 h-5" />
+        {loading ? (
+          <div className="space-y-4">
+            <div className="h-32 bg-muted animate-pulse rounded-xl" />
+            <div className="h-64 bg-muted animate-pulse rounded-xl" />
+          </div>
+        ) : (
+          <>
+            {/* Total Score Card */}
+            <Card className="bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20 mb-6">
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="w-16 h-16 rounded-2xl bg-primary/20 flex items-center justify-center">
+                      <BarChart3 className="w-8 h-8 text-primary" />
                     </div>
                     <div>
-                      <p className="font-medium text-foreground">{item.label}</p>
-                      <p className="text-sm text-muted-foreground">{item.value} total</p>
+                      <p className="text-sm text-muted-foreground">Total Score</p>
+                      <p className="text-4xl font-black text-foreground">{stats.contributionScore}</p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="font-bold text-primary">+{item.points}</p>
-                    <p className="text-xs text-muted-foreground">points</p>
+                    <Badge className={`${rank.color} text-primary-foreground px-4 py-1`}>
+                      <Trophy className="w-4 h-4 mr-1" />
+                      {rank.title}
+                    </Badge>
+                    <p className="text-xs text-muted-foreground mt-2">Your current rank</p>
                   </div>
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
 
-        {/* How to Earn Points */}
-        <Card className="bg-card border-border">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Star className="w-5 h-5 text-yellow-500" />
-              How to Earn Points
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-3 text-sm text-muted-foreground">
-              <li className="flex items-center gap-2">
-                <span className="font-bold text-primary">+10</span> Upload a new note
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="font-bold text-primary">+5</span> Receive a like on your note
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="font-bold text-primary">+1</span> Every 10 views on your notes
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="font-bold text-primary">+50</span> Help someone with their request
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="font-bold text-primary">+2</span> Rate or comment on notes
-              </li>
-            </ul>
-          </CardContent>
-        </Card>
+            {/* Score Breakdown */}
+            <Card className="bg-card border-border mb-6">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5 text-primary" />
+                  Score Breakdown
+                </CardTitle>
+                <CardDescription>How your contributions earn points</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {scoreBreakdown.map((item) => (
+                    <div key={item.label} className="flex items-center justify-between p-4 bg-muted/50 rounded-xl">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-xl bg-background flex items-center justify-center ${item.color}`}>
+                          <item.icon className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <p className="font-medium text-foreground">{item.label}</p>
+                          <p className="text-sm text-muted-foreground">{item.value} total</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-bold text-primary">+{item.points}</p>
+                        <p className="text-xs text-muted-foreground">points</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* How to Earn Points */}
+            <Card className="bg-card border-border">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Star className="w-5 h-5 text-yellow-500" />
+                  How to Earn Points
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-3 text-sm text-muted-foreground">
+                  <li className="flex items-center gap-2">
+                    <span className="font-bold text-primary">+10</span> Upload a new note
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="font-bold text-primary">+5</span> Receive a like on your note
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="font-bold text-primary">+1</span> Every 10 views on your notes
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="font-bold text-primary">+50</span> Help someone with their request
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="font-bold text-primary">+2</span> Rate or comment on notes
+                  </li>
+                </ul>
+              </CardContent>
+            </Card>
+          </>
+        )}
       </div>
     </MainLayout>
   );

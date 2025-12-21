@@ -203,7 +203,7 @@ export function Sidebar() {
                 </AvatarFallback>
               </Avatar>
               {privacy.showOnlineStatus && (
-                <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-chart-1 rounded-full border-2 border-card" />
+                <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-card" />
               )}
             </div>
             {!collapsed && (
