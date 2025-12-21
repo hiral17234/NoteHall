@@ -32,6 +32,18 @@ export const fcmService = {
   // Request permission and get FCM token
   async requestPermission(userId: string): Promise<string | null> {
     try {
+      // Check if Notification API is available
+      if (!('Notification' in window)) {
+        console.log('Notifications not supported');
+        return null;
+      }
+      
+      // Check if service workers are supported
+      if (!('serviceWorker' in navigator)) {
+        console.log('Service workers not supported');
+        return null;
+      }
+
       const permission = await Notification.requestPermission();
       
       if (permission !== 'granted') {
@@ -42,26 +54,36 @@ export const fcmService = {
       const msg = await initializeMessaging();
       if (!msg) return null;
 
-      // Register service worker
-      const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
-      console.log('Service Worker registered:', registration);
+      // Register service worker with error handling
+      let registration;
+      try {
+        registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+        console.log('Service Worker registered:', registration);
+      } catch (swError) {
+        console.log('Service Worker registration failed:', swError);
+        return null;
+      }
 
-      // Get FCM token
-      const token = await getToken(msg, {
-        vapidKey: VAPID_KEY,
-        serviceWorkerRegistration: registration,
-      });
+      // Get FCM token with error handling
+      try {
+        const token = await getToken(msg, {
+          vapidKey: VAPID_KEY,
+          serviceWorkerRegistration: registration,
+        });
 
-      if (token) {
-        console.log('FCM Token:', token);
-        // Save token to user's document in Firestore
-        await this.saveTokenToFirestore(userId, token);
-        return token;
+        if (token) {
+          console.log('FCM Token obtained');
+          await this.saveTokenToFirestore(userId, token);
+          return token;
+        }
+      } catch (tokenError) {
+        console.log('Error getting FCM token:', tokenError);
+        return null;
       }
       
       return null;
     } catch (error) {
-      console.error('Error getting FCM token:', error);
+      console.log('FCM initialization error (non-critical):', error);
       return null;
     }
   },
