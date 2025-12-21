@@ -62,15 +62,18 @@ export default function HelpDesk() {
     branch: request.branch,
     year: request.year,
     requestType: "pdf" as const, // Default type since we removed it from the model
-    status: request.status === "in_progress" ? "open" as const : 
-            request.status === "closed" ? "fulfilled" as const : 
-            request.status as "open" | "fulfilled" | "urgent",
+    status:
+      request.status === "in_progress"
+        ? ("open" as const)
+        : request.status === "closed"
+          ? ("fulfilled" as const)
+          : (request.status as "open" | "fulfilled" | "urgent"),
     requestedBy: request.requesterName,
     requestedById: request.requesterId,
-    timestamp: request.createdAt?.toDate?.()?.toLocaleDateString() || "Recently",
+    timestamp: request.createdAt,
     helpersCount: request.contributionsCount,
-    likes: 0,
-    comments: 0,
+    likes: [],
+    commentsCount: 0,
   });
 
   return (

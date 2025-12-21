@@ -162,33 +162,64 @@ export const notificationService = {
 
 // Helper to create notifications for specific events
 export const createNotification = {
-  async like(noteAuthorId: string, fromUserId: string, fromUserName: string, noteTitle: string, noteId: string) {
-    if (noteAuthorId === fromUserId) return;
-    
+  async like(
+    noteAuthorId: string,
+    fromUser: { id: string; name: string },
+    noteTitle: string,
+    noteId: string
+  ) {
+    if (!noteAuthorId || noteAuthorId === fromUser.id) return;
+
     await notificationService.create({
       type: 'like',
       title: 'New Like',
-      message: `${fromUserName} liked your note "${noteTitle}"`,
+      message: `${fromUser.name} liked your note "${noteTitle}"`,
       toUserId: noteAuthorId,
-      fromUserId,
-      fromUserName,
+      fromUserId: fromUser.id,
+      fromUserName: fromUser.name,
       relatedId: noteId,
       actionUrl: `/note/${noteId}`,
     });
   },
 
-  async contribution(requesterId: string, fromUserId: string, fromUserName: string, requestTitle: string, requestId: string) {
-    if (requesterId === fromUserId) return;
-    
+  async comment(
+    ownerId: string,
+    fromUser: { id: string; name: string },
+    itemTitle: string,
+    relatedId: string,
+    isReply = false
+  ) {
+    if (!ownerId || ownerId === fromUser.id) return;
+
+    await notificationService.create({
+      type: isReply ? 'reply' : 'comment',
+      title: isReply ? 'New Reply' : 'New Comment',
+      message: `${fromUser.name} commented on "${itemTitle}"`,
+      toUserId: ownerId,
+      fromUserId: fromUser.id,
+      fromUserName: fromUser.name,
+      relatedId,
+      actionUrl: `/note/${relatedId}`,
+    });
+  },
+
+  async contribution(
+    requesterId: string,
+    fromUser: { id: string; name: string },
+    requestTitle: string,
+    requestId: string
+  ) {
+    if (!requesterId || requesterId === fromUser.id) return;
+
     await notificationService.create({
       type: 'help_contribution',
       title: 'New Contribution',
-      message: `${fromUserName} contributed to your request "${requestTitle}"`,
+      message: `${fromUser.name} contributed to your request "${requestTitle}"`,
       toUserId: requesterId,
-      fromUserId,
-      fromUserName,
+      fromUserId: fromUser.id,
+      fromUserName: fromUser.name,
       relatedId: requestId,
-      actionUrl: `/helpdesk`,
+      actionUrl: `/help-desk?id=${requestId}`,
     });
   },
 
@@ -199,7 +230,8 @@ export const createNotification = {
       message: `Your request "${requestTitle}" has been fulfilled!`,
       toUserId: requesterId,
       relatedId: requestId,
-      actionUrl: `/helpdesk`,
+      actionUrl: `/help-desk?id=${requestId}`,
     });
   },
 };
+
