@@ -18,7 +18,7 @@ import { useHelpRequests, HelpRequest } from "@/contexts/HelpRequestsContext";
 
 export default function HelpDesk() {
   const navigate = useNavigate();
-  const { requests, loading, addRequest } = useHelpRequests();
+  const { requests, loading, addRequest, closeRequest } = useHelpRequests();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
@@ -239,7 +239,11 @@ export default function HelpDesk() {
               </>
             ) : openRequests.length > 0 ? (
               openRequests.map((request) => (
-                <RequestCard key={request.id} request={transformRequest(request)} />
+                <RequestCard 
+                  key={request.id} 
+                  request={transformRequest(request)} 
+                  onMarkFulfilled={closeRequest}
+                />
               ))
             ) : (
               <EmptyState 
@@ -258,7 +262,11 @@ export default function HelpDesk() {
               </>
             ) : fulfilledRequests.length > 0 ? (
               fulfilledRequests.map((request) => (
-                <RequestCard key={request.id} request={transformRequest(request)} />
+                <RequestCard 
+                  key={request.id} 
+                  request={transformRequest(request)} 
+                  onMarkFulfilled={closeRequest}
+                />
               ))
             ) : (
               <EmptyState 
