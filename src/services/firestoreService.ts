@@ -1,466 +1,274 @@
+import { useState, useEffect } from "react";
 import { 
-  collection, 
-  doc, 
-  getDoc, 
-  getDocs, 
-  setDoc, 
-  updateDoc, 
-  deleteDoc,
-  query, 
-  where, 
-  orderBy, 
-  limit,
-  addDoc,
-  increment,
-  arrayUnion,
-  arrayRemove,
-} from 'firebase/firestore';
-import { db, getServerTimestamp } from '@/lib/firebase';
-import { createNotification } from '@/services/notificationService';
+  FileText, Image, Video, Link, ThumbsUp, ThumbsDown, 
+  Eye, Bookmark, Bot, MoreVertical, Expand, Flag, Share2, 
+  Download, Star, AlertCircle
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { cn } from "@/lib/utils";
+import { toast } from "@/hooks/use-toast";
+import { useSavedNotes } from "@/contexts/SavedNotesContext";
 
-// ==================== NOTES INTERFACE ====================
-export interface Note {
-  id: string;
-  title: string;
-  subject: string;
-  branch: string;
-  year: string;
-  fileType: 'pdf' | 'image' | 'video' | 'link';
-  fileUrl: string;
-  description?: string;
-  topic?: string;
-  likes: number;
-  dislikes: number;
-  views: number;
-  authorId: string;
-  authorName: string;
-  authorUsername: string;
-  isTrusted: boolean;
-  ratings: {
-    total: number;
-    count: number;
-    average: number;
+// --- FIREBASE & SERVICES ---
+import { db, auth } from "@/lib/firebase"; 
+import { doc, updateDoc, arrayUnion, arrayRemove, onSnapshot, increment } from "firebase/firestore";
+import { notesService } from "@/services/firestoreService";
+
+interface NoteCardProps {
+  note: {
+    id: string;
+    title: string;
+    subject: string;
+    branch: string;
+    year: string;
+    fileType: "pdf" | "image" | "video" | "link";
+    fileUrl?: string;
+    likes: number;
+    dislikes: number;
+    views: number;
+    author: string;
+    authorId?: string;
+    timestamp: string;
+    topic?: string;
+    difficulty?: "easy" | "medium" | "hard";
+    rating?: number;
+    likedBy?: string[];
+    dislikedBy?: string[];
+    ratings?: {
+      average: number;
+      count: number;
+    };
   };
-  difficulty: {
-    easy: number;
-    medium: number;
-    hard: number;
-  };
-  savedBy: string[];
-  likedBy: string[];
-  createdAt: any;
-  updatedAt: any;
+  onAskAI?: () => void;
+  onExpand?: () => void;
 }
 
-// ==================== NOTES SERVICE ====================
-export const notesService = {
-  async getAll(): Promise<Note[]> {
-    const q = query(collection(db, 'notes'), orderBy('createdAt', 'desc'));
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Note));
-  },
-
-  async getById(id: string): Promise<Note | null> {
-    const docRef = doc(db, 'notes', id);
-    const docSnap = await getDoc(docRef);
-    return docSnap.exists() ? { id: docSnap.id, ...docSnap.data() } as Note : null;
-  },
-
-  async getByUser(userId: string): Promise<Note[]> {
-    const q = query(collection(db, 'notes'), where('authorId', '==', userId), orderBy('createdAt', 'desc'));
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Note));
-  },
-
-  async create(noteData: Omit<Note, 'id' | 'createdAt' | 'updatedAt' | 'likes' | 'dislikes' | 'views' | 'ratings' | 'difficulty' | 'savedBy' | 'likedBy'>): Promise<string> {
-    const docRef = await addDoc(collection(db, 'notes'), {
-      ...noteData,
-      likes: 0,
-      dislikes: 0,
-      views: 0,
-      ratings: { total: 0, count: 0, average: 0 },
-      difficulty: { easy: 0, medium: 0, hard: 0 },
-      savedBy: [],
-      likedBy: [],
-      createdAt: getServerTimestamp(),
-      updatedAt: getServerTimestamp(),
-    });
-    return docRef.id;
-  },
-
-  async incrementViews(noteId: string): Promise<void> {
-    const docRef = doc(db, 'notes', noteId);
-    await updateDoc(docRef, { views: increment(1) });
-  },
-
-  async toggleLike(noteId: string, userId: string, userName: string, isCurrentlyLiked: boolean): Promise<void> {
-    const noteRef = doc(db, 'notes', noteId);
-    const noteSnap = await getDoc(noteRef);
-    
-    if (!noteSnap.exists()) return;
-    
-    const note = noteSnap.data() as Note;
-    
-    if (isCurrentlyLiked) {
-      await updateDoc(noteRef, {
-        likes: increment(-1),
-        likedBy: arrayRemove(userId),
-      });
-    } else {
-      await updateDoc(noteRef, {
-        likes: increment(1),
-        likedBy: arrayUnion(userId),
-      });
-      
-      if (note.authorId !== userId) {
-        await createNotification.like(note.authorId, userId, userName, note.title, noteId);
-      }
-      
-      await updateDoc(doc(db, 'users', note.authorId), {
-        'stats.totalLikes': increment(1),
-      });
-    }
-  },
-
-  async isLikedByUser(noteId: string, userId: string): Promise<boolean> {
-    const noteRef = doc(db, 'notes', noteId);
-    const noteSnap = await getDoc(noteRef);
-    if (!noteSnap.exists()) return false;
-    const note = noteSnap.data() as Note;
-    return note.likedBy?.includes(userId) || false;
-  },
-
-  async saveNote(noteId: string, userId: string): Promise<void> {
-    try {
-      const noteRef = doc(db, 'notes', noteId);
-      await updateDoc(noteRef, { savedBy: arrayUnion(userId) });
-      
-      await setDoc(doc(db, 'users', userId, 'savedNotes', noteId), {
-        noteId,
-        savedAt: getServerTimestamp(),
-      });
-    } catch (error) {
-      console.error("Save Error:", error);
-      throw error;
-    }
-  },
-
-  async unsaveNote(noteId: string, userId: string): Promise<void> {
-    try {
-      const noteRef = doc(db, 'notes', noteId);
-      await updateDoc(noteRef, { savedBy: arrayRemove(userId) });
-      await deleteDoc(doc(db, 'users', userId, 'savedNotes', noteId));
-    } catch (error) {
-      console.error("Unsave Error:", error);
-      throw error;
-    }
-  },
-
-  async isSavedByUser(noteId: string, userId: string): Promise<boolean> {
-    const savedDoc = await getDoc(doc(db, 'users', userId, 'savedNotes', noteId));
-    return savedDoc.exists();
-  },
-
-  async getSavedNotes(userId: string): Promise<Note[]> {
-    try {
-      const savedDocsSnap = await getDocs(collection(db, 'users', userId, 'savedNotes'));
-      const noteIds = savedDocsSnap.docs.map(d => d.data().noteId);
-      
-      if (noteIds.length === 0) return [];
-      
-      const notes: Note[] = [];
-      for (const noteId of noteIds) {
-        const note = await this.getById(noteId);
-        if (note) notes.push(note);
-      }
-      return notes;
-    } catch (error) {
-      console.error("GetSavedNotes Error:", error);
-      return [];
-    }
-  },
-
-  // FIXED: Now triggers an actual browser download AND saves a record to DB
-  async downloadNote(noteId: string, userId: string, note: { title: string; subject: string; fileUrl: string }): Promise<void> {
-    try {
-      // 1. Database Recording
-      await setDoc(doc(db, 'users', userId, 'downloadedNotes', noteId), {
-        noteId,
-        title: note.title,
-        subject: note.subject,
-        fileUrl: note.fileUrl,
-        downloadedAt: getServerTimestamp(),
-      });
-
-      // 2. Trigger Actual File Download
-      const response = await fetch(note.fileUrl);
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      // Set filename (removes spaces for safety)
-      link.setAttribute('download', `${note.title.replace(/\s+/g, '_')}.pdf`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error("Download Error:", error);
-      // Fallback: Just open the link in a new tab if blob download fails
-      window.open(note.fileUrl, '_blank');
-    }
-  },
-
-  async getDownloadedNotes(userId: string): Promise<Array<{ noteId: string; title: string; subject: string; fileUrl: string; downloadedAt: any }>> {
-    const downloadedDocsSnap = await getDocs(collection(db, 'users', userId, 'downloadedNotes'));
-    return downloadedDocsSnap.docs.map(d => ({ noteId: d.id, ...d.data() } as any));
-  },
-
-  async rateNote(noteId: string, userId: string, rating: number, difficulty: 'easy' | 'medium' | 'hard'): Promise<void> {
-    await setDoc(doc(db, 'ratings', `${noteId}_${userId}`), {
-      noteId,
-      userId,
-      rating,
-      difficulty,
-      createdAt: getServerTimestamp(),
-    });
-
-    const noteRef = doc(db, 'notes', noteId);
-    const noteSnap = await getDoc(noteRef);
-    
-    if (noteSnap.exists()) {
-      const note = noteSnap.data() as Note;
-      const newCount = note.ratings.count + 1;
-      const newTotal = note.ratings.total + rating;
-      const newAverage = newTotal / newCount;
-
-      await updateDoc(noteRef, {
-        'ratings.count': newCount,
-        'ratings.total': newTotal,
-        'ratings.average': newAverage,
-        [`difficulty.${difficulty}`]: increment(1),
-        updatedAt: getServerTimestamp(),
-      });
-    }
-  },
-
-  async search(searchQuery: string): Promise<Note[]> {
-    const allNotes = await this.getAll();
-    const q = searchQuery.toLowerCase();
-    
-    return allNotes.filter(note => 
-      note.title.toLowerCase().includes(q) ||
-      note.subject.toLowerCase().includes(q) ||
-      note.authorName.toLowerCase().includes(q) ||
-      note.authorUsername.toLowerCase().includes(q) ||
-      note.topic?.toLowerCase().includes(q) ||
-      note.branch.toLowerCase().includes(q)
-    );
-  },
+const fileTypeIcons = { pdf: FileText, image: Image, video: Video, link: Link };
+const fileTypeColors = {
+  pdf: "bg-destructive/10 text-destructive",
+  image: "bg-chart-1/20 text-chart-4",
+  video: "bg-primary/10 text-primary",
+  link: "bg-secondary/20 text-secondary-foreground",
 };
-
-// ==================== HELP REQUESTS SERVICE ====================
-export interface HelpRequest {
-  id: string;
-  title: string;
-  description: string;
-  subject: string;
-  branch: string;
-  year: string;
-  semester?: string;
-  requesterId: string;
-  requesterName: string;
-  requesterUsername: string;
-  status: 'open' | 'in_progress' | 'fulfilled' | 'closed';
-  contributionsCount: number;
-  createdAt: any;
-  updatedAt: any;
-}
-
-export const helpRequestsService = {
-  async getAll(): Promise<HelpRequest[]> {
-    const q = query(collection(db, 'requests'), orderBy('createdAt', 'desc'));
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as HelpRequest));
-  },
-
-  async getByUser(userId: string): Promise<HelpRequest[]> {
-    const q = query(collection(db, 'requests'), where('requesterId', '==', userId), orderBy('createdAt', 'desc'));
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as HelpRequest));
-  },
-
-  async create(data: Omit<HelpRequest, 'id' | 'createdAt' | 'updatedAt' | 'contributionsCount' | 'status'>): Promise<string> {
-    const docRef = await addDoc(collection(db, 'requests'), {
-      ...data,
-      status: 'open',
-      contributionsCount: 0,
-      createdAt: getServerTimestamp(),
-      updatedAt: getServerTimestamp(),
-    });
-    return docRef.id;
-  },
-
-  async updateStatus(requestId: string, status: HelpRequest['status']): Promise<void> {
-    const requestRef = doc(db, 'requests', requestId);
-    const requestSnap = await getDoc(requestRef);
-    
-    await updateDoc(requestRef, {
-      status,
-      updatedAt: getServerTimestamp(),
-    });
-    
-    if (status === 'fulfilled' && requestSnap.exists()) {
-      const request = requestSnap.data() as HelpRequest;
-      await createNotification.requestFulfilled(request.requesterId, request.title, requestId);
-    }
-  },
-
-  async incrementContributions(requestId: string): Promise<void> {
-    await updateDoc(doc(db, 'requests', requestId), {
-      contributionsCount: increment(1),
-      updatedAt: getServerTimestamp(),
-    });
-  },
+const difficultyColors = {
+  easy: "bg-chart-1/20 text-chart-1",
+  medium: "bg-chart-4/20 text-chart-4",
+  hard: "bg-destructive/20 text-destructive",
 };
+const reportReasons = [
+  { id: "inappropriate", label: "Inappropriate content" },
+  { id: "wrong", label: "Wrong/misleading information" },
+  { id: "spam", label: "Spam or advertisement" },
+  { id: "copyright", label: "Copyright violation" },
+  { id: "quality", label: "Low quality content" },
+  { id: "other", label: "Other" },
+];
 
-// ==================== CONTRIBUTIONS SERVICE ====================
-export interface Contribution {
-  id: string;
-  requestId: string;
-  contributorId: string;
-  contributorName: string;
-  contributorUsername: string;
-  type: 'pdf' | 'image' | 'video' | 'link' | 'explanation';
-  content: string;
-  fileUrl?: string;
-  createdAt: any;
-}
+export function NoteCard({ note, onAskAI, onExpand }: NoteCardProps) {
+  const { isNoteSaved, toggleSave } = useSavedNotes();
+  const [liked, setLiked] = useState(false);
+  const [disliked, setDisliked] = useState(false);
+  const [likes, setLikes] = useState(note.likes || 0);
+  const [dislikes, setDislikes] = useState(note.dislikes || 0);
+  const [likeAnimating, setLikeAnimating] = useState(false);
+  const [dislikeAnimating, setDislikeAnimating] = useState(false);
+  const [saveAnimating, setSaveAnimating] = useState(false);
+  const [reportDialogOpen, setReportDialogOpen] = useState(false);
+  const [ratingDialogOpen, setRatingDialogOpen] = useState(false);
+  const [reportReason, setReportReason] = useState("");
+  const [reportDetails, setReportDetails] = useState("");
+  const [userRating, setUserRating] = useState(0);
+  const [userDifficulty, setUserDifficulty] = useState<"easy" | "medium" | "hard" | "">("");
+  const [currentRating, setCurrentRating] = useState(note.ratings?.average || note.rating || 0);
+  
+  const saved = isNoteSaved(note.id);
+  const FileIcon = fileTypeIcons[note.fileType] || FileText;
 
-export const contributionsService = {
-  async getByRequest(requestId: string): Promise<Contribution[]> {
-    const q = query(collection(db, 'contributions'), where('requestId', '==', requestId), orderBy('createdAt', 'desc'));
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Contribution));
-  },
-
-  async getByUser(userId: string): Promise<Contribution[]> {
-    const q = query(collection(db, 'contributions'), where('contributorId', '==', userId), orderBy('createdAt', 'desc'));
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Contribution));
-  },
-
-  async create(data: Omit<Contribution, 'id' | 'createdAt'>): Promise<string> {
-    const docRef = await addDoc(collection(db, 'contributions'), {
-      ...data,
-      createdAt: getServerTimestamp(),
-    });
-    
-    await helpRequestsService.incrementContributions(data.requestId);
-    
-    await updateDoc(doc(db, 'users', data.contributorId), {
-      'stats.helpedRequests': increment(1),
-      'stats.contributionScore': increment(5),
-      updatedAt: getServerTimestamp(),
-    });
-    
-    const requestRef = doc(db, 'requests', data.requestId);
-    const requestSnap = await getDoc(requestRef);
-    if (requestSnap.exists()) {
-      const request = requestSnap.data() as HelpRequest;
-      await createNotification.contribution(
-        request.requesterId, 
-        data.contributorId, 
-        data.contributorName, 
-        request.title, 
-        data.requestId
-      );
-    }
-    
-    return docRef.id;
-  },
-};
-
-// ==================== ACHIEVEMENTS & USERS ====================
-// ... (rest of achievementsService and usersService stays the same)
-export const achievementsService = {
-  checkAchievements(stats: { uploads: number; helpedRequests: number; totalLikes: number; totalViews: number }, streak: number) {
-    const earned: Achievement[] = [];
-    ACHIEVEMENTS.forEach(achievement => {
-      let count = 0;
-      switch (achievement.requirement.type) {
-        case 'uploads': count = stats.uploads; break;
-        case 'helped': count = stats.helpedRequests; break;
-        case 'likes': count = stats.totalLikes; break;
-        case 'views': count = stats.totalViews; break;
-        case 'streak': count = streak; break;
-      }
-      if (count >= achievement.requirement.count) {
-        earned.push(achievement);
-      }
-    });
-    return earned;
-  },
-
-  getActiveAchievement(stats: { uploads: number; helpedRequests: number; totalLikes: number; totalViews: number }, streak: number): Achievement | null {
-    let closest: { achievement: Achievement; progress: number } | null = null;
-    ACHIEVEMENTS.forEach(achievement => {
-      let count = 0;
-      switch (achievement.requirement.type) {
-        case 'uploads': count = stats.uploads; break;
-        case 'helped': count = stats.helpedRequests; break;
-        case 'likes': count = stats.totalLikes; break;
-        case 'views': count = stats.totalViews; break;
-        case 'streak': count = streak; break;
-      }
-      const progress = count / achievement.requirement.count;
-      if (progress < 1 && progress > 0) {
-        if (!closest || progress > closest.progress) {
-          closest = { achievement, progress };
+  // Real-time listener for Likes/Ratings
+  useEffect(() => {
+    if (!note.id) return;
+    const unsubscribe = onSnapshot(doc(db, "notes", note.id), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setLikes(data.likes || 0);
+        setDislikes(data.dislikes || 0);
+        setCurrentRating(data.ratings?.average || data.rating || 0);
+        if (auth.currentUser) {
+          setLiked(data.likedBy?.includes(auth.currentUser.uid) || false);
+          setDisliked(data.dislikedBy?.includes(auth.currentUser.uid) || false);
         }
       }
     });
-    return closest?.achievement || null;
-  },
-};
+    return () => unsubscribe();
+  }, [note.id]);
 
-export const usersService = {
-  async getById(userId: string): Promise<any | null> {
-    const docRef = doc(db, 'users', userId);
-    const docSnap = await getDoc(docRef);
-    return docSnap.exists() ? { id: docSnap.id, ...docSnap.data() } : null;
-  },
-
-  async getByUsername(username: string): Promise<any | null> {
-    if (!username || username.length < 3) return null;
+  const handleLike = async () => {
+    if (!auth.currentUser) return toast({ title: "Please sign in", variant: "destructive" });
+    setLikeAnimating(true);
+    setTimeout(() => setLikeAnimating(false), 300);
     try {
-      const q = query(collection(db, 'users'), where('username', '==', username), limit(1));
-      const snapshot = await getDocs(q);
-      return snapshot.empty ? null : { id: snapshot.docs[0].id, ...snapshot.docs[0].data() };
-    } catch (error) {
-      console.error('Error checking username:', error);
-      return null;
+      await notesService.toggleLike(note.id, auth.currentUser.uid, auth.currentUser.displayName || "User", liked);
+    } catch (e) { console.error(e); }
+  };
+
+  const handleDislike = async () => {
+    if (!auth.currentUser) return;
+    setDislikeAnimating(true);
+    setTimeout(() => setDislikeAnimating(false), 300);
+    try {
+      const noteRef = doc(db, "notes", note.id);
+      if (disliked) {
+        await updateDoc(noteRef, { dislikes: increment(-1), dislikedBy: arrayRemove(auth.currentUser.uid) });
+      } else {
+        await updateDoc(noteRef, { 
+          dislikes: increment(1), 
+          dislikedBy: arrayUnion(auth.currentUser.uid),
+          ...(liked ? { likes: increment(-1), likedBy: arrayRemove(auth.currentUser.uid) } : {})
+        });
+      }
+    } catch (e) { console.error(e); }
+  };
+
+  const handleDownload = async () => {
+    if (!note.fileUrl) return;
+    try {
+      if (auth.currentUser) {
+        await notesService.downloadNote(note.id, auth.currentUser.uid, note);
+      }
+      const res = await fetch(note.fileUrl);
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${note.title.replace(/\s+/g, '_')}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      toast({ title: "Success", description: "Download started" });
+    } catch (e) {
+      window.open(note.fileUrl, '_blank');
     }
-  },
+  };
 
-  async search(searchQuery: string): Promise<any[]> {
-    const allUsersSnap = await getDocs(collection(db, 'users'));
-    const q = searchQuery.toLowerCase();
-    return allUsersSnap.docs
-      .map(doc => ({ id: doc.id, ...doc.data() }))
-      .filter((user: any) => 
-        user.username?.toLowerCase().includes(q) ||
-        user.name?.toLowerCase().includes(q)
-      );
-  },
+  const handleRatingSubmit = async () => {
+    if (!userRating || !userDifficulty || !auth.currentUser) return;
+    try {
+      await notesService.rateNote(note.id, auth.currentUser.uid, userRating, userDifficulty as any);
+      setRatingDialogOpen(false);
+      toast({ title: "Rating submitted!" });
+    } catch (e) { console.error(e); }
+  };
 
-  async getTopContributors(limitCount: number = 5): Promise<any[]> {
-    const q = query(
-      collection(db, 'users'), 
-      orderBy('stats.contributionScore', 'desc'), 
-      limit(limitCount)
-    );
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-  },
-};
+  return (
+    <>
+      <Card className="bg-card border-border hover:shadow-lg transition-all duration-200 group">
+        <CardHeader className="pb-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-3 flex-1 min-w-0">
+              <div className={cn("p-2.5 rounded-xl flex-shrink-0", fileTypeColors[note.fileType])}>
+                <FileIcon className="w-5 h-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h3 className="font-semibold text-foreground line-clamp-2 group-hover:text-primary transition-colors cursor-pointer" onClick={onExpand}>
+                  {note.title}
+                </h3>
+                <p className="text-sm text-muted-foreground mt-1">by {note.author} • {note.timestamp}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-1">
+              <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity" onClick={onExpand}>
+                <Expand className="w-4 h-4" />
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8"><MoreVertical className="w-4 h-4" /></Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => {}}><Share2 className="w-4 h-4 mr-2" /> Share</DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleDownload}><Download className="w-4 h-4 mr-2" /> Download</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setRatingDialogOpen(true)}><Star className="w-4 h-4 mr-2" /> Rate</DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => setReportDialogOpen(true)} className="text-destructive"><Flag className="w-4 h-4 mr-2" /> Report</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </div>
+        </CardHeader>
+
+        <CardContent className="pb-3">
+          <div className="flex flex-wrap gap-2">
+            <Badge variant="secondary">{note.subject}</Badge>
+            <Badge variant="secondary">{note.branch}</Badge>
+            <Badge variant="secondary">{note.year}</Badge>
+            {note.topic && <Badge variant="outline" className="text-primary">{note.topic}</Badge>}
+            {note.difficulty && <Badge className={difficultyColors[note.difficulty]}>{note.difficulty}</Badge>}
+          </div>
+          {currentRating > 0 && (
+            <div className="flex items-center gap-2 mt-2">
+              <div className="flex items-center gap-0.5">
+                {[1, 2, 3, 4, 5].map((s) => (
+                  <Star key={s} className={cn("w-4 h-4", s <= Math.round(currentRating) ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground")} />
+                ))}
+              </div>
+              <span className="text-xs text-muted-foreground">({currentRating.toFixed(1)})</span>
+            </div>
+          )}
+        </CardContent>
+
+        <CardFooter className="pt-3 border-t border-border flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="sm" onClick={handleLike} className={cn(liked && "text-primary bg-primary/10", likeAnimating && "scale-110")}>
+              <ThumbsUp className={cn("w-4 h-4 mr-1", liked && "fill-current")} /> {likes}
+            </Button>
+            <Button variant="ghost" size="sm" onClick={handleDislike} className={cn(disliked && "text-destructive bg-destructive/10", dislikeAnimating && "scale-110")}>
+              <ThumbsDown className={cn("w-4 h-4 mr-1", disliked && "fill-current")} /> {dislikes}
+            </Button>
+            <div className="flex items-center gap-1 text-muted-foreground px-2 text-xs"><Eye className="w-4 h-4" /> {note.views}</div>
+          </div>
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="sm" onClick={() => { setSaveAnimating(true); setTimeout(() => setSaveAnimating(false), 300); toggleSave(note); }} className={cn(saved && "text-primary bg-primary/10", saveAnimating && "scale-110")}>
+              <Bookmark className={cn("w-4 h-4", saved && "fill-current")} />
+            </Button>
+            <Button variant="outline" size="sm" onClick={onAskAI} className="h-8 gap-1 border-primary/30 text-primary hover:bg-primary hover:text-primary-foreground">
+              <Bot className="w-4 h-4" /> Gemini
+            </Button>
+          </div>
+        </CardFooter>
+      </Card>
+
+      {/* RATING DIALOG */}
+      <Dialog open={ratingDialogOpen} onOpenChange={setRatingDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader><DialogTitle>Rate this Note</DialogTitle></DialogHeader>
+          <div className="space-y-6 py-4">
+            <div className="space-y-2 text-center">
+              <Label>Quality Rating</Label>
+              <div className="flex justify-center gap-2">
+                {[1, 2, 3, 4, 5].map((s) => (
+                  <Star key={s} onClick={() => setUserRating(s)} className={cn("w-8 h-8 cursor-pointer", s <= userRating ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground")} />
+                ))}
+              </div>
+            </div>
+            <div className="space-y-2 text-center">
+              <Label>Difficulty Level</Label>
+              <div className="flex gap-2 justify-center">
+                {["easy", "medium", "hard"].map((l) => (
+                  <Button key={l} variant={userDifficulty === l ? "default" : "outline"} onClick={() => setUserDifficulty(l as any)} className="capitalize">{l}</Button>
+                ))}
+              </div>
+            </div>
+            <Button onClick={handleRatingSubmit} className="w-full">Submit Feedback</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
