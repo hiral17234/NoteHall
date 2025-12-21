@@ -190,9 +190,10 @@ export const notesService = {
       await updateDoc(noteRef, { likes: increment(-1), likedBy: arrayRemove(userId) });
       await updateDoc(authorRef, { 'stats.totalLikes': increment(-1), 'stats.contributionScore': increment(-5) });
     } else {
-      await updateDoc(noteRef, { likes: increment(1), likedBy: arrayUnion(userId), dislikedBy: arrayRemove(userId) });
+      await updateDoc(noteRef, { likes: increment(1), likedBy: arrayUnion(userId) });
       if (note.authorId !== userId) {
-        await createNotification.like(note.authorId, userId, userName, note.title, noteId);
+        // Corrected to pass the user object as expected by the notification service
+        await createNotification.like(note.authorId, { id: userId, name: userName }, note.title, noteId);
       }
       await updateDoc(authorRef, { 'stats.totalLikes': increment(1), 'stats.contributionScore': increment(5) });
     }
@@ -214,17 +215,15 @@ export const notesService = {
     const savedDocsSnap = await getDocs(collection(db, 'users', userId, 'savedNotes'));
     const noteIds = savedDocsSnap.docs.map(d => d.data().noteId);
     if (noteIds.length === 0) return [];
+    
     const notes: Note[] = [];
-    for (const noteId of noteIds) {
-      const note = await this.getById(noteId);
-      if (note) notes.push(note);
-    }
-    return notes;
+    // Efficiently fetch notes in parallel
+    const notePromises = noteIds.map(id => this.getById(id));
+    const results = await Promise.all(notePromises);
+    return results.filter((n): n is Note => n !== null);
   },
 
-  // Fixed download with Blob approach for Chrome + Cloudinary fl_attachment
   async downloadNote(noteId: string, userId: string, note: { title: string; subject: string; fileUrl: string }): Promise<void> {
-    // Store download history in Firestore
     try {
       await setDoc(doc(db, 'users', userId, 'downloadedNotes', noteId), { 
         noteId,
@@ -236,17 +235,13 @@ export const notesService = {
       await updateDoc(doc(db, 'users', userId), { 'stats.contributionScore': increment(1) });
     } catch (error) {
       console.error('Error saving download history:', error);
-      // Continue with download even if history save fails
     }
     
-    // Build the download URL with Cloudinary fl_attachment for PDFs
     let downloadUrl = note.fileUrl;
     if (downloadUrl.includes('cloudinary.com') && downloadUrl.includes('/upload/')) {
-      // Insert fl_attachment transformation for Cloudinary PDFs
       downloadUrl = downloadUrl.replace('/upload/', '/upload/fl_attachment/');
     }
     
-    // Use Blob approach to bypass Chrome's security blocks
     try {
       const response = await fetch(downloadUrl);
       if (!response.ok) throw new Error('Fetch failed');
@@ -261,7 +256,6 @@ export const notesService = {
       link.remove();
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      // Fallback to window.open with fl_attachment if fetch fails (CORS)
       window.open(downloadUrl, '_blank');
     }
   },
@@ -290,7 +284,6 @@ export const notesService = {
     }
   },
 
-  // Enhanced search that includes both notes and users
   async search(searchQuery: string): Promise<Note[]> {
     const allNotes = await this.getAll();
     const q = searchQuery.toLowerCase();
@@ -303,14 +296,11 @@ export const notesService = {
     );
   },
 
-  // Combined search for notes and users
   async searchAll(searchQuery: string): Promise<SearchResult[]> {
     const q = searchQuery.toLowerCase().trim();
     if (!q) return [];
 
     const results: SearchResult[] = [];
-
-    // Search notes
     const allNotes = await this.getAll();
     const noteResults = allNotes.filter(n => 
       n.title.toLowerCase().includes(q) || 
@@ -330,7 +320,6 @@ export const notesService = {
       });
     });
 
-    // Search users by username and name
     const userResults = await usersService.search(searchQuery);
     userResults.forEach(user => {
       results.push({
@@ -414,12 +403,10 @@ export const contributionsService = {
       updatedAt: getServerTimestamp(),
     });
     
-    // Send notification to requester
     if (data.requesterId && data.requesterId !== data.contributorId) {
       await createNotification.contribution(
         data.requesterId,
-        data.contributorId,
-        data.contributorName,
+        { id: data.contributorId, name: data.contributorName }, // Corrected user object
         data.requestTitle || 'your request',
         data.requestId
       );
@@ -438,11 +425,16 @@ export const commentsService = {
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
   },
 
-  async addComment(noteId: string, userId: string, userName: string, text: string) {
+  async addComment(noteId: string, userId: string, userName: string, text: string, ownerId?: string, itemTitle?: string) {
     await addDoc(collection(db, 'notes', noteId, 'comments'), {
       userId, userName, text, createdAt: getServerTimestamp(),
     });
     await updateDoc(doc(db, 'users', userId), { 'stats.contributionScore': increment(2) });
+
+    // Added notification for comments
+    if (ownerId && ownerId !== userId && itemTitle) {
+      await createNotification.comment(ownerId, { id: userId, name: userName }, itemTitle, noteId, false);
+    }
   }
 };
 
@@ -484,18 +476,12 @@ const decorateAchievement = (a: Achievement): AchievementBadge => {
 
 const getAchievementCount = (stats: any, streak: number, type: Achievement['requirement']['type']) => {
   switch (type) {
-    case 'uploads':
-      return stats?.uploads ?? 0;
-    case 'helped':
-      return stats?.helpedRequests ?? 0;
-    case 'likes':
-      return stats?.totalLikes ?? 0;
-    case 'views':
-      return stats?.totalViews ?? 0;
-    case 'streak':
-      return streak ?? 0;
-    default:
-      return 0;
+    case 'uploads': return stats?.uploads ?? 0;
+    case 'helped': return stats?.helpedRequests ?? 0;
+    case 'likes': return stats?.totalLikes ?? 0;
+    case 'views': return stats?.totalViews ?? 0;
+    case 'streak': return streak ?? 0;
+    default: return 0;
   }
 };
 
@@ -534,12 +520,10 @@ export const usersService = {
     return { id: d.id, ...d.data() } as UserProfile;
   },
 
-  // Search users by username and name
   async search(queryText: string): Promise<UserProfile[]> {
     const q = queryText.toLowerCase().trim();
     if (!q) return [];
 
-    // Get all users and filter client-side (Firestore doesn't support OR queries on different fields)
     const snapshot = await getDocs(collection(db, 'users'));
     const users: UserProfile[] = [];
     
@@ -556,8 +540,8 @@ export const usersService = {
     return users.slice(0, 10);
   },
 
-  // Subscribe to real-time user profile updates
   subscribeToProfile(userId: string, callback: (profile: UserProfile | null) => void): () => void {
+    if (!userId) return () => {};
     return onSnapshot(doc(db, 'users', userId), (snap) => {
       if (snap.exists()) {
         callback({ id: snap.id, ...snap.data() } as UserProfile);
@@ -570,14 +554,15 @@ export const usersService = {
     });
   },
 
-  // Get counts for saved, liked notes in real-time
   subscribeToSavedNotes(userId: string, callback: (notes: any[]) => void): () => void {
+    if (!userId) return () => {};
     return onSnapshot(collection(db, 'users', userId, 'savedNotes'), (snapshot) => {
       callback(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
     });
   },
 
   subscribeToDownloadedNotes(userId: string, callback: (notes: any[]) => void): () => void {
+    if (!userId) return () => {};
     return onSnapshot(collection(db, 'users', userId, 'downloadedNotes'), (snapshot) => {
       callback(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
     });
