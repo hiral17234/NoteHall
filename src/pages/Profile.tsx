@@ -7,6 +7,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { EditProfileDialog } from "@/components/profile/EditProfileDialog";
 import { ContributionCard } from "@/components/helpdesk/ContributionCard";
 import { StatDetailModal, AchievementsSection } from "@/components/profile/StatDetailModal";
+import { HelloWaveIcon } from "@/components/profile/HelloWaveIcon";
 import { useAuth } from "@/contexts/AuthContext";
 import { 
   usersService, 
@@ -16,7 +17,8 @@ import {
   achievementsService, 
   UserProfile,
   Contribution,
-  AchievementBadge
+  AchievementBadge,
+  helpRequestsService
 } from "@/services/firestoreService";
 import { mapFirestoreNoteToCardNote } from "@/lib/noteCard";
 import { parseSocialLink } from "@/lib/socialLinks";
@@ -28,7 +30,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { db } from "@/lib/firebase";
-import { collection, query, where, onSnapshot, orderBy, limit } from "firebase/firestore";
+import { collection, query, where, onSnapshot, orderBy, limit, getDocs } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { 
   Edit2, Github, Linkedin, Globe, FileText, HandHelping, BarChart3,
@@ -50,6 +52,7 @@ export default function Profile() {
   const [downloadedNotes, setDownloadedNotes] = useState<any[]>([]);
   const [contributions, setContributions] = useState<Contribution[]>([]);
   const [activeTab, setActiveTab] = useState("uploads");
+  const [totalUploadCount, setTotalUploadCount] = useState(0);
   
   // Dialog/Modal States
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -139,9 +142,26 @@ export default function Profile() {
     };
   }, [targetUserId, isOwnProfile]);
 
+  // Fetch total uploads (notes + contributions to requests)
+  useEffect(() => {
+    if (!targetUserId) return;
+    
+    const fetchTotalUploads = async () => {
+      try {
+        const notesCount = uploadedNotes.length;
+        const contribCount = contributions.length;
+        setTotalUploadCount(notesCount + contribCount);
+      } catch (error) {
+        console.error("Error calculating total uploads:", error);
+      }
+    };
+    
+    fetchTotalUploads();
+  }, [targetUserId, uploadedNotes.length, contributions.length]);
+
   // --- LOGIC HELPER ---
   const stats = {
-    uploads: liveStats.uploads,
+    uploads: totalUploadCount || liveStats.uploads,
     totalLikes: liveStats.totalLikes,
     totalViews: liveStats.totalViews,
     helpedRequests: helpedCount,
@@ -190,6 +210,9 @@ export default function Profile() {
           <CardContent className="pt-10 pb-8 px-6 sm:px-10">
             <div className="flex flex-col sm:flex-row items-center sm:items-start gap-8">
               <div className="relative group">
+                {/* Hello Wave Icon for other user profiles */}
+                {!isOwnProfile && <HelloWaveIcon show={!isOwnProfile} />}
+                
                 <Avatar className="w-36 h-36 border-4 border-background shadow-2xl transition-transform group-hover:scale-105 duration-300">
                   <AvatarImage src={profileData.avatar} />
                   <AvatarFallback className="bg-primary text-primary-foreground text-4xl font-bold">
