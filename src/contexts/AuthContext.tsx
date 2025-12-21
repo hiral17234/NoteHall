@@ -149,22 +149,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   // Listen to auth state changes
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+ // Replace your existing useEffect with this:
+useEffect(() => {
+  const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    try {
       setFirebaseUser(user);
-      
       if (user) {
         const profile = await fetchUserProfile(user.uid);
         if (profile) {
           setUserProfile(profile);
           setNeedsOnboarding(!profile.onboardingComplete);
-          
-          // Initialize FCM for push notifications
           try {
             await fcmService.requestPermission(user.uid);
-          } catch (error) {
-            console.log("FCM initialization skipped:", error);
-          }
+          } catch (e) { console.log("FCM skipped"); }
         } else {
           setNeedsOnboarding(true);
         }
@@ -172,12 +169,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUserProfile(null);
         setNeedsOnboarding(false);
       }
-      
-      setIsLoading(false);
-    });
+    } catch (error) {
+      console.error("Auth error:", error);
+    } finally {
+      setIsLoading(false); // THIS LINE IS CRITICAL
+    }
+  });
 
-    return () => unsubscribe();
-  }, [fetchUserProfile]);
+  return () => unsubscribe();
+}, [fetchUserProfile]);
 
   const signUp = async (email: string, password: string, name: string, username: string) => {
     try {
