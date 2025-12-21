@@ -155,6 +155,7 @@ export const notesService = {
   async create(noteData: any): Promise<string> {
     const docRef = await addDoc(collection(db, 'notes'), {
       ...noteData,
+      userId: noteData.authorId, // ADD THIS LINE for Security Rules
       likes: 0,
       dislikes: 0,
       views: 0,
