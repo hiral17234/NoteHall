@@ -46,12 +46,13 @@ import { toast } from "@/hooks/use-toast";
 import { useSavedNotes } from "@/contexts/SavedNotesContext";
 
 // --- FIREBASE & SERVICES ---
-import { db, auth } from "@/lib/firebase"; 
+import { db, auth } from "@/lib/firebase";
 import { doc, updateDoc, arrayUnion, arrayRemove, onSnapshot, increment } from "firebase/firestore";
-import { notesService, Note } from "@/services/firestoreService";
+import { notesService } from "@/services/firestoreService";
+import type { NoteCardNote } from "@/lib/noteCard";
 
 interface NoteCardProps {
-  note: Note;
+  note: NoteCardNote;
   onAskAI?: () => void;
   onExpand?: () => void;
 }
@@ -253,7 +254,7 @@ export function NoteCard({ note, onAskAI, onExpand }: NoteCardProps) {
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <span className="truncate">by <span className="font-medium text-foreground/80">{note.authorName}</span></span>
                 <span>•</span>
-                <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {note.timestamp || 'Just now'}</span>
+                <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {note.timestamp ?? "Recently"}</span>
               </div>
             </div>
           </div>
@@ -271,7 +272,7 @@ export function NoteCard({ note, onAskAI, onExpand }: NoteCardProps) {
               </Badge>
             )}
             {note.difficulty && (
-              <Badge variant="outline" className={cn("capitalize font-medium", difficultyColors[note.difficulty as keyof typeof difficultyColors])}>
+              <Badge variant="outline" className={cn("capitalize font-medium", difficultyColors[note.difficulty])}>
                 {note.difficulty}
               </Badge>
             )}
