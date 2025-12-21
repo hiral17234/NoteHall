@@ -51,10 +51,11 @@ export function TopContributors({ onViewProfile }: { onViewProfile?: (userId: st
         const topUsers: Contributor[] = snapshot.docs
           .map((doc, index) => {
             const data = doc.data();
+            if (!data) return null;
             return {
               id: doc.id,
               name: data.name || "Anonymous",
-              avatar: data.avatar || "",
+              avatar: data.avatar ?? "",
               branch: data.branch || "Unknown",
               year: data.year || "Unknown",
               contributionScore: data.stats?.contributionScore || 0,
@@ -62,7 +63,7 @@ export function TopContributors({ onViewProfile }: { onViewProfile?: (userId: st
               rank: index + 1,
             };
           })
-          .filter(user => user.contributionScore > 0); // Only show users with contributions
+          .filter((user): user is NonNullable<typeof user> => user !== null && user.contributionScore > 0);
         
         setContributors(topUsers);
       } catch (error) {
