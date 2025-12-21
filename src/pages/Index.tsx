@@ -88,9 +88,6 @@ export default function Index() {
               <CardTitle className="text-lg flex items-center gap-2">
                 <Sparkles className="w-5 h-5 text-primary" />
                 Recommended for You
-                <Badge variant="outline" className="ml-2 border-primary/30 text-primary">
-                  AI Powered
-                </Badge>
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -153,18 +150,6 @@ export default function Index() {
                 <SelectItem value="4th Year">4th Year</SelectItem>
               </SelectContent>
             </Select>
-          </div>
-        </div>
-
-        {/* Quality Indicator Legend */}
-        <div className="flex items-center gap-4 mb-4 text-sm text-muted-foreground">
-          <div className="flex items-center gap-1">
-            <Award className="w-4 h-4 text-primary" />
-            <span>Verified Notes</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <BookOpen className="w-4 h-4" />
-            <span>Faculty Verified</span>
           </div>
         </div>
 

@@ -20,6 +20,8 @@ import Signup from "./pages/Signup";
 import Placeholder from "./pages/Placeholder";
 import NotFound from "./pages/NotFound";
 import Notifications from "./pages/Notifications";
+import ScorePage from "./pages/ScorePage";
+import HelpedPage from "./pages/HelpedPage";
 import { OnboardingDialog } from "@/components/onboarding/OnboardingDialog";
 
 const queryClient = new QueryClient();
@@ -93,6 +95,8 @@ function AuthenticatedApp() {
               <Route path="/profile/:userId" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
               <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
               <Route path="/gemini" element={<ProtectedRoute><Gemini /></ProtectedRoute>} />
+              <Route path="/score" element={<ProtectedRoute><ScorePage /></ProtectedRoute>} />
+              <Route path="/helped" element={<ProtectedRoute><HelpedPage /></ProtectedRoute>} />
               <Route 
                 path="/campusvoice" 
                 element={<Placeholder title="CampusVoice" description="Share your campus experiences and feedback. Coming soon!" externalUrl="https://campusvoice-git-main-hiral-goyals-projects.vercel.app/" />} 
