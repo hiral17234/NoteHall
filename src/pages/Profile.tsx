@@ -94,9 +94,15 @@ export default function Profile() {
       where("authorId", "==", targetUserId), 
       orderBy("createdAt", "desc")
     );
-    const unsubNotes = onSnapshot(qNotes, (snap) => {
-      setUploadedNotes(snap.docs.map(d => ({ id: d.id, ...d.data() } as Note)));
-    });
+    const unsubNotes = onSnapshot(
+      qNotes, 
+      (snap) => {
+        setUploadedNotes(snap.docs.map(d => ({ id: d.id, ...d.data() } as Note)));
+      },
+      (error) => {
+        console.error("Real-time notes error:", error?.code || error);
+      }
+    );
 
     // 5. Subscribe to Contributions (Help Desk interactions)
     const unsubContribs = contributionsService.subscribeToUserContributions(targetUserId, (data) => {

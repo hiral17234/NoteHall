@@ -3,14 +3,15 @@ import { getAuth, GoogleAuthProvider, GithubAuthProvider } from 'firebase/auth';
 import { getFirestore, serverTimestamp } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
-// Firebase configuration - these are public keys (security is handled by Firebase Rules)
+// Firebase configuration - reads from environment variables for production builds
+// Falls back to hardcoded values for development (these are public keys, security is handled by Firebase Rules)
 const firebaseConfig = {
-  apiKey: "AIzaSyAkALFSr--NzXKrnVXgQC0_O6tqYHl5-pw",
-  authDomain: "notehall-6ab8b.firebaseapp.com",
-  projectId: "notehall-6ab8b",
-  storageBucket: "notehall-6ab8b.firebasestorage.app",
-  messagingSenderId: "464597920358",
-  appId: "1:464597920358:web:e2fd6288ae868257b0dba7",
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyAkALFSr--NzXKrnVXgQC0_O6tqYHl5-pw",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "notehall-6ab8b.firebaseapp.com",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "notehall-6ab8b",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "notehall-6ab8b.firebasestorage.app",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "464597920358",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:464597920358:web:e2fd6288ae868257b0dba7",
 };
 
 // Initialize Firebase

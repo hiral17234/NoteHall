@@ -129,12 +129,18 @@ export function RequestCard({ request, onHelp, onMarkFulfilled }: RequestCardPro
   // Real-time Listener for Request doc (for likes)
   useEffect(() => {
     const requestRef = doc(db, "requests", request.id);
-    const unsubscribe = onSnapshot(requestRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setLiveLikes(data.likes || []);
+    const unsubscribe = onSnapshot(
+      requestRef, 
+      (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          setLiveLikes(data.likes || []);
+        }
+      },
+      (error) => {
+        console.error("Real-time request likes error:", error?.code || error);
       }
-    });
+    );
     return () => unsubscribe();
   }, [request.id]);
 
@@ -144,9 +150,15 @@ export function RequestCard({ request, onHelp, onMarkFulfilled }: RequestCardPro
       collection(db, "requests", request.id, "contributions"),
       orderBy("createdAt", "desc")
     );
-    const unsubscribe = onSnapshot(q, (snap) => {
-      setLiveContributions(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any)));
-    });
+    const unsubscribe = onSnapshot(
+      q, 
+      (snap) => {
+        setLiveContributions(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any)));
+      },
+      (error) => {
+        console.error("Real-time contributions error:", error?.code || error);
+      }
+    );
     return () => unsubscribe();
   }, [request.id]);
 
@@ -156,9 +168,15 @@ export function RequestCard({ request, onHelp, onMarkFulfilled }: RequestCardPro
       collection(db, "requests", request.id, "comments"),
       orderBy("createdAt", "asc")
     );
-    const unsubscribe = onSnapshot(q, (snap) => {
-      setLiveComments(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
+    const unsubscribe = onSnapshot(
+      q, 
+      (snap) => {
+        setLiveComments(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      },
+      (error) => {
+        console.error("Real-time comments error:", error?.code || error);
+      }
+    );
     return () => unsubscribe();
   }, [request.id]);
 
@@ -190,16 +208,21 @@ export function RequestCard({ request, onHelp, onMarkFulfilled }: RequestCardPro
       
       // Handle Cloudinary Upload if a file exists
       if (helpData.file) {
+        const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || "dxapljgci";
         const formData = new FormData();
         formData.append("file", helpData.file);
-        formData.append("upload_preset", "notes_preset"); 
+        formData.append("upload_preset", "notehall_uploads"); 
         
-        const res = await fetch(`https://api.cloudinary.com/v1_1/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/upload`, {
+        const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`, {
           method: "POST",
           body: formData
         });
         
-        if (!res.ok) throw new Error("Cloudinary upload failed");
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          console.error("Cloudinary error response:", errData);
+          throw new Error(errData?.error?.message || "Cloudinary upload failed");
+        }
         const data = await res.json();
         fileUrl = data.secure_url;
       }
