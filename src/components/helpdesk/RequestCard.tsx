@@ -95,7 +95,7 @@ const statusConfig = {
   },
 };
 
-export function RequestCard({ request, onHelp }: RequestCardProps) {
+export function RequestCard({ request, onHelp, onMarkFulfilled }: RequestCardProps & { onMarkFulfilled?: (requestId: string) => void }) {
   const navigate = useNavigate();
   const { userProfile } = useAuth();
   
@@ -106,7 +106,7 @@ export function RequestCard({ request, onHelp }: RequestCardProps) {
   const [showContributions, setShowContributions] = useState(false);
   
   // Real-time Data States
-  const [liveContributions, setLiveContributions] = useState<Contribution[]>([]);
+  const [liveContributions, setLiveContributions] = useState<any[]>([]);
   const [liveComments, setLiveComments] = useState<any[]>([]);
   const [liveLikes, setLiveLikes] = useState<string[]>(request.likes || []);
   const [newComment, setNewComment] = useState("");
@@ -115,6 +115,8 @@ export function RequestCard({ request, onHelp }: RequestCardProps) {
     link: "",
     message: "",
   });
+  
+  const isOwner = userProfile?.id === request.requestedById;
 
   const liked = liveLikes.includes(userProfile?.id || "");
   const likeCount = liveLikes.length;
@@ -297,7 +299,17 @@ export function RequestCard({ request, onHelp }: RequestCardProps) {
                 {liveContributions.map((contribution) => (
                   <ContributionCard
                     key={contribution.id}
-                    contribution={contribution}
+                    contribution={{
+                      id: contribution.id,
+                      type: contribution.type === 'explanation' ? 'link' : (contribution.type || 'link'),
+                      fileName: contribution.fileName || contribution.message || 'Contribution',
+                      link: contribution.fileUrl,
+                      message: contribution.message,
+                      contributorId: contribution.contributorId,
+                      contributorName: contribution.contributorName || 'Anonymous',
+                      timestamp: contribution.createdAt?.toDate?.()?.toLocaleDateString() || 'Recently',
+                      likes: 0,
+                    }}
                     onViewProfile={handleViewProfile}
                   />
                 ))}
@@ -349,13 +361,26 @@ export function RequestCard({ request, onHelp }: RequestCardProps) {
             </Button>
 
             {isOpen && (
-              <Button
-                onClick={() => setShowHelpDialog(true)}
-                className="bg-primary hover:bg-primary/90 text-primary-foreground gap-2"
-              >
-                <Upload className="w-4 h-4" />
-                Help
-              </Button>
+              <>
+                <Button
+                  onClick={() => setShowHelpDialog(true)}
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground gap-2"
+                >
+                  <Upload className="w-4 h-4" />
+                  Help
+                </Button>
+                {isOwner && liveContributions.length > 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onMarkFulfilled?.(request.id)}
+                    className="gap-1 border-chart-1 text-chart-1 hover:bg-chart-1/10"
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    Mark Fulfilled
+                  </Button>
+                )}
+              </>
             )}
           </div>
         </CardFooter>
