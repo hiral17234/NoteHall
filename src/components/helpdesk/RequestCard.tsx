@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
   FileText, 
@@ -16,7 +16,9 @@ import {
   Eye,
   ChevronDown,
   ChevronUp,
-  Loader2
+  Loader2,
+  Reply,
+  CornerDownRight
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
@@ -111,6 +113,8 @@ export function RequestCard({ request, onHelp, onMarkFulfilled }: RequestCardPro
   const [liveComments, setLiveComments] = useState<any[]>([]);
   const [liveLikes, setLiveLikes] = useState<string[]>(request.likes || []);
   const [newComment, setNewComment] = useState("");
+  const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState("");
   const [helpData, setHelpData] = useState({
     file: null as File | null,
     link: "",
@@ -203,6 +207,7 @@ export function RequestCard({ request, onHelp, onMarkFulfilled }: RequestCardPro
       await contributionsService.addContribution(request.id, {
         contributorId: userProfile.id,
         contributorName: userProfile.name,
+        contributorUsername: userProfile.username || userProfile.name,
         type: helpData.file ? "pdf" : "link",
         fileUrl: fileUrl,
         message: helpData.message,
@@ -213,9 +218,15 @@ export function RequestCard({ request, onHelp, onMarkFulfilled }: RequestCardPro
       setShowHelpDialog(false);
       setHelpData({ file: null, link: "", message: "" });
       onHelp?.();
-    } catch (error) {
-      console.error(error);
-      toast({ title: "Submission failed", description: "Could not upload your help. Try again.", variant: "destructive" });
+    } catch (error: any) {
+      console.error("Firestore contribution error:", error?.code || error);
+      toast({ 
+        title: "Submission failed", 
+        description: error?.code === 'permission-denied' 
+          ? "Permission denied. Check Firestore rules." 
+          : "Could not upload your help. Try again.", 
+        variant: "destructive" 
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -228,11 +239,31 @@ export function RequestCard({ request, onHelp, onMarkFulfilled }: RequestCardPro
         userId: userProfile.id,
         author: userProfile.name,
         text: newComment,
+        parentId: null, // Top-level comment
         createdAt: serverTimestamp()
       });
       setNewComment("");
-    } catch (e) {
-      toast({ title: "Error", description: "Failed to post comment." });
+    } catch (e: any) {
+      console.error("Firestore addComment error:", e?.code || e);
+      toast({ title: "Error", description: `Failed to post comment. ${e?.code === 'permission-denied' ? 'Permission denied.' : ''}`, variant: "destructive" });
+    }
+  };
+
+  const handleAddReply = async (parentCommentId: string) => {
+    if (!replyText.trim() || !userProfile) return;
+    try {
+      await addDoc(collection(db, "requests", request.id, "comments"), {
+        userId: userProfile.id,
+        author: userProfile.name,
+        text: replyText,
+        parentId: parentCommentId,
+        createdAt: serverTimestamp()
+      });
+      setReplyText("");
+      setReplyingTo(null);
+    } catch (e: any) {
+      console.error("Firestore addReply error:", e?.code || e);
+      toast({ title: "Error", description: `Failed to post reply. ${e?.code === 'permission-denied' ? 'Permission denied.' : ''}`, variant: "destructive" });
     }
   };
 
@@ -241,14 +272,26 @@ export function RequestCard({ request, onHelp, onMarkFulfilled }: RequestCardPro
     try {
       await deleteDoc(doc(db, "requests", request.id, "comments", commentId));
       toast({ title: "Deleted", description: "Comment removed." });
-    } catch (e) {
-      toast({ title: "Error", description: "Failed to delete comment.", variant: "destructive" });
+    } catch (e: any) {
+      console.error("Firestore deleteComment error:", e?.code || e);
+      toast({ title: "Error", description: `Failed to delete comment. ${e?.code === 'permission-denied' ? 'Permission denied.' : ''}`, variant: "destructive" });
     }
   };
 
   const handleViewProfile = (userId: string) => {
     navigate(`/profile/${userId}`);
   };
+
+  // Organize comments into threads
+  const organizedComments = useMemo(() => {
+    const topLevel = liveComments.filter(c => !c.parentId);
+    const replies = liveComments.filter(c => c.parentId);
+    
+    return topLevel.map(comment => ({
+      ...comment,
+      replies: replies.filter(r => r.parentId === comment.id)
+    }));
+  }, [liveComments]);
 
   const FileIcon = fileTypeIcons[request.requestType] || FileText;
   const status = statusConfig[request.status];
@@ -465,44 +508,108 @@ export function RequestCard({ request, onHelp, onMarkFulfilled }: RequestCardPro
         </DialogContent>
       </Dialog>
 
-      {/* Comments Dialog */}
+      {/* Comments Dialog with Threading */}
       <Dialog open={showCommentsDialog} onOpenChange={setShowCommentsDialog}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-lg max-h-[80vh]">
           <DialogHeader>
-            <DialogTitle>Comments</DialogTitle>
+            <DialogTitle>Comments ({liveComments.length})</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 mt-4 max-h-64 overflow-y-auto">
-            {liveComments.length === 0 && <p className="text-sm text-center text-muted-foreground">No comments yet.</p>}
-            {liveComments.map((comment) => (
-              <div key={comment.id} className="flex gap-3 group">
-                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                  <User className="w-4 h-4 text-primary" />
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-sm text-foreground">{comment.author}</span>
-                      <span className="text-[10px] text-muted-foreground">
-                        {comment.createdAt?.seconds ? new Date(comment.createdAt.seconds * 1000).toLocaleTimeString() : "Just now"}
-                      </span>
+          <div className="space-y-4 mt-4 max-h-[400px] overflow-y-auto pr-2">
+            {organizedComments.length === 0 && <p className="text-sm text-center text-muted-foreground py-8">No comments yet. Be the first to comment!</p>}
+            {organizedComments.map((comment) => (
+              <div key={comment.id} className="space-y-2">
+                {/* Main Comment */}
+                <div className="flex gap-3 group">
+                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <User className="w-4 h-4 text-primary" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-sm text-foreground">{comment.author}</span>
+                        <span className="text-[10px] text-muted-foreground">
+                          {comment.createdAt?.seconds ? new Date(comment.createdAt.seconds * 1000).toLocaleTimeString() : "Just now"}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 text-muted-foreground hover:text-primary"
+                          onClick={() => setReplyingTo(replyingTo === comment.id ? null : comment.id)}
+                        >
+                          <Reply className="w-3 h-3" />
+                        </Button>
+                        {comment.userId === userProfile?.id && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => handleDeleteComment(comment.id)}
+                          >
+                            <X className="w-3 h-3" />
+                          </Button>
+                        )}
+                      </div>
                     </div>
-                    {comment.userId === userProfile?.id && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive hover:bg-destructive/10"
-                        onClick={() => handleDeleteComment(comment.id)}
-                      >
-                        <X className="w-3 h-3" />
-                      </Button>
+                    <p className="text-sm text-muted-foreground mt-1">{comment.text}</p>
+                    
+                    {/* Reply Input */}
+                    {replyingTo === comment.id && (
+                      <div className="flex gap-2 mt-2">
+                        <Input
+                          placeholder="Write a reply..."
+                          value={replyText}
+                          onChange={(e) => setReplyText(e.target.value)}
+                          onKeyDown={(e) => e.key === "Enter" && handleAddReply(comment.id)}
+                          className="h-8 text-sm"
+                          autoFocus
+                        />
+                        <Button onClick={() => handleAddReply(comment.id)} size="sm" className="h-8 px-3">
+                          Reply
+                        </Button>
+                      </div>
                     )}
                   </div>
-                  <p className="text-sm text-muted-foreground mt-1">{comment.text}</p>
                 </div>
+                
+                {/* Replies */}
+                {comment.replies && comment.replies.length > 0 && (
+                  <div className="ml-8 pl-3 border-l-2 border-border space-y-2">
+                    {comment.replies.map((reply: any) => (
+                      <div key={reply.id} className="flex gap-2 group">
+                        <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center shrink-0">
+                          <User className="w-3 h-3 text-muted-foreground" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium text-xs text-foreground">{reply.author}</span>
+                              <span className="text-[10px] text-muted-foreground">
+                                {reply.createdAt?.seconds ? new Date(reply.createdAt.seconds * 1000).toLocaleTimeString() : "Just now"}
+                              </span>
+                            </div>
+                            {reply.userId === userProfile?.id && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive hover:bg-destructive/10"
+                                onClick={() => handleDeleteComment(reply.id)}
+                              >
+                                <X className="w-2.5 h-2.5" />
+                              </Button>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-0.5">{reply.text}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             ))}
           </div>
-          <div className="flex gap-2 mt-4">
+          <div className="flex gap-2 mt-4 pt-4 border-t border-border">
             <Input
               placeholder="Add a comment..."
               value={newComment}

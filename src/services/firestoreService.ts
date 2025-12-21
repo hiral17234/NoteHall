@@ -373,61 +373,132 @@ export const contributionsService = {
   },
 
   async create(data: any): Promise<string> {
-    const docRef = await addDoc(collection(db, 'contributions'), { ...data, createdAt: getServerTimestamp() });
-    await helpRequestsService.incrementContributions(data.requestId);
-    await updateDoc(doc(db, 'users', data.contributorId), {
-      'stats.helpedRequests': increment(1),
-      'stats.contributionScore': increment(50),
-      updatedAt: getServerTimestamp(),
-    });
+    try {
+      const docRef = await addDoc(collection(db, 'contributions'), { 
+        ...data, 
+        userId: data.contributorId, // Required for RLS
+        createdAt: getServerTimestamp() 
+      });
+      await helpRequestsService.incrementContributions(data.requestId);
+      await updateDoc(doc(db, 'users', data.contributorId), {
+        'stats.helpedRequests': increment(1),
+        'stats.contributionScore': increment(50),
+        updatedAt: getServerTimestamp(),
+      });
 
-    if (data.requesterId && data.requesterId !== data.contributorId) {
-      await createNotification.contribution(data.requesterId, { id: data.contributorId, name: data.contributorName }, data.requestTitle || 'your request', data.requestId);
+      if (data.requesterId && data.requesterId !== data.contributorId) {
+        await createNotification.contribution(data.requesterId, { id: data.contributorId, name: data.contributorName }, data.requestTitle || 'your request', data.requestId);
+      }
+      return docRef.id;
+    } catch (error: any) {
+      console.error('Firestore contribution create error:', error?.code || error);
+      throw error;
     }
-    return docRef.id;
   },
 
+  // Add contribution to request subcollection (path: requests/{requestId}/contributions)
   async addContribution(requestId: string, data: any): Promise<string> {
-    const requestRef = doc(db, 'requests', requestId);
-    const requestSnap = await getDoc(requestRef);
-    const request = requestSnap.exists() ? (requestSnap.data() as any) : null;
+    try {
+      const requestRef = doc(db, 'requests', requestId);
+      const requestSnap = await getDoc(requestRef);
+      const request = requestSnap.exists() ? (requestSnap.data() as any) : null;
 
-    await addDoc(collection(db, 'requests', requestId, 'contributions'), {
-      ...data,
-      requestId,
-      createdAt: getServerTimestamp(),
-    });
+      // Add to subcollection with userId for RLS
+      await addDoc(collection(db, 'requests', requestId, 'contributions'), {
+        ...data,
+        userId: data.contributorId, // Required for RLS delete rule
+        requestId,
+        createdAt: getServerTimestamp(),
+      });
 
-    return this.create({
-      requestId,
-      requesterId: request?.requesterId,
-      requestTitle: request?.title,
-      contributorId: data.contributorId,
-      contributorName: data.contributorName,
-      contributorUsername: data.contributorUsername,
-      type: data.type ?? 'link',
-      content: data.message ?? data.fileName ?? 'Contribution',
-      fileUrl: data.fileUrl,
-    });
+      // Also add to top-level contributions collection for user profile tracking
+      return this.create({
+        requestId,
+        requesterId: request?.requesterId,
+        requestTitle: request?.title,
+        contributorId: data.contributorId,
+        contributorName: data.contributorName,
+        contributorUsername: data.contributorUsername,
+        type: data.type ?? 'link',
+        content: data.message ?? data.fileName ?? 'Contribution',
+        fileUrl: data.fileUrl,
+      });
+    } catch (error: any) {
+      console.error('Firestore addContribution error:', error?.code || error);
+      throw error;
+    }
   },
 };
 
 // ==================== COMMENTS SERVICE ====================
 
 export const commentsService = {
+  // Get comments for a note
   async getByNote(noteId: string) {
     const q = query(collection(db, 'notes', noteId, 'comments'), orderBy('createdAt', 'desc'));
     const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
   },
 
-  async addComment(noteId: string, userId: string, userName: string, text: string, ownerId?: string, itemTitle?: string) {
-    await addDoc(collection(db, 'notes', noteId, 'comments'), {
-      userId, userName, text, createdAt: getServerTimestamp(),
-    });
-    await updateDoc(doc(db, 'users', userId), { 'stats.contributionScore': increment(2) });
-    if (ownerId && ownerId !== userId && itemTitle) {
-      await createNotification.comment(ownerId, { id: userId, name: userName }, itemTitle, noteId, false);
+  // Add comment to a note (path: notes/{noteId}/comments)
+  async addNoteComment(noteId: string, userId: string, userName: string, text: string, ownerId?: string, itemTitle?: string) {
+    try {
+      await addDoc(collection(db, 'notes', noteId, 'comments'), {
+        userId, // Required for RLS delete rule
+        userName, 
+        text, 
+        parentId: null, // For threading support
+        createdAt: getServerTimestamp(),
+      });
+      await updateDoc(doc(db, 'users', userId), { 'stats.contributionScore': increment(2) });
+      if (ownerId && ownerId !== userId && itemTitle) {
+        await createNotification.comment(ownerId, { id: userId, name: userName }, itemTitle, noteId, false);
+      }
+    } catch (error: any) {
+      console.error('Firestore addNoteComment error:', error?.code || error);
+      throw error;
+    }
+  },
+
+  // Add comment to a request (path: requests/{requestId}/comments)
+  async addRequestComment(requestId: string, userId: string, userName: string, text: string, parentId?: string | null) {
+    try {
+      await addDoc(collection(db, 'requests', requestId, 'comments'), {
+        userId, // Required for RLS delete rule
+        author: userName,
+        text,
+        parentId: parentId || null, // For threading support
+        createdAt: getServerTimestamp(),
+      });
+    } catch (error: any) {
+      console.error('Firestore addRequestComment error:', error?.code || error);
+      throw error;
+    }
+  },
+
+  // Add reply to a comment
+  async addReply(requestId: string, parentCommentId: string, userId: string, userName: string, text: string) {
+    try {
+      await addDoc(collection(db, 'requests', requestId, 'comments'), {
+        userId,
+        author: userName,
+        text,
+        parentId: parentCommentId,
+        createdAt: getServerTimestamp(),
+      });
+    } catch (error: any) {
+      console.error('Firestore addReply error:', error?.code || error);
+      throw error;
+    }
+  },
+
+  // Delete a comment
+  async deleteComment(collectionPath: string, commentId: string) {
+    try {
+      await deleteDoc(doc(db, collectionPath, commentId));
+    } catch (error: any) {
+      console.error('Firestore deleteComment error:', error?.code || error);
+      throw error;
     }
   }
 };
