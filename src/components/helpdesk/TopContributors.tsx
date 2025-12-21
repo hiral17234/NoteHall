@@ -54,7 +54,7 @@ export function TopContributors({ onViewProfile }: { onViewProfile?: (userId: st
             return {
               id: doc.id,
               name: data.name || "Anonymous",
-              avatar: data.avatar,
+              avatar: data.avatar || "",
               branch: data.branch || "Unknown",
               year: data.year || "Unknown",
               contributionScore: data.stats?.contributionScore || 0,

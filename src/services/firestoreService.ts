@@ -222,33 +222,47 @@ export const notesService = {
     return notes;
   },
 
-  // Fixed download with Blob approach for Chrome
+  // Fixed download with Blob approach for Chrome + Cloudinary fl_attachment
   async downloadNote(noteId: string, userId: string, note: { title: string; subject: string; fileUrl: string }): Promise<void> {
     // Store download history in Firestore
-    await setDoc(doc(db, 'users', userId, 'downloadedNotes', noteId), { 
-      noteId,
-      title: note.title,
-      subject: note.subject,
-      fileUrl: note.fileUrl,
-      downloadedAt: getServerTimestamp() 
-    });
-    await updateDoc(doc(db, 'users', userId), { 'stats.contributionScore': increment(1) });
+    try {
+      await setDoc(doc(db, 'users', userId, 'downloadedNotes', noteId), { 
+        noteId,
+        title: note.title,
+        subject: note.subject,
+        fileUrl: note.fileUrl,
+        downloadedAt: getServerTimestamp() 
+      });
+      await updateDoc(doc(db, 'users', userId), { 'stats.contributionScore': increment(1) });
+    } catch (error) {
+      console.error('Error saving download history:', error);
+      // Continue with download even if history save fails
+    }
+    
+    // Build the download URL with Cloudinary fl_attachment for PDFs
+    let downloadUrl = note.fileUrl;
+    if (downloadUrl.includes('cloudinary.com') && downloadUrl.includes('/upload/')) {
+      // Insert fl_attachment transformation for Cloudinary PDFs
+      downloadUrl = downloadUrl.replace('/upload/', '/upload/fl_attachment/');
+    }
     
     // Use Blob approach to bypass Chrome's security blocks
     try {
-      const response = await fetch(note.fileUrl);
+      const response = await fetch(downloadUrl);
+      if (!response.ok) throw new Error('Fetch failed');
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', `${note.title.replace(/\s+/g, '_')}.pdf`);
+      const fileName = note.title.replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_');
+      link.setAttribute('download', `${fileName}.pdf`);
       document.body.appendChild(link);
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      // Fallback to window.open if fetch fails (CORS)
-      window.open(note.fileUrl, '_blank');
+      // Fallback to window.open with fl_attachment if fetch fails (CORS)
+      window.open(downloadUrl, '_blank');
     }
   },
 
