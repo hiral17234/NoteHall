@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
   FileText, 
@@ -15,7 +15,8 @@ import {
   X,
   Eye,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Loader2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
@@ -28,6 +29,21 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 import { ContributionCard, Contribution } from "./ContributionCard";
+import { useAuth } from "@/contexts/AuthContext";
+import { db } from "@/lib/firebase";
+import { 
+  collection, 
+  query, 
+  onSnapshot, 
+  orderBy, 
+  addDoc, 
+  serverTimestamp, 
+  updateDoc, 
+  doc, 
+  arrayUnion, 
+  arrayRemove 
+} from "firebase/firestore";
+import { contributionsService } from "@/services/firestoreService";
 
 interface RequestCardProps {
   request: {
@@ -40,11 +56,11 @@ interface RequestCardProps {
     requestType: "pdf" | "image" | "video";
     status: "open" | "fulfilled" | "urgent" | "closed";
     requestedBy: string;
-    requestedById?: string;
-    timestamp: string;
+    requestedById: string;
+    timestamp: any;
     helpersCount: number;
-    likes?: number;
-    comments?: number;
+    likes?: string[]; 
+    commentsCount?: number;
     contributions?: Contribution[];
   };
   onHelp?: () => void;
@@ -79,90 +95,139 @@ const statusConfig = {
   },
 };
 
-// Mock contributions data
-const mockContributions: Contribution[] = [
-  {
-    id: "c1",
-    type: "pdf",
-    fileName: "DBMS_ER_Diagram_Notes.pdf",
-    message: "Complete notes with examples!",
-    contributorId: "user-2",
-    contributorName: "Priya Sharma",
-    timestamp: "2 hours ago",
-    likes: 8,
-  },
-  {
-    id: "c2",
-    type: "link",
-    link: "https://drive.google.com/file/example",
-    message: "Google Drive link with additional resources",
-    contributorId: "user-3",
-    contributorName: "Amit Kumar",
-    timestamp: "1 hour ago",
-    likes: 5,
-  },
-];
-
 export function RequestCard({ request, onHelp }: RequestCardProps) {
   const navigate = useNavigate();
-  const [liked, setLiked] = useState(false);
-  const [likeCount, setLikeCount] = useState(request.likes || 0);
+  const { userProfile } = useAuth();
+  
+  // States
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [showHelpDialog, setShowHelpDialog] = useState(false);
   const [showCommentsDialog, setShowCommentsDialog] = useState(false);
   const [showContributions, setShowContributions] = useState(false);
+  
+  // Real-time Data States
+  const [liveContributions, setLiveContributions] = useState<Contribution[]>([]);
+  const [liveComments, setLiveComments] = useState<any[]>([]);
+  const [newComment, setNewComment] = useState("");
   const [helpData, setHelpData] = useState({
     file: null as File | null,
     link: "",
     message: "",
   });
-  const [newComment, setNewComment] = useState("");
-  const [comments, setComments] = useState([
-    { id: "1", author: "Amit K.", text: "I have these notes, will upload soon!", time: "2h ago" },
-    { id: "2", author: "Priya S.", text: "Check Google Drive, there's a good PDF", time: "1h ago" },
-  ]);
 
-  const contributions = request.contributions || (request.helpersCount > 0 ? mockContributions : []);
+  const liked = request.likes?.includes(userProfile?.id || "");
+  const likeCount = request.likes?.length || 0;
 
-  const FileIcon = fileTypeIcons[request.requestType];
-  const status = statusConfig[request.status];
-  const StatusIcon = status.icon;
-  const isOpen = request.status !== "fulfilled" && request.status !== "closed";
+  // Real-time Listener for Contributions
+  useEffect(() => {
+    const q = query(
+      collection(db, "requests", request.id, "contributions"),
+      orderBy("createdAt", "desc")
+    );
+    const unsubscribe = onSnapshot(q, (snap) => {
+      setLiveContributions(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any)));
+    });
+    return () => unsubscribe();
+  }, [request.id]);
 
-  const handleLike = () => {
-    setLiked(!liked);
-    setLikeCount(liked ? likeCount - 1 : likeCount + 1);
-    if (!liked) {
-      toast({ title: "Liked!", description: "You supported this request" });
-    }
-  };
+  // Real-time Listener for Comments
+  useEffect(() => {
+    const q = query(
+      collection(db, "requests", request.id, "comments"),
+      orderBy("createdAt", "asc")
+    );
+    const unsubscribe = onSnapshot(q, (snap) => {
+      setLiveComments(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    return () => unsubscribe();
+  }, [request.id]);
 
-  const handleHelpSubmit = () => {
-    if (!helpData.file && !helpData.link) {
-      toast({ title: "Please provide a file or link", variant: "destructive" });
+  const handleLike = async () => {
+    if (!userProfile) {
+      toast({ title: "Please login", description: "You need an account to like requests." });
       return;
     }
-    toast({
-      title: "Thank you for helping!",
-      description: "Your contribution has been submitted for review.",
-    });
-    setShowHelpDialog(false);
-    setHelpData({ file: null, link: "", message: "" });
-    onHelp?.();
+    const requestRef = doc(db, "requests", request.id);
+    try {
+      await updateDoc(requestRef, {
+        likes: liked ? arrayRemove(userProfile.id) : arrayUnion(userProfile.id)
+      });
+    } catch (e) {
+      console.error("Error updating like:", e);
+    }
   };
 
-  const handleAddComment = () => {
-    if (!newComment.trim()) return;
-    setComments([
-      ...comments,
-      { id: Date.now().toString(), author: "You", text: newComment, time: "Just now" },
-    ]);
-    setNewComment("");
-    toast({ title: "Comment added!" });
+  const handleHelpSubmit = async () => {
+    if (!userProfile) return;
+    if (!helpData.file && !helpData.link) {
+      toast({ title: "Missing information", description: "Please provide a file or a link.", variant: "destructive" });
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      let fileUrl = helpData.link;
+      
+      // Handle Cloudinary Upload if a file exists
+      if (helpData.file) {
+        const formData = new FormData();
+        formData.append("file", helpData.file);
+        formData.append("upload_preset", "notes_preset"); 
+        
+        const res = await fetch(`https://api.cloudinary.com/v1_1/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/upload`, {
+          method: "POST",
+          body: formData
+        });
+        
+        if (!res.ok) throw new Error("Cloudinary upload failed");
+        const data = await res.json();
+        fileUrl = data.secure_url;
+      }
+
+      await contributionsService.addContribution(request.id, {
+        contributorId: userProfile.id,
+        contributorName: userProfile.name,
+        type: helpData.file ? "pdf" : "link",
+        fileUrl: fileUrl,
+        message: helpData.message,
+        fileName: helpData.file?.name || "Shared Resource Link"
+      });
+
+      toast({ title: "Contribution shared!", description: "You've earned contribution points!" });
+      setShowHelpDialog(false);
+      setHelpData({ file: null, link: "", message: "" });
+      onHelp?.();
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Submission failed", description: "Could not upload your help. Try again.", variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleAddComment = async () => {
+    if (!newComment.trim() || !userProfile) return;
+    try {
+      await addDoc(collection(db, "requests", request.id, "comments"), {
+        userId: userProfile.id,
+        author: userProfile.name,
+        text: newComment,
+        createdAt: serverTimestamp()
+      });
+      setNewComment("");
+    } catch (e) {
+      toast({ title: "Error", description: "Failed to post comment." });
+    }
   };
 
   const handleViewProfile = (userId: string) => {
     navigate(`/profile/${userId}`);
   };
+
+  const FileIcon = fileTypeIcons[request.requestType] || FileText;
+  const status = statusConfig[request.status];
+  const StatusIcon = status.icon;
+  const isOpen = request.status !== "fulfilled" && request.status !== "closed";
 
   return (
     <>
@@ -199,35 +264,24 @@ export function RequestCard({ request, onHelp }: RequestCardProps) {
 
         <CardContent className="pb-3">
           <div className="flex flex-wrap gap-2">
-            <Badge variant="secondary" className="bg-muted text-foreground">
-              {request.subject}
-            </Badge>
-            <Badge variant="secondary" className="bg-muted text-foreground">
-              {request.branch}
-            </Badge>
-            <Badge variant="secondary" className="bg-muted text-foreground">
-              {request.year}
-            </Badge>
+            <Badge variant="secondary" className="bg-muted text-foreground">{request.subject}</Badge>
+            <Badge variant="secondary" className="bg-muted text-foreground">{request.branch}</Badge>
+            <Badge variant="secondary" className="bg-muted text-foreground">{request.year}</Badge>
           </div>
 
-          {/* Contributions Section */}
-          {contributions.length > 0 && (
+          {liveContributions.length > 0 && (
             <Collapsible open={showContributions} onOpenChange={setShowContributions} className="mt-4">
               <CollapsibleTrigger asChild>
                 <Button variant="outline" size="sm" className="w-full justify-between gap-2">
                   <span className="flex items-center gap-2">
                     <Eye className="w-4 h-4" />
-                    View Contributions ({contributions.length})
+                    View Contributions ({liveContributions.length})
                   </span>
-                  {showContributions ? (
-                    <ChevronUp className="w-4 h-4" />
-                  ) : (
-                    <ChevronDown className="w-4 h-4" />
-                  )}
+                  {showContributions ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                 </Button>
               </CollapsibleTrigger>
               <CollapsibleContent className="mt-3 space-y-2">
-                {contributions.map((contribution) => (
+                {liveContributions.map((contribution) => (
                   <ContributionCard
                     key={contribution.id}
                     contribution={contribution}
@@ -242,38 +296,35 @@ export function RequestCard({ request, onHelp }: RequestCardProps) {
         <CardFooter className="pt-3 border-t border-border flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-4 text-sm text-muted-foreground">
             <button 
-              onClick={() => handleViewProfile(request.requestedById || "user-1")}
+              onClick={() => handleViewProfile(request.requestedById)}
               className="flex items-center gap-1 hover:text-primary transition-colors"
             >
               <User className="w-4 h-4" />
               <span>{request.requestedBy}</span>
             </button>
             <span className="hidden sm:inline">•</span>
-            <span className="hidden sm:inline">{request.timestamp}</span>
-            {request.helpersCount > 0 && (
+            <span className="hidden sm:inline text-xs">
+               {request.timestamp?.seconds ? new Date(request.timestamp.seconds * 1000).toLocaleDateString() : "Just now"}
+            </span>
+            {liveContributions.length > 0 && (
               <>
                 <span>•</span>
-                <span className="text-primary font-medium">{request.helpersCount} helpers</span>
+                <span className="text-primary font-medium">{liveContributions.length} helpers</span>
               </>
             )}
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Like Button */}
             <Button
               variant="ghost"
               size="sm"
               onClick={handleLike}
-              className={cn(
-                "h-8 px-2 gap-1",
-                liked && "text-primary bg-primary/10"
-              )}
+              className={cn("h-8 px-2 gap-1", liked && "text-primary bg-primary/10")}
             >
               <ThumbsUp className={cn("w-4 h-4", liked && "fill-current")} />
               <span className="text-xs">{likeCount}</span>
             </Button>
 
-            {/* Comment Button */}
             <Button
               variant="ghost"
               size="sm"
@@ -281,10 +332,9 @@ export function RequestCard({ request, onHelp }: RequestCardProps) {
               className="h-8 px-2 gap-1"
             >
               <MessageCircle className="w-4 h-4" />
-              <span className="text-xs">{request.comments || comments.length}</span>
+              <span className="text-xs">{liveComments.length}</span>
             </Button>
 
-            {/* Help Button */}
             {isOpen && (
               <Button
                 onClick={() => setShowHelpDialog(true)}
@@ -303,87 +353,64 @@ export function RequestCard({ request, onHelp }: RequestCardProps) {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Help with this request</DialogTitle>
-            <DialogDescription>
-              Upload a file or share a link to help fulfill this request.
-            </DialogDescription>
+            <DialogDescription>Upload a file or share a link to help fulfill this request.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 mt-4">
             <div className="space-y-2">
               <Label>Upload File</Label>
               <label
-                htmlFor={`help-file-${request.id}`}
                 className={cn(
                   "flex flex-col items-center justify-center w-full h-28 border-2 border-dashed rounded-xl cursor-pointer transition-colors",
-                  helpData.file
-                    ? "border-primary bg-primary/5"
-                    : "border-border hover:border-primary/50"
+                  helpData.file ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"
                 )}
               >
                 {helpData.file ? (
                   <div className="flex items-center gap-2">
                     <CheckCircle2 className="w-5 h-5 text-primary" />
-                    <span className="text-sm text-foreground">{helpData.file.name}</span>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        setHelpData({ ...helpData, file: null });
-                      }}
-                    >
+                    <span className="text-sm text-foreground truncate max-w-[200px]">{helpData.file.name}</span>
+                    <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.preventDefault(); setHelpData({ ...helpData, file: null }); }}>
                       <X className="w-4 h-4" />
                     </Button>
                   </div>
                 ) : (
                   <div className="flex flex-col items-center gap-1">
                     <Upload className="w-6 h-6 text-muted-foreground" />
-                    <span className="text-sm text-muted-foreground">Click to upload</span>
+                    <span className="text-sm text-muted-foreground">Click to upload PDF/Image</span>
                   </div>
                 )}
-                <input
-                  id={`help-file-${request.id}`}
-                  type="file"
-                  className="hidden"
-                  onChange={(e) => setHelpData({ ...helpData, file: e.target.files?.[0] || null })}
-                />
+                <input type="file" className="hidden" onChange={(e) => setHelpData({ ...helpData, file: e.target.files?.[0] || null })} />
               </label>
             </div>
-
             <div className="flex items-center gap-3">
               <div className="h-px flex-1 bg-border" />
               <span className="text-xs text-muted-foreground">OR</span>
               <div className="h-px flex-1 bg-border" />
             </div>
-
             <div className="space-y-2">
-              <Label htmlFor="help-link">Share Link (Google Drive, etc.)</Label>
+              <Label htmlFor="help-link">Share Link</Label>
               <div className="relative">
                 <Link className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   id="help-link"
-                  placeholder="https://drive.google.com/..."
+                  placeholder="Drive link..."
                   value={helpData.link}
                   onChange={(e) => setHelpData({ ...helpData, link: e.target.value })}
                   className="pl-10"
                 />
               </div>
             </div>
-
             <div className="space-y-2">
               <Label htmlFor="help-message">Message (optional)</Label>
               <Textarea
                 id="help-message"
-                placeholder="Add a note about your contribution..."
+                placeholder="Briefly describe your contribution..."
                 value={helpData.message}
                 onChange={(e) => setHelpData({ ...helpData, message: e.target.value })}
                 rows={2}
               />
             </div>
-
-            <Button onClick={handleHelpSubmit} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
-              Submit Contribution
+            <Button onClick={handleHelpSubmit} className="w-full" disabled={isSubmitting}>
+              {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Submit Contribution"}
             </Button>
           </div>
         </DialogContent>
@@ -394,20 +421,20 @@ export function RequestCard({ request, onHelp }: RequestCardProps) {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Comments</DialogTitle>
-            <DialogDescription>
-              Discussion about this request
-            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 mt-4 max-h-64 overflow-y-auto">
-            {comments.map((comment) => (
+            {liveComments.length === 0 && <p className="text-sm text-center text-muted-foreground">No comments yet.</p>}
+            {liveComments.map((comment) => (
               <div key={comment.id} className="flex gap-3">
-                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                   <User className="w-4 h-4 text-primary" />
                 </div>
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
                     <span className="font-medium text-sm text-foreground">{comment.author}</span>
-                    <span className="text-xs text-muted-foreground">{comment.time}</span>
+                    <span className="text-[10px] text-muted-foreground">
+                      {comment.createdAt?.seconds ? new Date(comment.createdAt.seconds * 1000).toLocaleTimeString() : "Just now"}
+                    </span>
                   </div>
                   <p className="text-sm text-muted-foreground mt-1">{comment.text}</p>
                 </div>
@@ -421,9 +448,7 @@ export function RequestCard({ request, onHelp }: RequestCardProps) {
               onChange={(e) => setNewComment(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleAddComment()}
             />
-            <Button onClick={handleAddComment} className="bg-primary hover:bg-primary/90 text-primary-foreground">
-              Send
-            </Button>
+            <Button onClick={handleAddComment} size="sm">Send</Button>
           </div>
         </DialogContent>
       </Dialog>
