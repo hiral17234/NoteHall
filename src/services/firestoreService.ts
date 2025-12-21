@@ -394,6 +394,33 @@ export const contributionsService = {
     return snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Contribution));
   },
 
+  subscribeToUserContributions(
+    userId: string,
+    callback: (contributions: Contribution[]) => void
+  ): () => void {
+    if (!userId) {
+      callback([]);
+      return () => {};
+    }
+
+    const q = query(
+      collection(db, 'contributions'),
+      where('contributorId', '==', userId),
+      orderBy('createdAt', 'desc')
+    );
+
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        callback(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Contribution)));
+      },
+      (error) => {
+        console.error('Error subscribing to contributions:', error);
+        callback([]);
+      }
+    );
+  },
+
   async create(data: any): Promise<string> {
     const docRef = await addDoc(collection(db, 'contributions'), { ...data, createdAt: getServerTimestamp() });
     await helpRequestsService.incrementContributions(data.requestId);
@@ -402,17 +429,49 @@ export const contributionsService = {
       'stats.contributionScore': increment(50),
       updatedAt: getServerTimestamp(),
     });
-    
+
     if (data.requesterId && data.requesterId !== data.contributorId) {
       await createNotification.contribution(
         data.requesterId,
-        { id: data.contributorId, name: data.contributorName }, // Corrected user object
+        { id: data.contributorId, name: data.contributorName },
         data.requestTitle || 'your request',
         data.requestId
       );
     }
-    
+
     return docRef.id;
+  },
+
+  /**
+   * Backwards compatible helper used by RequestCard.
+   * Writes to both:
+   * - requests/{requestId}/contributions (so RequestCard live list updates)
+   * - contributions (so Profile "Help" tab can query by contributorId)
+   */
+  async addContribution(requestId: string, data: any): Promise<string> {
+    const requestRef = doc(db, 'requests', requestId);
+    const requestSnap = await getDoc(requestRef);
+    const request = requestSnap.exists() ? (requestSnap.data() as any) : null;
+
+    // 1) Ensure request-scoped realtime list updates
+    await addDoc(collection(db, 'requests', requestId, 'contributions'), {
+      ...data,
+      requestId,
+      createdAt: getServerTimestamp(),
+    });
+
+    // 2) Ensure global contributions + stats + notification
+    return this.create({
+      requestId,
+      requesterId: request?.requesterId,
+      requestTitle: request?.title,
+      contributorId: data.contributorId,
+      contributorName: data.contributorName,
+      contributorUsername: data.contributorUsername,
+      type: data.type ?? 'link',
+      content: data.message ?? data.fileName ?? 'Contribution',
+      fileUrl: data.fileUrl,
+    });
   },
 };
 
