@@ -368,9 +368,16 @@ export const contributionsService = {
   subscribeToUserContributions(userId: string, callback: (contributions: Contribution[]) => void): () => void {
     if (!userId) { callback([]); return () => {}; }
     const q = query(collection(db, 'contributions'), where('contributorId', '==', userId), orderBy('createdAt', 'desc'));
-    return onSnapshot(q, (snapshot) => {
-      callback(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Contribution)));
-    });
+    return onSnapshot(
+      q, 
+      (snapshot) => {
+        callback(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Contribution)));
+      },
+      (error) => {
+        console.error("Contributions subscription error:", error?.code || error);
+        callback([]);
+      }
+    );
   },
 
   async create(data: any): Promise<string> {

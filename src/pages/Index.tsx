@@ -51,7 +51,12 @@ export default function Index() {
   const sortedNotes = [...filteredNotes].sort((a, b) => {
     if (activeTab === "trending") return b.views - a.views;
     if (activeTab === "top") return b.likes - a.likes;
-    return 0; // latest - keep original order (already sorted by createdAt desc)
+    if (activeTab === "latest") {
+      const dateA = a.createdAt?.toDate?.() ?? new Date(0);
+      const dateB = b.createdAt?.toDate?.() ?? new Date(0);
+      return dateB.getTime() - dateA.getTime();
+    }
+    return 0;
   });
 
   // Get recommended notes (top 2 most liked)
@@ -135,6 +140,7 @@ export default function Index() {
                 <SelectItem value="EEE">EEE</SelectItem>
                 <SelectItem value="ME">ME</SelectItem>
                 <SelectItem value="CE">CE</SelectItem>
+                <SelectItem value="other">Other</SelectItem>
               </SelectContent>
             </Select>
 
@@ -148,6 +154,7 @@ export default function Index() {
                 <SelectItem value="2nd Year">2nd Year</SelectItem>
                 <SelectItem value="3rd Year">3rd Year</SelectItem>
                 <SelectItem value="4th Year">4th Year</SelectItem>
+                <SelectItem value="other">Other</SelectItem>
               </SelectContent>
             </Select>
           </div>
