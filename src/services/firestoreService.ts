@@ -265,13 +265,23 @@ export const helpRequestsService = {
 // ==================== CONTRIBUTIONS SERVICE ====================
 
 export const contributionsService = {
+  async getByUser(userId: string): Promise<Contribution[]> {
+    const q = query(
+      collection(db, 'contributions'),
+      where('contributorId', '==', userId),
+      orderBy('createdAt', 'desc')
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Contribution));
+  },
+
   async create(data: any): Promise<string> {
     const docRef = await addDoc(collection(db, 'contributions'), { ...data, createdAt: getServerTimestamp() });
     await helpRequestsService.incrementContributions(data.requestId);
-    await updateDoc(doc(db, 'users', data.contributorId), { 
-      'stats.helpedRequests': increment(1), 
+    await updateDoc(doc(db, 'users', data.contributorId), {
+      'stats.helpedRequests': increment(1),
       'stats.contributionScore': increment(50),
-      updatedAt: getServerTimestamp() 
+      updatedAt: getServerTimestamp(),
     });
     return docRef.id;
   },
@@ -301,3 +311,84 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: '2', title: 'Contributor', description: 'Upload 5 study notes', icon: 'Upload', requirement: { type: 'uploads', count: 5 }, points: 50 },
   { id: '3', title: 'Helper', description: 'Help 1 student with their request', icon: 'HandHelping', requirement: { type: 'helped', count: 1 }, points: 20 },
 ];
+
+export type AchievementBadge = Achievement & {
+  label: string;
+  tier: 'bronze' | 'silver' | 'gold';
+  color: string;
+};
+
+const getTier = (points: number): AchievementBadge['tier'] => {
+  if (points >= 50) return 'gold';
+  if (points >= 20) return 'silver';
+  return 'bronze';
+};
+
+const tierColor: Record<AchievementBadge['tier'], string> = {
+  bronze: 'bg-primary/15 text-primary',
+  silver: 'bg-chart-1/15 text-chart-1',
+  gold: 'bg-chart-2/15 text-chart-2',
+};
+
+const decorateAchievement = (a: Achievement): AchievementBadge => {
+  const tier = getTier(a.points);
+  return {
+    ...a,
+    label: a.title,
+    tier,
+    color: tierColor[tier],
+  };
+};
+
+const getAchievementCount = (stats: any, streak: number, type: Achievement['requirement']['type']) => {
+  switch (type) {
+    case 'uploads':
+      return stats?.uploads ?? 0;
+    case 'helped':
+      return stats?.helpedRequests ?? 0;
+    case 'likes':
+      return stats?.totalLikes ?? 0;
+    case 'views':
+      return stats?.totalViews ?? 0;
+    case 'streak':
+      return streak ?? 0;
+    default:
+      return 0;
+  }
+};
+
+export const achievementsService = {
+  getAll(): AchievementBadge[] {
+    return ACHIEVEMENTS.map(decorateAchievement);
+  },
+
+  checkAchievements(stats: any, streak: number): AchievementBadge[] {
+    return this.getAll().filter(a => getAchievementCount(stats, streak, a.requirement.type) >= a.requirement.count);
+  },
+
+  getActiveAchievement(stats: any, streak: number): AchievementBadge | null {
+    const earned = new Set(this.checkAchievements(stats, streak).map(a => a.id));
+    const next = this.getAll()
+      .filter(a => !earned.has(a.id))
+      .sort((a, b) => a.requirement.count - b.requirement.count)[0];
+
+    return next || null;
+  },
+};
+
+// ==================== USERS SERVICE ====================
+
+export const usersService = {
+  async getById(userId: string): Promise<any | null> {
+    const snap = await getDoc(doc(db, 'users', userId));
+    return snap.exists() ? ({ id: snap.id, ...snap.data() } as any) : null;
+  },
+
+  async getByUsername(username: string): Promise<any | null> {
+    const q = query(collection(db, 'users'), where('username', '==', username), limit(1));
+    const snapshot = await getDocs(q);
+    if (snapshot.empty) return null;
+    const d = snapshot.docs[0];
+    return { id: d.id, ...d.data() } as any;
+  },
+};

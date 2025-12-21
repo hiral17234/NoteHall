@@ -23,13 +23,12 @@ interface SavedNotesContextType {
 const SavedNotesContext = createContext<SavedNotesContextType | undefined>(undefined);
 
 export function SavedNotesProvider({ children }: { children: ReactNode }) {
-  // Extracting user to ensure we have the UID for Firestore paths
-  const { userProfile, user } = useAuth();
+  // Use firebaseUser for UID-based paths; userProfile carries app profile fields
+  const { userProfile, firebaseUser } = useAuth();
   const [savedNotes, setSavedNotes] = useState<SavedNote[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // Determine the correct ID to use (checks both profile and base auth user)
-  const currentUserId = userProfile?.id || userProfile?.uid || user?.uid;
+  const currentUserId = userProfile?.id || firebaseUser?.uid;
 
   // Load saved notes from Firestore when user changes
   useEffect(() => {
@@ -46,8 +45,8 @@ export function SavedNotesProvider({ children }: { children: ReactNode }) {
           id: n.id,
           title: n.title,
           subject: n.subject,
-          // Safely handle Firebase Timestamps
-          savedAt: n.createdAt?.toDate?.()?.toISOString() || n.savedAt || new Date().toISOString(),
+          // We don't currently fetch savedAt from the savedNotes subcollection.
+          savedAt: new Date().toISOString(),
         })));
       } catch (error) {
         console.error("Error loading saved notes:", error);

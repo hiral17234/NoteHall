@@ -9,6 +9,7 @@ import { ContributionCard, Contribution } from "@/components/helpdesk/Contributi
 import { StatDetailModal, AchievementsSection, Achievement } from "@/components/profile/StatDetailModal";
 import { useAuth, UserProfile } from "@/contexts/AuthContext";
 import { usersService, notesService, Note, contributionsService, helpRequestsService, achievementsService } from "@/services/firestoreService";
+import { mapFirestoreNoteToCardNote } from "@/lib/noteCard";
 import { parseSocialLink } from "@/lib/socialLinks";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -416,20 +417,7 @@ export default function Profile() {
                 {uploadedNotes.map((note) => (
                   <NoteCard
                     key={note.id}
-                    note={{
-                      id: note.id,
-                      title: note.title,
-                      subject: note.subject,
-                      branch: note.branch,
-                      year: note.year,
-                      fileType: note.fileType,
-                      likes: note.likes,
-                      dislikes: note.dislikes,
-                      views: note.views,
-                      author: note.authorName,
-                      timestamp: note.createdAt?.toDate?.()?.toLocaleDateString() || "Recently",
-                      topic: note.topic,
-                    }}
+                    note={mapFirestoreNoteToCardNote(note)}
                   />
                 ))}
               </div>
@@ -453,20 +441,7 @@ export default function Profile() {
                   {savedNotes.map((note) => (
                     <NoteCard
                       key={note.id}
-                      note={{
-                        id: note.id,
-                        title: note.title,
-                        subject: note.subject,
-                        branch: note.branch,
-                        year: note.year,
-                        fileType: note.fileType,
-                        likes: note.likes,
-                        dislikes: note.dislikes,
-                        views: note.views,
-                        author: note.authorName,
-                        timestamp: note.createdAt?.toDate?.()?.toLocaleDateString() || "Recently",
-                        topic: note.topic,
-                      }}
+                      note={mapFirestoreNoteToCardNote(note)}
                     />
                   ))}
                 </div>

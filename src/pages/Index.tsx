@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, TrendingUp, Clock, Star, Sparkles, BookOpen, Award } from "lucide-react";
 import { Link } from "react-router-dom";
 import { notesService, Note } from "@/services/firestoreService";
+import { mapFirestoreNoteToCardNote } from "@/lib/noteCard";
 
 export default function Index() {
   const [selectedBranch, setSelectedBranch] = useState<string>("all");
@@ -38,24 +39,7 @@ export default function Index() {
     fetchNotes();
   }, []);
 
-  // Transform Note to display format
-  const transformNote = (note: Note) => ({
-    id: note.id,
-    title: note.title,
-    subject: note.subject,
-    branch: note.branch,
-    year: note.year,
-    fileType: note.fileType,
-    fileUrl: note.fileUrl,
-    likes: note.likes,
-    dislikes: note.dislikes,
-    views: note.views,
-    author: note.authorName,
-    authorId: note.authorId,
-    timestamp: note.createdAt?.toDate?.()?.toLocaleDateString() || "Recently",
-    topic: note.topic,
-    likedBy: note.likedBy || [],
-  });
+  const toCardNote = (note: Note) => mapFirestoreNoteToCardNote(note);
 
   const filteredNotes = notes.filter((note) => {
     if (selectedBranch !== "all" && note.branch !== selectedBranch) return false;
@@ -114,8 +98,8 @@ export default function Index() {
                 {recommendedNotes.map((note) => (
                   <NoteCard 
                     key={note.id} 
-                    note={transformNote(note)} 
-                    onExpand={() => handleExpand(transformNote(note))}
+                    note={toCardNote(note)} 
+                    onExpand={() => handleExpand(toCardNote(note))}
                   />
                 ))}
               </div>
@@ -196,8 +180,8 @@ export default function Index() {
             {sortedNotes.map((note) => (
               <NoteCard 
                 key={note.id} 
-                note={transformNote(note)} 
-                onExpand={() => handleExpand(transformNote(note))}
+                note={toCardNote(note)} 
+                onExpand={() => handleExpand(toCardNote(note))}
               />
             ))}
           </div>
