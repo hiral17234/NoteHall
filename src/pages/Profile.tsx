@@ -288,10 +288,23 @@ export default function Profile() {
 
           <TabsContent value="contributions">
             {contributions.length === 0 ? (
-              <EmptyState type="help" title="No help given yet" description="Helping others with their requests boosts your score!" />
+              <EmptyState type="helped" title="No help given yet" description="Helping others with their requests boosts your score!" />
             ) : (
               <div className="grid grid-cols-1 gap-4">
-                {contributions.map(c => <ContributionCard key={c.id} contribution={c} />)}
+                {contributions.map(c => (
+                  <ContributionCard 
+                    key={c.id} 
+                    contribution={{
+                      id: c.id,
+                      type: c.type === 'explanation' ? 'link' : c.type,
+                      fileName: c.content,
+                      contributorId: c.contributorId,
+                      contributorName: c.contributorName,
+                      timestamp: c.createdAt?.toDate?.()?.toLocaleDateString() || 'Recently',
+                      likes: 0,
+                    }} 
+                  />
+                ))}
               </div>
             )}
           </TabsContent>
@@ -353,7 +366,20 @@ export default function Profile() {
           <EditProfileDialog 
             open={editDialogOpen} 
             onOpenChange={setEditDialogOpen} 
-            profile={profileData} 
+            profile={{
+              name: profileData.name || '',
+              bio: profileData.bio || '',
+              college: profileData.college || '',
+              branch: profileData.branch || '',
+              year: profileData.year || '',
+              degree: (profileData as any).degree || '',
+              avatar: profileData.avatar || '',
+              github: profileData.github || '',
+              linkedin: profileData.linkedin || '',
+              portfolio: (profileData as any).portfolio || '',
+              instagram: (profileData as any).instagram || '',
+              twitter: (profileData as any).twitter || '',
+            }} 
             onSave={updateUserProfile} 
           />
         )}
@@ -361,7 +387,7 @@ export default function Profile() {
         <StatDetailModal 
           open={statModalOpen !== null} 
           onClose={() => setStatModalOpen(null)} 
-          statType={statModalOpen || "uploads"} 
+          statType={(statModalOpen as "uploads" | "likes" | "views" | "helped" | "score") || "uploads"} 
           value={(stats as any)[statModalOpen || "uploads"]}
           isOwner={isOwnProfile} 
         />

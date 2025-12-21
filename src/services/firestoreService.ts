@@ -110,6 +110,10 @@ export interface UserProfile {
   streak?: number;
   github?: string;
   linkedin?: string;
+  degree?: string;
+  portfolio?: string;
+  instagram?: string;
+  twitter?: string;
   stats: {
     uploads: number;
     totalLikes: number;
