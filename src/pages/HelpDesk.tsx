@@ -20,6 +20,7 @@ export default function HelpDesk() {
   const navigate = useNavigate();
   const { requests, loading, addRequest } = useHelpRequests();
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -33,17 +34,23 @@ export default function HelpDesk() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return; // Prevent double submission
     
-    await addRequest({
-      title: formData.title,
-      description: formData.description,
-      subject: formData.subject.toUpperCase(),
-      branch: formData.branch.toUpperCase(),
-      year: formData.year === "1" ? "1st Year" : formData.year === "2" ? "2nd Year" : formData.year === "3" ? "3rd Year" : "4th Year",
-    });
-    
-    setDialogOpen(false);
-    setFormData({ title: "", description: "", subject: "", branch: "", year: "" });
+    setIsSubmitting(true);
+    try {
+      await addRequest({
+        title: formData.title,
+        description: formData.description,
+        subject: formData.subject.toUpperCase(),
+        branch: formData.branch.toUpperCase(),
+        year: formData.year === "1" ? "1st Year" : formData.year === "2" ? "2nd Year" : formData.year === "3" ? "3rd Year" : "4th Year",
+      });
+      
+      setDialogOpen(false);
+      setFormData({ title: "", description: "", subject: "", branch: "", year: "" });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // Transform HelpRequest to RequestCard format
@@ -160,8 +167,12 @@ export default function HelpDesk() {
                   </Select>
                 </div>
 
-                <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
-                  Post Request
+                <Button 
+                  type="submit" 
+                  disabled={isSubmitting}
+                  className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
+                >
+                  {isSubmitting ? "Posting..." : "Post Request"}
                 </Button>
               </form>
             </DialogContent>
