@@ -473,3 +473,54 @@ export const usersService = {
       );
   }
 };
+
+// Add this to your firestoreService.ts
+
+// ==================== COMMENTS SERVICE ====================
+export const commentsService = {
+  async getByNote(noteId: string) {
+    const q = query(
+      collection(db, 'notes', noteId, 'comments'),
+      orderBy('createdAt', 'desc')
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  },
+
+  async addComment(noteId: string, userId: string, userName: string, text: string) {
+    const commentRef = collection(db, 'notes', noteId, 'comments');
+    await addDoc(commentRef, {
+      userId,
+      userName,
+      text,
+      createdAt: getServerTimestamp(),
+    });
+    
+    // Award points for commenting
+    await updateDoc(doc(db, 'users', userId), {
+      'stats.contributionScore': increment(2)
+    });
+  }
+};
+
+// ==================== FIXING HELP REQUESTS ====================
+export const helpRequestsService = {
+  // Ensure this matches the collection name used in your UI (requests vs help_requests)
+  async create(data: any): Promise<string> {
+    const docRef = await addDoc(collection(db, 'requests'), {
+      ...data,
+      status: 'open',
+      contributionsCount: 0,
+      createdAt: getServerTimestamp(),
+      updatedAt: getServerTimestamp(),
+    });
+    
+    // Award points for asking for help
+    await updateDoc(doc(db, 'users', data.requesterId), {
+      'stats.contributionScore': increment(5)
+    });
+    
+    return docRef.id;
+  },
+  // ... (keep getAll and other functions from previous full code)
+};
