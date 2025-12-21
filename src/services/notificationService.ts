@@ -39,6 +39,11 @@ export const notificationService = {
     userId: string, 
     callback: (notifications: Notification[]) => void
   ): () => void {
+    if (!userId) {
+      callback([]);
+      return () => {};
+    }
+
     const q = query(
       collection(db, 'notifications'),
       where('toUserId', '==', userId),
@@ -95,41 +100,62 @@ export const notificationService = {
     await deleteDoc(doc(db, 'notifications', notificationId));
   },
 
-  // Legacy methods for backwards compatibility
-  async initialize(): Promise<Notification[]> {
-    return [];
+  // Legacy methods for backwards compatibility - Corrected to return real data
+  async initialize(userId: string): Promise<Notification[]> {
+    const q = query(
+      collection(db, 'notifications'),
+      where('toUserId', '==', userId),
+      orderBy('createdAt', 'desc')
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Notification));
   },
 
-  async getNotifications(): Promise<Notification[]> {
-    return [];
+  async getNotifications(userId: string): Promise<Notification[]> {
+    return this.initialize(userId);
   },
 
-  async getUnreadCount(): Promise<number> {
-    return 0;
+  async getUnreadCount(userId: string): Promise<number> {
+    const q = query(
+      collection(db, 'notifications'),
+      where('toUserId', '==', userId),
+      where('read', '==', false)
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.size;
   },
 
   async addNotification(notification: Omit<Notification, 'id' | 'createdAt' | 'read'>): Promise<Notification> {
     const id = await this.create(notification);
-    return { ...notification, id, read: false, createdAt: new Date().toISOString() };
+    return { 
+      ...notification, 
+      id, 
+      read: false, 
+      createdAt: new Date().toISOString() 
+    };
   },
 
   async deleteNotification(id: string): Promise<void> {
     await this.delete(id);
   },
 
-  async clearAll(): Promise<void> {
-    // Not implemented for Firestore
+  async clearAll(userId: string): Promise<void> {
+    const q = query(collection(db, 'notifications'), where('toUserId', '==', userId));
+    const snapshot = await getDocs(q);
+    const batch = writeBatch(db);
+    snapshot.docs.forEach(docSnap => batch.delete(docSnap.ref));
+    await batch.commit();
   },
 
-  simulateNewNotification(): Notification {
+  simulateNewNotification(userId: string): Notification {
     return {
       id: `notif-${Date.now()}`,
       type: 'general',
-      title: 'New Notification',
-      message: 'This is a test notification',
+      title: 'Real-time Connected',
+      message: 'You are now receiving live notifications.',
       read: false,
       createdAt: new Date().toISOString(),
-      toUserId: '',
+      toUserId: userId,
     };
   },
 };
