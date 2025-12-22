@@ -1,40 +1,22 @@
-// /api/gemini.ts
 // Vercel Serverless Function for Gemini AI
-// API key is read ONLY from process.env.GEMINI_API_KEY
+// API key is read from process.env.GEMINI_API_KEY
 
-import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+const GEMINI_API_URL =
+  "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
 
-/* ============================
-   SYSTEM PROMPT
-============================ */
-const SYSTEM_PROMPT = `You are Gemini, an AI study assistant integrated into NoteHall - a platform for college students to share and find academic notes.
+const SYSTEM_PROMPT = `You are Gemini, an AI study assistant integrated into NoteHall.
 
-Your personality:
-- Friendly and helpful, like a knowledgeable senior student or tutor
-- Enthusiastic about learning and helping others succeed academically
-- Clear, concise, and focused on practical value
-
-Your capabilities:
-1. General Chat
-2. Note Summarization
-3. Doubt Solving
-4. Study Recommendations
-5. Exam Preparation
+You help students with:
+- Note summarization
+- Concept explanation
+- Doubt solving
+- Exam preparation
 
 Rules:
-- Keep responses focused and actionable
-- Use markdown formatting when helpful
-- NEVER ask for personal data
+- Be clear and concise
+- Use markdown
+- Never ask for personal data`;
 
-Response formatting:
-- Use bullet points when useful
-- Be concise unless user asks for detail
-`;
-
-/* ============================
-   TYPES
-============================ */
 interface RequestBody {
   prompt: string;
   context?: {
@@ -47,95 +29,96 @@ interface RequestBody {
   history?: Array<{ role: "user" | "model"; content: string }>;
 }
 
-/* ============================
-   HANDLER
-============================ */
-export default async function handler(
-  req: VercelRequest,
-  res: VercelResponse
-) {
-  /* ---------- Method Check ---------- */
+export default async function handler(req: Request): Promise<Response> {
+  // CORS
+  if (req.method === "OPTIONS") {
+    return new Response(null, {
+      status: 200,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+      },
+    });
+  }
+
   if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
+    return new Response(
+      JSON.stringify({ error: "Method not allowed" }),
+      { status: 405, headers: { "Content-Type": "application/json" } }
+    );
   }
 
-  /* ---------- API Key ---------- */
   const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+
   if (!GEMINI_API_KEY) {
-    console.error("❌ GEMINI_API_KEY missing");
-    return res.status(500).json({
-      error: "Gemini API key is not configured on server",
-    });
+    return new Response(
+      JSON.stringify({ error: "Gemini API key not configured" }),
+      { status: 500 }
+    );
   }
 
-  /* ---------- Parse Body ---------- */
-  let body: RequestBody;
   try {
-    body = req.body;
-  } catch {
-    return res.status(400).json({ error: "Invalid JSON body" });
-  }
+    const body: RequestBody = await req.json();
 
-  const { prompt, context, history } = body;
-
-  if (!prompt || typeof prompt !== "string" || !prompt.trim()) {
-    return res.status(400).json({
-      error: "Prompt is required and must be a non-empty string",
-    });
-  }
-
-  /* ---------- Build Context ---------- */
-  const contextLines: string[] = [];
-  if (context?.subject) contextLines.push(`Subject: ${context.subject}`);
-  if (context?.noteTitle) contextLines.push(`Note: ${context.noteTitle}`);
-  if (context?.userBranch) contextLines.push(`Branch: ${context.userBranch}`);
-  if (context?.userYear) contextLines.push(`Year: ${context.userYear}`);
-  if (context?.noteContent)
-    contextLines.push(`Note Content:\n${context.noteContent}`);
-
-  const contextBlock =
-    contextLines.length > 0
-      ? `\n\nContext:\n${contextLines.join("\n")}`
-      : "";
-
-  /* ---------- Build Final Prompt ---------- */
-  let finalPrompt = `${SYSTEM_PROMPT}${contextBlock}\n\nUser Question:\n${prompt}`;
-
-  if (history && Array.isArray(history)) {
-    const historyText = history
-      .map((h) => `${h.role === "user" ? "User" : "Assistant"}: ${h.content}`)
-      .join("\n");
-    finalPrompt = `${SYSTEM_PROMPT}${contextBlock}\n\nConversation so far:\n${historyText}\n\nUser Question:\n${prompt}`;
-  }
-
-  /* ---------- Gemini Call ---------- */
-  try {
-    const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({
-      model: "gemini-pro",
-    });
-
-    const result = await model.generateContent(finalPrompt);
-    const text = result.response.text();
-
-    if (!text) {
-      return res.status(500).json({
-        error: "Empty response from Gemini",
-      });
+    if (!body.prompt?.trim()) {
+      return new Response(
+        JSON.stringify({ error: "Prompt is required" }),
+        { status: 400 }
+      );
     }
 
-    return res.status(200).json({ text });
-  } catch (error: any) {
-    console.error("🔥 Gemini API Error:", error);
+    const contents = [
+      {
+        role: "user",
+        parts: [{ text: SYSTEM_PROMPT }],
+      },
+    ];
 
-    if (error?.message?.includes("quota")) {
-      return res.status(429).json({
-        error: "Rate limit exceeded. Please try again later.",
-      });
+    if (body.history) {
+      for (const msg of body.history) {
+        contents.push({
+          role: msg.role,
+          parts: [{ text: msg.content }],
+        });
+      }
     }
 
-    return res.status(500).json({
-      error: "Gemini failed to generate a response",
+    contents.push({
+      role: "user",
+      parts: [{ text: body.prompt }],
     });
+
+    const geminiRes = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents,
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 2048,
+        },
+      }),
+    });
+
+    const data = await geminiRes.json();
+
+    const text =
+      data?.candidates?.[0]?.content?.parts?.[0]?.text ||
+      "No response from Gemini";
+
+    return new Response(JSON.stringify({ text }), {
+      status: 200,
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+      },
+    });
+  } catch (err) {
+    console.error("Gemini API error:", err);
+    return new Response(
+      JSON.stringify({ error: "Internal server error" }),
+      { status: 500 }
+    );
   }
 }
