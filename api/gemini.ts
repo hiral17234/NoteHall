@@ -1,9 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-
-const GEMINI_API_URL =
-  "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
-
-const SYSTEM_PROMPT = `You are Gemini, an AI study assistant integrated into NoteHall.`;
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 export default async function handler(
   req: VercelRequest,
@@ -13,61 +9,28 @@ export default async function handler(
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-
-  if (!GEMINI_API_KEY) {
-    console.error("GEMINI_API_KEY missing");
-    return res.status(500).json({
-      error: "Gemini API key is not configured",
-    });
-  }
-
   try {
-    const { prompt, context, history } = req.body;
+    const { prompt } = req.body;
 
-    if (!prompt || typeof prompt !== "string") {
-      return res.status(400).json({ error: "Invalid prompt" });
+    if (!prompt) {
+      return res.status(400).json({ error: "Prompt is required" });
     }
 
-    const contents = [
-      {
-        role: "user",
-        parts: [{ text: SYSTEM_PROMPT }],
-      },
-      ...(history || []).map((m: any) => ({
-        role: m.role === "user" ? "user" : "model",
-        parts: [{ text: m.content }],
-      })),
-      {
-        role: "user",
-        parts: [{ text: prompt }],
-      },
-    ];
-
-    const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents,
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 1024,
-        },
-      }),
-    });
-
-    const data = await response.json();
-
-    if (!data?.candidates?.[0]?.content?.parts?.[0]?.text) {
-      console.error("Invalid Gemini response", data);
-      return res.status(500).json({ error: "Invalid Gemini response" });
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      console.error("GEMINI_API_KEY missing");
+      return res.status(500).json({ error: "Server misconfigured" });
     }
 
-    return res.status(200).json({
-      text: data.candidates[0].content.parts[0].text,
-    });
-  } catch (err) {
-    console.error("Gemini server error:", err);
-    return res.status(500).json({ error: "Internal server error" });
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+
+    const result = await model.generateContent(prompt);
+    const text = result.response.text();
+
+    return res.status(200).json({ text });
+  } catch (err: any) {
+    console.error("Gemini error:", err);
+    return res.status(500).json({ error: "Gemini failed" });
   }
 }
