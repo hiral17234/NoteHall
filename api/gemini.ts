@@ -1,71 +1,32 @@
-// Vercel Serverless Function for Gemini AI
-// API key is read from process.env.GEMINI_API_KEY
+import type { VercelRequest, VercelResponse } from "@vercel/node";
 
 const GEMINI_API_URL =
   "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
 
-const SYSTEM_PROMPT = `You are Gemini, an AI study assistant integrated into NoteHall.
+const SYSTEM_PROMPT = `You are Gemini, an AI study assistant integrated into NoteHall.`;
 
-You help students with:
-- Note summarization
-- Concept explanation
-- Doubt solving
-- Exam preparation
-
-Rules:
-- Be clear and concise
-- Use markdown
-- Never ask for personal data`;
-
-interface RequestBody {
-  prompt: string;
-  context?: {
-    subject?: string;
-    noteTitle?: string;
-    noteContent?: string;
-    userBranch?: string;
-    userYear?: string;
-  };
-  history?: Array<{ role: "user" | "model"; content: string }>;
-}
-
-export default async function handler(req: Request): Promise<Response> {
-  // CORS
-  if (req.method === "OPTIONS") {
-    return new Response(null, {
-      status: 200,
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type",
-      },
-    });
-  }
-
+export default async function handler(
+  req: VercelRequest,
+  res: VercelResponse
+) {
   if (req.method !== "POST") {
-    return new Response(
-      JSON.stringify({ error: "Method not allowed" }),
-      { status: 405, headers: { "Content-Type": "application/json" } }
-    );
+    return res.status(405).json({ error: "Method not allowed" });
   }
 
   const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
   if (!GEMINI_API_KEY) {
-    return new Response(
-      JSON.stringify({ error: "Gemini API key not configured" }),
-      { status: 500 }
-    );
+    console.error("GEMINI_API_KEY missing");
+    return res.status(500).json({
+      error: "Gemini API key is not configured",
+    });
   }
 
   try {
-    const body: RequestBody = await req.json();
+    const { prompt, context, history } = req.body;
 
-    if (!body.prompt?.trim()) {
-      return new Response(
-        JSON.stringify({ error: "Prompt is required" }),
-        { status: 400 }
-      );
+    if (!prompt || typeof prompt !== "string") {
+      return res.status(400).json({ error: "Invalid prompt" });
     }
 
     const contents = [
@@ -73,52 +34,40 @@ export default async function handler(req: Request): Promise<Response> {
         role: "user",
         parts: [{ text: SYSTEM_PROMPT }],
       },
+      ...(history || []).map((m: any) => ({
+        role: m.role === "user" ? "user" : "model",
+        parts: [{ text: m.content }],
+      })),
+      {
+        role: "user",
+        parts: [{ text: prompt }],
+      },
     ];
 
-    if (body.history) {
-      for (const msg of body.history) {
-        contents.push({
-          role: msg.role,
-          parts: [{ text: msg.content }],
-        });
-      }
-    }
-
-    contents.push({
-      role: "user",
-      parts: [{ text: body.prompt }],
-    });
-
-    const geminiRes = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+    const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         contents,
         generationConfig: {
           temperature: 0.7,
-          maxOutputTokens: 2048,
+          maxOutputTokens: 1024,
         },
       }),
     });
 
-    const data = await geminiRes.json();
+    const data = await response.json();
 
-    const text =
-      data?.candidates?.[0]?.content?.parts?.[0]?.text ||
-      "No response from Gemini";
+    if (!data?.candidates?.[0]?.content?.parts?.[0]?.text) {
+      console.error("Invalid Gemini response", data);
+      return res.status(500).json({ error: "Invalid Gemini response" });
+    }
 
-    return new Response(JSON.stringify({ text }), {
-      status: 200,
-      headers: {
-        "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*",
-      },
+    return res.status(200).json({
+      text: data.candidates[0].content.parts[0].text,
     });
   } catch (err) {
-    console.error("Gemini API error:", err);
-    return new Response(
-      JSON.stringify({ error: "Internal server error" }),
-      { status: 500 }
-    );
+    console.error("Gemini server error:", err);
+    return res.status(500).json({ error: "Internal server error" });
   }
 }
