@@ -53,6 +53,14 @@ const fileToBase64 = (file: File): Promise<string> =>
       img.src = reader.result as string;
     };
 
+    // ✅ ADD THIS HELPER
+const urlToFile = async (url: string, filename: string): Promise<File> => {
+  const res = await fetch(url);
+  const blob = await res.blob();
+  return new File([blob], filename, { type: blob.type });
+};
+
+
     img.onload = () => {
       const canvas = document.createElement("canvas");
       const MAX = 1024;
@@ -131,6 +139,60 @@ const [imagePreviews, setImagePreviews] = useState<string[]>([]);
       }
     }
 }, [noteContext, setContext, messages]);
+
+  // ✅ AUTO-LOAD FILE FROM NOTE INTO GEMINI
+useEffect(() => {
+  if (!noteContext?.fileUrl) return;
+
+  const loadNoteFile = async () => {
+    try {
+      const file = await urlToFile(
+        noteContext.fileUrl,
+        noteContext.title || "note-file"
+      );
+
+      // 🖼 IMAGE
+      if (file.type.startsWith("image/")) {
+        setSelectedImages([file]);
+
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setImagePreviews([reader.result as string]);
+        };
+        reader.readAsDataURL(file);
+      }
+
+      // 📄 PDF
+      else if (file.type === "application/pdf") {
+        const pdfImages = await pdfToImages(file);
+
+        const files: File[] = [];
+
+        for (const src of pdfImages) {
+          const blob = await (await fetch(src)).blob();
+          files.push(
+            new File([blob], `pdf-page-${Date.now()}.jpg`, {
+              type: "image/jpeg",
+            })
+          );
+        }
+
+        setSelectedImages(files);
+        setImagePreviews(pdfImages);
+      }
+    } catch (err) {
+      console.error("Gemini file load failed", err);
+      toast({
+        title: "File load failed",
+        description: "Could not attach note to Gemini",
+        variant: "destructive",
+      });
+    }
+  };
+
+  loadNoteFile();
+}, [noteContext]);
+
 
   // Auto-scroll to bottom
   useEffect(() => {
