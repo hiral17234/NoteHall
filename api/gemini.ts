@@ -12,6 +12,7 @@ export default async function handler(
   try {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
+      console.error("❌ GEMINI_API_KEY missing");
       return res.status(500).json({ error: "API key missing" });
     }
 
@@ -22,9 +23,9 @@ export default async function handler(
 
     const genAI = new GoogleGenerativeAI(apiKey);
 
-    // ✅ WORKING MODEL
+    // ✅ ONLY universally supported model
     const model = genAI.getGenerativeModel({
-      model: "models/gemini-1.0-pro"
+      model: "models/gemini-1.0-pro",
     });
 
     const result = await model.generateContent(prompt);
@@ -32,7 +33,7 @@ export default async function handler(
 
     return res.status(200).json({ text });
   } catch (err) {
-    console.error("FULL GEMINI ERROR:", err);
+    console.error("🔥 FULL GEMINI ERROR:", err);
     return res.status(500).json({ error: "Gemini failed" });
   }
 }
