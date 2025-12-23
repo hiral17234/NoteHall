@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { GeminiChat } from "@/components/GeminiChat";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
