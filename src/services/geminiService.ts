@@ -58,7 +58,7 @@ this.conversationHistory.push({
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          prompt: userMessage,
+          prompt: userMessage?.trim() || "Please analyze the provided image(s).",
           images, // ✅ FIX
           context: {
             subject: this.context.selectedSubject,
