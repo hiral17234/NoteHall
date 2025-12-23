@@ -22,9 +22,9 @@ export default async function handler(
 
     const genAI = new GoogleGenerativeAI(apiKey);
 
-    // ✅ ONLY SUPPORTED MODEL
+    // ✅ THIS MODEL IS CONFIRMED FROM YOUR LIST
     const model = genAI.getGenerativeModel({
-      model: "models/gemini-1.0-pro",
+      model: "models/gemini-2.5-flash",
     });
 
     const result = await model.generateContent(prompt);
@@ -36,4 +36,3 @@ export default async function handler(
     return res.status(500).json({ error: "Gemini failed" });
   }
 }
-
