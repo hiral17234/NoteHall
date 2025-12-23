@@ -270,6 +270,7 @@ await sendMessage(message, imagePayloads);
             <MessageBubble key={message.id} message={message} />
           ))}
         </div>
+    </div>
       </ScrollArea>
 
       {/* Image Preview */}
