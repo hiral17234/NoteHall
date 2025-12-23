@@ -2,7 +2,7 @@
 // Uses backend API route for secure API key handling
 
 export interface GeminiMessage {
-  role: "user" | "model";
+  role: "user" | "assistant";
   content: string;
 }
 
@@ -40,12 +40,16 @@ class GeminiService {
 
   async sendMessage(
     userMessage: string,
-    image?: {
+    images?: {
       base64: string;
       mimeType: string;
-    }
+    }[]
   ): Promise<string> {
-    this.conversationHistory.push({ role: "user", content: userMessage });
+this.conversationHistory.push({
+  role: "user",
+  content:
+    userMessage?.trim() || "User sent image(s) for analysis.",
+});
 
     try {
       const response = await fetch(API_ENDPOINT, {
@@ -55,7 +59,7 @@ class GeminiService {
         },
         body: JSON.stringify({
           prompt: userMessage,
-          image, // ✅ FIX
+          images, // ✅ FIX
           context: {
             subject: this.context.selectedSubject,
             noteTitle: this.context.noteTitle,
@@ -76,9 +80,9 @@ class GeminiService {
       const assistantMessage = data.text;
 
       this.conversationHistory.push({
-        role: "model",
-        content: assistantMessage,
-      });
+  role: "assistant",
+  content: assistantMessage,
+});
 
       return assistantMessage;
     } catch (error) {
