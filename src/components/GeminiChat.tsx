@@ -43,10 +43,11 @@ const quickActions = [
 // ✅ ADD: helper to convert image to base64
 const fileToBase64 = (file: File): Promise<string> =>
 new Promise((resolve, reject) => {
-    img.onerror = () => reject("Image load failed");
-reader.onerror = () => reject("File read failed");
     const img = new Image();
     const reader = new FileReader();
+
+  img.onerror = () => reject("Image load failed");
+reader.onerror = () => reject("File read failed");
 
     reader.onload = () => {
       img.src = reader.result as string;
@@ -157,27 +158,28 @@ const [imagePreviews, setImagePreviews] = useState<string[]>([]);
       try {
         const pdfImages = await pdfToImages(file);
 
-        pdfImages.forEach((src) => {
-          setImagePreviews(prev => [...prev, src]);
+       else if (file.type === "application/pdf") {
+  try {
+    const pdfImages = await pdfToImages(file);
 
-          // convert base64 → File so pipeline stays SAME
-          fetch(src)
-            .then(res => res.blob())
-            .then(blob => {
-              const imgFile = new File([blob], "pdf-page.jpg", {
-                type: "image/jpeg",
-              });
-              setSelectedImages(prev => [...prev, imgFile]);
-            });
-        });
-      } catch (err) {
-        toast({
-          title: "PDF error",
-          description: "Failed to read PDF file",
-          variant: "destructive",
-        });
-      }
+    for (const src of pdfImages) {
+      setImagePreviews(prev => [...prev, src]);
+
+      const blob = await (await fetch(src)).blob();
+      const imgFile = new File([blob], "pdf-page.jpg", {
+        type: "image/jpeg",
+      });
+
+      setSelectedImages(prev => [...prev, imgFile]);
     }
+  } catch {
+    toast({
+      title: "PDF error",
+      description: "Failed to read PDF file",
+      variant: "destructive",
+    });
+  }
+}
 
     // ❌ Unsupported
     else {
@@ -188,16 +190,6 @@ const [imagePreviews, setImagePreviews] = useState<string[]>([]);
       });
     }
   }
-};
-
-
-  images.forEach(file => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setImagePreviews(prev => [...prev, reader.result as string]);
-    };
-    reader.readAsDataURL(file);
-  });
 };
   
   const clearImages = () => {
@@ -227,18 +219,9 @@ for (const file of files) {
   if (file.type.startsWith("image/")) {
     handleFileSelect({ target: { files: [file] } } as any);
   } else if (file.type === "application/pdf") {
-    handleFileSelect({ target: { files: [file] } } as any);
+handleFileSelect(Array.from(e.dataTransfer.files));
   }
 }
-
-  if (!images.length) {
-    toast({
-      title: "Invalid file",
-      description: "Only image files are supported.",
-      variant: "destructive",
-    });
-    return;
-  }
 
   setSelectedImages(prev => [...prev, ...images]);
 
