@@ -54,7 +54,6 @@ import type { NoteCardNote } from "@/lib/noteCard";
 
 interface NoteCardProps {
   note: NoteCardNote;
-  onAskAI?: () => void;
   onExpand?: () => void;
 }
 
@@ -78,7 +77,7 @@ const difficultyColors = {
   hard: "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20",
 };
 
-export function NoteCard({ note, onAskAI, onExpand }: NoteCardProps) {
+export function NoteCard({ note, onExpand }: NoteCardProps) {
   const navigate = useNavigate();
   const { isNoteSaved, toggleSave } = useSavedNotes();
   
@@ -250,6 +249,28 @@ export function NoteCard({ note, onAskAI, onExpand }: NoteCardProps) {
     }
   };
 
+  const handleAskAI = (e: React.MouseEvent) => {
+  e.stopPropagation();
+
+  if (!note.fileUrl) {
+    toast({
+      title: "No file found",
+      description: "This note has no attached PDF",
+      variant: "destructive",
+    });
+    return;
+  }
+
+  navigate("/gemini", {
+    state: {
+      pdfUrl: note.fileUrl,
+      title: note.title,
+      subject: note.subject,
+    },
+  });
+};
+
+
   return (
     <>
       <Card 
@@ -387,7 +408,7 @@ export function NoteCard({ note, onAskAI, onExpand }: NoteCardProps) {
                 <DropdownMenuItem onClick={() => setRatingDialogOpen(true)}><Star className="w-4 h-4 mr-2" /> Rate Quality</DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={onExpand}><Expand className="w-4 h-4 mr-2" /> Full Details</DropdownMenuItem>
-                <DropdownMenuItem onClick={onAskAI} className="text-primary font-medium focus:text-primary">
+                <DropdownMenuItem onClick={handleAskAI} className="text-primary font-medium focus:text-primary">
                   <Bot className="w-4 h-4 mr-2 animate-pulse" /> Ask AI Gemini
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
@@ -399,7 +420,7 @@ export function NoteCard({ note, onAskAI, onExpand }: NoteCardProps) {
 
             <Button 
               size="sm" 
-              onClick={(e) => { e.stopPropagation(); onAskAI?.(); }}
+              onClick={handleAskAI}
               className="h-9 ml-1 rounded-full bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 border-none px-4 gap-2 transition-all hover:scale-105 active:scale-95"
             >
               <Bot className="w-4 h-4" />
