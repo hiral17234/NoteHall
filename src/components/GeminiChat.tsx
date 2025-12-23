@@ -96,7 +96,7 @@ const [imagePreviews, setImagePreviews] = useState<string[]>([]);
         setInput(contextMessage);
       }
     }
-}, [noteContext, setContext, messages.length]);
+}, [noteContext, setContext, messages]);
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -426,7 +426,7 @@ function MessageBubble({ message }: { message: ChatMessage }) {
         variant="outline"
         size="sm"
         className="mt-2"
-        onClick={() => window.location.reload()}
+        onClick={clearChat}
       >
         Retry
       </Button>
