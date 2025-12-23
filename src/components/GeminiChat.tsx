@@ -58,15 +58,13 @@ const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { 
-    messages, 
-    isLoading, 
-    error, 
-    isConfigured, 
-    sendMessage, 
-    clearChat,
-    setContext 
-  } = useGemini();
+  const {
+  messages,
+  isLoading,
+  sendMessage,
+  clearChat,
+  setContext
+} = useGemini();
 
   // Set context when note context changes
   useEffect(() => {
@@ -191,9 +189,10 @@ await sendMessage(message, imagePayloads);
     }
   };
 
-  const handleQuickAction = (prompt: string) => {
-    sendMessage(prompt);
-  };
+  const handleQuickAction = async (prompt: string) => {
+  if (isLoading) return;
+  await sendMessage(prompt);
+};
 
   return (
    <Card
@@ -277,23 +276,26 @@ await sendMessage(message, imagePayloads);
   <div className="px-4 py-2 border-t border-border">
     <div className="flex gap-2 flex-wrap">
       {imagePreviews.map((src, index) => (
-        <div key={index} className="relative">
-          <img
-            src={src}
-            className="h-20 rounded-lg border border-border"
-          />
-        </div>
-      ))}
-      <Button
-        variant="destructive"
-        size="sm"
-        onClick={clearImages}
-      >
-        Clear images
-      </Button>
-    </div>
+  <div key={index} className="relative">
+    <img
+      src={src}
+      className="h-20 rounded-lg border border-border"
+    />
+
+    {/* REMOVE SINGLE IMAGE */}
+    <button
+      type="button"
+      onClick={() => {
+        setImagePreviews(prev => prev.filter((_, i) => i !== index));
+        setSelectedImages(prev => prev.filter((_, i) => i !== index));
+      }}
+      className="absolute -top-2 -right-2 bg-destructive text-white rounded-full p-1"
+    >
+      <X className="w-3 h-3" />
+    </button>
   </div>
-)}
+))}
+
 
 
       {/* Input */}
