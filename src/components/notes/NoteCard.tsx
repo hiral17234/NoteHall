@@ -435,6 +435,7 @@ export function NoteCard({ note, onExpand }: NoteCardProps) {
 </Button>
 
 
+
               <Bot className="w-4 h-4" />
               <span className="text-xs font-bold">Ask AI</span>
             </Button>
