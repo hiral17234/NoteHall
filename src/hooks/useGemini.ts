@@ -27,8 +27,14 @@ export function useGemini() {
     geminiService.setContext(context);
   }, []);
 
-  const sendMessage = useCallback(async (content: string) => {
-    if (!content.trim()) return;
+  const sendMessage = useCallback(
+  async (
+    content: string,
+    image?: { base64: string; mimeType: string }
+  ) => {
+
+    if (!content.trim() && !image) return;
+
     
     setError(null);
     
@@ -53,7 +59,8 @@ export function useGemini() {
     setIsLoading(true);
 
     try {
-      const response = await geminiService.sendMessage(content);
+      const response = await geminiService.sendMessage(content, image);
+
       
       // Replace loading message with actual response
       setMessages(prev => {
@@ -89,6 +96,7 @@ export function useGemini() {
       setIsLoading(false);
     }
   }, []);
+
 
   const clearChat = useCallback(() => {
     geminiService.clearHistory();
