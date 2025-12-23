@@ -250,33 +250,40 @@ export function NoteCard({ note, onExpand }: NoteCardProps) {
   };
 
   const handleAskAI = (e: React.MouseEvent) => {
+  e.preventDefault();
   e.stopPropagation();
 
   if (!note.fileUrl && note.fileType !== "link") {
-  toast({
-    title: "No file found",
-    description: "This note has no attached media",
-    variant: "destructive",
-  });
-  return;
-}
+    toast({
+      title: "No file found",
+      description: "This note has no attached media",
+      variant: "destructive",
+    });
+    return;
+  }
 
- navigate("/gemini", {
-  state: {
-    fileUrl: note.fileUrl,
-    fileType: note.fileType, // pdf | image | video | link
-    title: note.title,
-    subject: note.subject,
-  },
-});
+  navigate("/gemini", {
+    state: {
+      fileUrl: note.fileUrl,
+      fileType: note.fileType, // pdf | image | video | link
+      title: note.title,
+      subject: note.subject,
+    },
+  });
+};
 
 
   return (
     <>
-      <Card 
-        className="group relative bg-card border-border/50 hover:border-primary/50 transition-all duration-300 hover:shadow-2xl hover:shadow-primary/5 overflow-hidden flex flex-col h-full cursor-pointer"
-        onClick={onExpand}
-      >
+      <Card
+  className="group relative bg-card border-border/50 hover:border-primary/50 transition-all duration-300 hover:shadow-2xl hover:shadow-primary/5 overflow-hidden flex flex-col h-full cursor-pointer"
+  onClick={(e) => {
+    // 🔒 If click came from a button or menu, ignore card click
+    if ((e.target as HTMLElement).closest("button")) return;
+    onExpand?.();
+  }}
+>
+
         {/* TOP BADGE AREA */}
         <div className="absolute top-3 right-3 z-10 flex gap-2">
           {note.isTrusted && (
@@ -421,8 +428,7 @@ export function NoteCard({ note, onExpand }: NoteCardProps) {
            <Button
             size="sm"
             onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
+             onClick={handleAskAI}
             handleAskAI(e);
              }
               className="h-9 ml-1 rounded-full bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 border-none px-4 gap-2 transition-all hover:scale-105 active:scale-95"
