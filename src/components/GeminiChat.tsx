@@ -241,7 +241,6 @@ const handleDrop = (e: React.DragEvent) => {
   })
 );
 
-clearImages();
 await sendMessage(message, imagePayloads);
   };
 
