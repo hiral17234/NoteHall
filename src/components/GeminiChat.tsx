@@ -143,10 +143,23 @@ useEffect(() => {
 
   const loadNoteFile = async () => {
     try {
-      const file = await urlToFile(
-        noteContext.fileUrl,
-        noteContext.title || "note-file"
-      );
+   console.log("Loading file into Gemini:", noteContext.fileUrl);
+
+const response = await fetch(noteContext.fileUrl, {
+  mode: "cors",
+});
+
+if (!response.ok) {
+  throw new Error("File fetch failed");
+}
+
+const blob = await response.blob();
+
+const file = new File(
+  [blob],
+  noteContext.title || "note-file",
+  { type: blob.type }
+);
 
       // 🖼 IMAGE
       if (file.type.startsWith("image/")) {
