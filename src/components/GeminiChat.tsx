@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useGemini, ChatMessage } from "@/hooks/useGemini";
@@ -38,6 +38,17 @@ const quickActions = [
   { id: "tips", label: "Study Tips", icon: BookOpen, prompt: "Give me effective study tips for this subject" },
 ];
 
+/* =======================
+   ✅ ADDED (REQUIRED)
+   ======================= */
+const fileToBase64 = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
 export function GeminiChat({ noteContext, className }: GeminiChatProps) {
   const [input, setInput] = useState("");
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
@@ -63,7 +74,6 @@ export function GeminiChat({ noteContext, className }: GeminiChatProps) {
         noteContent: noteContext.content,
         selectedSubject: noteContext.subject,
       });
-      // If we have note context, add an initial message about it
       if (noteContext.title && messages.length <= 1) {
         const contextMessage = `I'm asking about the note: "${noteContext.title}" (${noteContext.subject || 'Unknown subject'})`;
         setInput(contextMessage);
@@ -81,8 +91,12 @@ export function GeminiChat({ noteContext, className }: GeminiChatProps) {
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (!file.type.startsWith('image/')) {
-        toast({ title: "Invalid file", description: "Please select an image file.", variant: "destructive" });
+      if (!file.type.startsWith("image/")) {
+        toast({
+          title: "Invalid file",
+          description: "Please select an image file.",
+          variant: "destructive",
+        });
         return;
       }
       setSelectedImage(file);
@@ -98,25 +112,34 @@ export function GeminiChat({ noteContext, className }: GeminiChatProps) {
     setSelectedImage(null);
     setImagePreview(null);
     if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+      fileInputRef.current.value = "";
     }
   };
 
+  /* =======================
+     ✅ EDITED (CORE FIX)
+     ======================= */
   const handleSend = async () => {
     if ((!input.trim() && !selectedImage) || isLoading) return;
-    
-    let message = input;
-    
-    // If we have an image, include it in the message context
-    if (selectedImage && imagePreview) {
-      message = `[Image attached: ${selectedImage.name}]\n${input || "Please analyze this image."}`;
-      // Note: For actual image analysis, the backend would need to handle the image
-      // For now, we'll just indicate that an image was attached
-    }
-    
+
+    const message = input || "Please analyze this image.";
+
     setInput("");
+
+    let imagePayload:
+      | { base64: string; mimeType: string }
+      | undefined = undefined;
+
+    if (selectedImage) {
+      const base64 = await fileToBase64(selectedImage);
+      imagePayload = {
+        base64: base64.split(",")[1], // IMPORTANT
+        mimeType: selectedImage.type,
+      };
+    }
+
     clearImage();
-    await sendMessage(message);
+    await sendMessage(message, imagePayload); // ✅ IMAGE NOW SENT
     inputRef.current?.focus();
   };
 
@@ -153,8 +176,15 @@ export function GeminiChat({ noteContext, className }: GeminiChatProps) {
       {noteContext?.title && (
         <div className="px-4 py-2 bg-primary/5 border-b border-border">
           <p className="text-xs text-muted-foreground">
-            Asking about: <span className="font-medium text-foreground">{noteContext.title}</span>
-            {noteContext.subject && <span className="text-primary ml-1">({noteContext.subject})</span>}
+            Asking about:{" "}
+            <span className="font-medium text-foreground">
+              {noteContext.title}
+            </span>
+            {noteContext.subject && (
+              <span className="text-primary ml-1">
+                ({noteContext.subject})
+              </span>
+            )}
           </p>
         </div>
       )}
@@ -162,7 +192,9 @@ export function GeminiChat({ noteContext, className }: GeminiChatProps) {
       {/* Quick Actions */}
       {messages.length <= 1 && !noteContext?.title && (
         <div className="p-4 border-b border-border">
-          <p className="text-xs text-muted-foreground mb-2">Quick actions:</p>
+          <p className="text-xs text-muted-foreground mb-2">
+            Quick actions:
+          </p>
           <div className="flex flex-wrap gap-2">
             {quickActions.map((action) => (
               <Button
@@ -194,9 +226,9 @@ export function GeminiChat({ noteContext, className }: GeminiChatProps) {
       {imagePreview && (
         <div className="px-4 py-2 border-t border-border">
           <div className="relative inline-block">
-            <img 
-              src={imagePreview} 
-              alt="Selected" 
+            <img
+              src={imagePreview}
+              alt="Selected"
               className="h-20 rounded-lg border border-border"
             />
             <Button
@@ -239,8 +271,8 @@ export function GeminiChat({ noteContext, className }: GeminiChatProps) {
             disabled={isLoading}
             className="flex-1"
           />
-          <Button 
-            onClick={handleSend} 
+          <Button
+            onClick={handleSend}
             disabled={(!input.trim() && !selectedImage) || isLoading}
             className="bg-primary hover:bg-primary/90"
           >
@@ -283,48 +315,36 @@ function MessageBubble({ message }: { message: ChatMessage }) {
   return (
     <div className={cn("flex items-start gap-3", isUser && "flex-row-reverse")}>
       <Avatar className="w-8 h-8 flex-shrink-0">
-        <AvatarFallback className={cn(
-          isUser ? "bg-secondary text-secondary-foreground" : "bg-primary/10 text-primary"
-        )}>
+        <AvatarFallback
+          className={cn(
+            isUser
+              ? "bg-secondary text-secondary-foreground"
+              : "bg-primary/10 text-primary"
+          )}
+        >
           {isUser ? "U" : <Sparkles className="w-4 h-4" />}
         </AvatarFallback>
       </Avatar>
-      <div className={cn(
-        "flex-1 rounded-lg p-3 max-w-[85%]",
-        isUser ? "bg-primary text-primary-foreground ml-auto" : "bg-muted"
-      )}>
+      <div
+        className={cn(
+          "flex-1 rounded-lg p-3 max-w-[85%]",
+          isUser
+            ? "bg-primary text-primary-foreground ml-auto"
+            : "bg-muted"
+        )}
+      >
         {isUser ? (
           <p className="text-sm whitespace-pre-wrap">{message.content}</p>
         ) : (
           <div className="prose prose-sm dark:prose-invert max-w-none">
-            <ReactMarkdown
-              components={{
-                p: ({ children }) => <p className="text-sm mb-2 last:mb-0">{children}</p>,
-                ul: ({ children }) => <ul className="text-sm list-disc pl-4 mb-2">{children}</ul>,
-                ol: ({ children }) => <ol className="text-sm list-decimal pl-4 mb-2">{children}</ol>,
-                li: ({ children }) => <li className="mb-1">{children}</li>,
-                h1: ({ children }) => <h1 className="text-base font-bold mb-2">{children}</h1>,
-                h2: ({ children }) => <h2 className="text-sm font-bold mb-2">{children}</h2>,
-                h3: ({ children }) => <h3 className="text-sm font-semibold mb-1">{children}</h3>,
-                strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
-                code: ({ children }) => (
-                  <code className="bg-background/50 px-1 py-0.5 rounded text-xs font-mono">
-                    {children}
-                  </code>
-                ),
-                pre: ({ children }) => (
-                  <pre className="bg-background/50 p-2 rounded overflow-x-auto text-xs my-2">
-                    {children}
-                  </pre>
-                ),
-              }}
-            >
-              {message.content}
-            </ReactMarkdown>
+            <ReactMarkdown>{message.content}</ReactMarkdown>
           </div>
         )}
         <p className="text-[10px] opacity-60 mt-1">
-          {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+          {message.timestamp.toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          })}
         </p>
       </div>
     </div>
