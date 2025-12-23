@@ -16,7 +16,6 @@ export interface GeminiContext {
   noteTitle?: string;
 }
 
-// API endpoint - uses relative path for Vercel deployment
 const API_ENDPOINT = "/api/gemini";
 
 class GeminiService {
@@ -24,7 +23,6 @@ class GeminiService {
   private context: GeminiContext = {};
 
   isConfigured(): boolean {
-    // Always configured since backend handles the API key
     return true;
   }
 
@@ -40,8 +38,13 @@ class GeminiService {
     return [...this.conversationHistory];
   }
 
-  async sendMessage(userMessage: string): Promise<string> {
-    // Add user message to history
+  async sendMessage(
+    userMessage: string,
+    image?: {
+      base64: string;
+      mimeType: string;
+    }
+  ): Promise<string> {
     this.conversationHistory.push({ role: "user", content: userMessage });
 
     try {
@@ -52,6 +55,7 @@ class GeminiService {
         },
         body: JSON.stringify({
           prompt: userMessage,
+          image, // ✅ FIX
           context: {
             subject: this.context.selectedSubject,
             noteTitle: this.context.noteTitle,
@@ -59,7 +63,7 @@ class GeminiService {
             userBranch: this.context.userBranch,
             userYear: this.context.userYear,
           },
-          history: this.conversationHistory.slice(0, -1), // Exclude current message
+          history: this.conversationHistory.slice(0, -1),
         }),
       });
 
@@ -71,53 +75,16 @@ class GeminiService {
       const data = await response.json();
       const assistantMessage = data.text;
 
-      // Add assistant response to history
-      this.conversationHistory.push({ role: "model", content: assistantMessage });
+      this.conversationHistory.push({
+        role: "model",
+        content: assistantMessage,
+      });
 
       return assistantMessage;
     } catch (error) {
-      // Remove the failed user message from history
       this.conversationHistory.pop();
       throw error;
     }
-  }
-
-  // Specialized methods for common actions
-  async summarize(content: string, format: "short" | "bullets" | "exam"): Promise<string> {
-    const prompts = {
-      short: `Provide a concise summary (2-3 paragraphs) of the following content:\n\n${content}`,
-      bullets: `Summarize the following content as bullet points with key concepts:\n\n${content}`,
-      exam: `Extract the most important exam-focused points from this content. Include key definitions, formulas, and concepts likely to appear in exams:\n\n${content}`,
-    };
-    
-    return this.sendMessage(prompts[format]);
-  }
-
-  async explainConcept(concept: string, level: "beginner" | "intermediate" | "advanced"): Promise<string> {
-    const levelDescriptions = {
-      beginner: "Explain this as if I'm completely new to the topic. Use simple language and analogies.",
-      intermediate: "Explain this assuming I have basic knowledge. Include more technical details.",
-      advanced: "Give me an in-depth explanation with technical details, edge cases, and advanced concepts.",
-    };
-
-    return this.sendMessage(`${levelDescriptions[level]}\n\nConcept: ${concept}`);
-  }
-
-  async generateQuestions(topic: string, count: number = 5): Promise<string> {
-    return this.sendMessage(`Generate ${count} practice questions about "${topic}". Include a mix of:
-- 2 conceptual/theory questions
-- 2 application/problem-solving questions  
-- 1 tricky/challenging question that could appear in exams
-
-Format each question clearly with numbers.`);
-  }
-
-  async getStudyTips(subject: string): Promise<string> {
-    return this.sendMessage(`Provide practical study tips and strategies for learning ${subject}. Include:
-- Recommended approach/methodology
-- Common mistakes to avoid
-- Key topics to focus on
-- Resources or techniques that help`);
   }
 }
 
