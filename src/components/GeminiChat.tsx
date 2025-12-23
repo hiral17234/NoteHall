@@ -40,13 +40,30 @@ const quickActions = [
 
 // ✅ ADD: helper to convert image to base64
 const fileToBase64 = (file: File): Promise<string> =>
-  new Promise((resolve, reject) => {
+  new Promise((resolve) => {
+    const img = new Image();
     const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = reject;
+
+    reader.onload = () => {
+      img.src = reader.result as string;
+    };
+
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      const MAX = 1024;
+      const scale = Math.min(MAX / img.width, MAX / img.height, 1);
+
+      canvas.width = img.width * scale;
+      canvas.height = img.height * scale;
+
+      const ctx = canvas.getContext("2d")!;
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+      resolve(canvas.toDataURL("image/jpeg", 0.8));
+    };
+
     reader.readAsDataURL(file);
   });
-
 
 
 
@@ -402,6 +419,34 @@ function MessageBubble({ message }: { message: ChatMessage }) {
           <div className="prose prose-sm dark:prose-invert max-w-none">
             <ReactMarkdown>{message.content}</ReactMarkdown>
           </div>
+        {isUser ? (
+  <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+) : (
+  <div className="prose prose-sm dark:prose-invert max-w-none">
+    <ReactMarkdown>{message.content}</ReactMarkdown>
+  </div>
+)}
+
+/* 👉 ADD RETRY BUTTON RIGHT HERE */
+{!isUser && message.content.includes("⚠️") && (
+  <Button
+    variant="outline"
+    size="sm"
+    className="mt-2"
+    onClick={() => window.location.reload()}
+  >
+    Retry
+  </Button>
+)}
+
+<p className="text-[10px] opacity-60 mt-1">
+  {message.timestamp.toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  })}
+</p>
+
+        
         )}
         <p className="text-[10px] opacity-60 mt-1">
           {message.timestamp.toLocaleTimeString([], {
