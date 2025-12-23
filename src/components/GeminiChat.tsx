@@ -136,10 +136,10 @@ const handleDrop = (e: React.DragEvent) => {
   e.preventDefault();
   setIsDragging(false);
 
-  const file = e.dataTransfer.files?.[0];
-  if (!file) return;
+  const files = Array.from(e.dataTransfer.files || []);
+  const images = files.filter(f => f.type.startsWith("image/"));
 
-  if (!file.type.startsWith("image/")) {
+  if (!images.length) {
     toast({
       title: "Invalid file",
       description: "Only image files are supported.",
@@ -148,14 +148,17 @@ const handleDrop = (e: React.DragEvent) => {
     return;
   }
 
-  setSelectedImage(file);
+  setSelectedImages(prev => [...prev, ...images]);
 
-  const reader = new FileReader();
-  reader.onloadend = () => {
-    setImagePreview(reader.result as string);
-  };
-  reader.readAsDataURL(file);
+  images.forEach(file => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setImagePreviews(prev => [...prev, reader.result as string]);
+    };
+    reader.readAsDataURL(file);
+  });
 };
+
 
   /* =======================
      ✅ EDITED (CORE FIX)
@@ -269,36 +272,41 @@ await sendMessage(message, imagePayloads);
       </ScrollArea>
 
       {/* Image Preview */}
-      {imagePreview && (
-        <div className="px-4 py-2 border-t border-border">
-          <div className="relative inline-block">
-            <img
-              src={imagePreview}
-              alt="Selected"
-              className="h-20 rounded-lg border border-border"
-            />
-            <Button
-              variant="destructive"
-              size="icon"
-              className="absolute -top-2 -right-2 h-6 w-6"
-              onClick={clearImage}
-            >
-              <X className="w-3 h-3" />
-            </Button>
-          </div>
+     {imagePreviews.length > 0 && (
+  <div className="px-4 py-2 border-t border-border">
+    <div className="flex gap-2 flex-wrap">
+      {imagePreviews.map((src, index) => (
+        <div key={index} className="relative">
+          <img
+            src={src}
+            className="h-20 rounded-lg border border-border"
+          />
         </div>
-      )}
+      ))}
+      <Button
+        variant="destructive"
+        size="sm"
+        onClick={clearImages}
+      >
+        Clear images
+      </Button>
+    </div>
+  </div>
+)}
+
 
       {/* Input */}
       <div className="p-4 border-t border-border">
         <div className="flex gap-2">
           <input
             type="file"
+            multiple
             ref={fileInputRef}
             onChange={handleImageSelect}
             accept="image/*"
             className="hidden"
-          />
+            />
+          
           <Button
             variant="outline"
             size="icon"
@@ -319,7 +327,7 @@ await sendMessage(message, imagePayloads);
           />
           <Button
             onClick={handleSend}
-            disabled={(!input.trim() && !selectedImage) || isLoading}
+            disabled={(!input.trim() && selectedImages.length === 0) || isLoading}
             className="bg-primary hover:bg-primary/90"
           >
             {isLoading ? (
