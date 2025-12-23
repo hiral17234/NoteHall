@@ -1,13 +1,3 @@
-// ✅ ADD: helper to convert image to base64
-const fileToBase64 = (file: File): Promise<string> =>
-  new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-
-
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,11 +38,23 @@ const quickActions = [
   { id: "tips", label: "Study Tips", icon: BookOpen, prompt: "Give me effective study tips for this subject" },
 ];
 
+// ✅ ADD: helper to convert image to base64
+const fileToBase64 = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
+
+
 
 export function GeminiChat({ noteContext, className }: GeminiChatProps) {
   const [input, setInput] = useState("");
-  const [selectedImage, setSelectedImage] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [selectedImages, setSelectedImages] = useState<File[]>([]);
+const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [isDragging, setIsDragging] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -89,59 +91,94 @@ export function GeminiChat({ noteContext, className }: GeminiChatProps) {
   }, [messages]);
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (!file.type.startsWith("image/")) {
-        toast({
-          title: "Invalid file",
-          description: "Please select an image file.",
-          variant: "destructive",
-        });
-        return;
-      }
-      setSelectedImage(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
+  const files = Array.from(e.target.files || []);
 
-  const clearImage = () => {
-    setSelectedImage(null);
-    setImagePreview(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
+  const images = files.filter(f => f.type.startsWith("image/"));
+  if (!images.length) {
+    toast({
+      title: "Invalid file",
+      description: "Only image files are allowed",
+      variant: "destructive",
+    });
+    return;
+  }
+
+  setSelectedImages(prev => [...prev, ...images]);
+
+  images.forEach(file => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setImagePreviews(prev => [...prev, reader.result as string]);
+    };
+    reader.readAsDataURL(file);
+  });
+};
+  
+  const clearImages = () => {
+  setSelectedImages([]);
+  setImagePreviews([]);
+  if (fileInputRef.current) fileInputRef.current.value = "";
+};
+
+/* =======================
+   DRAG & DROP HANDLERS
+======================= */
+const handleDragOver = (e: React.DragEvent) => {
+  e.preventDefault();
+  setIsDragging(true);
+};
+
+const handleDragLeave = () => {
+  setIsDragging(false);
+};
+
+const handleDrop = (e: React.DragEvent) => {
+  e.preventDefault();
+  setIsDragging(false);
+
+  const file = e.dataTransfer.files?.[0];
+  if (!file) return;
+
+  if (!file.type.startsWith("image/")) {
+    toast({
+      title: "Invalid file",
+      description: "Only image files are supported.",
+      variant: "destructive",
+    });
+    return;
+  }
+
+  setSelectedImage(file);
+
+  const reader = new FileReader();
+  reader.onloadend = () => {
+    setImagePreview(reader.result as string);
   };
+  reader.readAsDataURL(file);
+};
 
   /* =======================
      ✅ EDITED (CORE FIX)
      ======================= */
   const handleSend = async () => {
-    if ((!input.trim() && !selectedImage) || isLoading) return;
+    if ((!input.trim() && selectedImages.length === 0) || isLoading) return;
 
     const message = input || "Please analyze this image.";
 
     setInput("");
 
-    let imagePayload:
-      | { base64: string; mimeType: string }
-      | undefined = undefined;
+    const imagePayloads = await Promise.all(
+  selectedImages.map(async file => {
+    const base64 = await fileToBase64(file);
+    return {
+      base64: base64.split(",")[1],
+      mimeType: file.type,
+    };
+  })
+);
 
-    if (selectedImage) {
-      const base64 = await fileToBase64(selectedImage);
-      imagePayload = {
-        base64: base64.split(",")[1], // IMPORTANT
-        mimeType: selectedImage.type,
-      };
-    }
-
-    clearImage();
-    await sendMessage(message, imagePayload); // ✅ IMAGE NOW SENT
-    inputRef.current?.focus();
-  };
+clearImages();
+await sendMessage(message, imagePayloads);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -155,7 +192,16 @@ export function GeminiChat({ noteContext, className }: GeminiChatProps) {
   };
 
   return (
-    <Card className={cn("bg-card border-border flex flex-col h-full", className)}>
+   <Card
+  onDragOver={handleDragOver}
+  onDragLeave={handleDragLeave}
+  onDrop={handleDrop}
+  className={cn(
+    "bg-card border-border flex flex-col h-full",
+    isDragging && "ring-2 ring-primary ring-dashed",
+    className
+  )}
+> 
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-border">
         <div className="flex items-center gap-2">
