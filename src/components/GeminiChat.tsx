@@ -81,7 +81,7 @@ const [imagePreviews, setImagePreviews] = useState<string[]>([]);
         setInput(contextMessage);
       }
     }
-  }, [noteContext, setContext]);
+}, [noteContext, setContext, messages.length]);
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -182,6 +182,7 @@ const handleDrop = (e: React.DragEvent) => {
 
 clearImages();
 await sendMessage(message, imagePayloads);
+  };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
