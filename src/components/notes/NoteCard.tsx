@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { formatDate } from "@/lib/formatDate";
 import { 
   FileText, 
   Image, 
@@ -308,7 +309,10 @@ export function NoteCard({ note, onExpand }: NoteCardProps) {
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <span className="truncate">by <span className="font-medium text-foreground/80">{note.authorName}</span></span>
                 <span>•</span>
-                <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {note.timestamp ?? "Recently"}</span>
+                <span className="flex items-center gap-1">
+  <Clock className="w-3 h-3" /> {formatDate(note.timestamp)}
+</span>
+
               </div>
             </div>
           </div>
