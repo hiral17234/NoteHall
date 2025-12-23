@@ -1,17 +1,24 @@
-export function formatDate(ts: any): string {
-  if (!ts) return "Recently";
+import { Timestamp } from "firebase/firestore";
 
+export function formatDate(value: any): string {
   try {
+    if (!value) return "Recently";
+
     // Firestore Timestamp
-    if (typeof ts === "object" && "seconds" in ts) {
-      return new Date(ts.seconds * 1000).toLocaleDateString();
+    if (value instanceof Timestamp) {
+      return value.toDate().toLocaleDateString();
     }
 
-    // ISO string / Date
-    const d = new Date(ts);
-    if (isNaN(d.getTime())) return "Recently";
+    // Firestore timestamp-like object
+    if (typeof value === "object" && value.seconds) {
+      return new Date(value.seconds * 1000).toLocaleDateString();
+    }
 
-    return d.toLocaleDateString();
+    // ISO string / Date / number
+    const date = new Date(value);
+    if (isNaN(date.getTime())) return "Recently";
+
+    return date.toLocaleDateString();
   } catch {
     return "Recently";
   }
