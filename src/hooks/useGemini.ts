@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { geminiService, GeminiContext } from "@/services/geminiService";
 
 export interface ChatMessage {
@@ -10,14 +10,29 @@ export interface ChatMessage {
 }
 
 export function useGemini() {
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: "welcome",
-      content: "Hi! I'm **Gemini**, your AI study assistant. I can help you:\n\n• **Summarize notes** - Get quick summaries or exam-focused points\n• **Explain concepts** - Clear explanations at your level\n• **Answer doubts** - Step-by-step problem solving\n• **Study tips** - Personalized recommendations\n\nHow can I help you today?",
-      role: "assistant",
-      timestamp: new Date(),
-    },
-  ]);
+const [messages, setMessages] = useState<ChatMessage[]>(() => {
+  const saved = sessionStorage.getItem("gemini-chat");
+  return saved
+    ? JSON.parse(saved).map((m: any) => ({
+        ...m,
+        timestamp: new Date(m.timestamp),
+      }))
+    : [
+        {
+          id: "welcome",
+          content: "Hi! I'm **Gemini**, your AI study assistant. How can I help you today?",
+          role: "assistant",
+          timestamp: new Date(),
+        },
+      ];
+});
+
+
+  // ✅ ADD THIS EXACTLY HERE
+useEffect(() => {
+  sessionStorage.setItem("gemini-chat", JSON.stringify(messages));
+}, [messages]);
+
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -99,17 +114,20 @@ if (!content.trim() && (!images || images.length === 0)) return;
 
 
   const clearChat = useCallback(() => {
-    geminiService.clearHistory();
-    setMessages([
-      {
-        id: "welcome",
-        content: "Hi! I'm **Gemini**, your AI study assistant. How can I help you today?",
-        role: "assistant",
-        timestamp: new Date(),
-      },
-    ]);
-    setError(null);
-  }, []);
+  geminiService.clearHistory();
+  sessionStorage.removeItem("gemini-chat");
+
+  setMessages([
+    {
+      id: "welcome",
+      content: "Hi! I'm **Gemini**, your AI study assistant. How can I help you today?",
+      role: "assistant",
+      timestamp: new Date(),
+    },
+  ]);
+
+  setError(null);
+}, []);
 
   const summarize = useCallback(async (content: string, format: "short" | "bullets" | "exam") => {
     setIsLoading(true);
