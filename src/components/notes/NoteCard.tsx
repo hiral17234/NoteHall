@@ -250,10 +250,9 @@ export function NoteCard({ note, onExpand }: NoteCardProps) {
   };
 
   const handleAskAI = (e: React.MouseEvent) => {
-  e.preventDefault();
   e.stopPropagation();
 
-  if (!note.fileUrl && note.fileType !== "link") {
+  if (!note.fileUrl) {
     toast({
       title: "No file found",
       description: "This note has no attached media",
@@ -273,15 +272,16 @@ export function NoteCard({ note, onExpand }: NoteCardProps) {
 };
 
 
+
   return (
     <>
       <Card
   className="group relative bg-card border-border/50 hover:border-primary/50 transition-all duration-300 hover:shadow-2xl hover:shadow-primary/5 overflow-hidden flex flex-col h-full cursor-pointer"
   onClick={(e) => {
-    // 🔒 If click came from a button or menu, ignore card click
-    if ((e.target as HTMLElement).closest("button")) return;
-    onExpand?.();
-  }}
+  if ((e.target as HTMLElement).closest("button, [role='menuitem']")) return;
+  onExpand?.();
+}}
+
 >
 
         {/* TOP BADGE AREA */}
@@ -426,13 +426,15 @@ export function NoteCard({ note, onExpand }: NoteCardProps) {
             </DropdownMenu>
 
            <Button
-            size="sm"
-            onClick={(e) => {
-             onClick={handleAskAI}
-            handleAskAI(e);
-             }
-              className="h-9 ml-1 rounded-full bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 border-none px-4 gap-2 transition-all hover:scale-105 active:scale-95"
-            >
+  size="sm"
+  onClick={handleAskAI}
+  className="h-9 ml-1 rounded-full bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 border-none px-4 gap-2 transition-all hover:scale-105 active:scale-95"
+>
+  <Bot className="w-4 h-4" />
+  <span className="text-xs font-bold">Ask AI</span>
+</Button>
+
+
               <Bot className="w-4 h-4" />
               <span className="text-xs font-bold">Ask AI</span>
             </Button>
