@@ -17,11 +17,11 @@ export default async function handler(
       return res.status(500).json({ error: "API key missing" });
     }
 
-    const { prompt, image } = req.body;
+    const { prompt, images } = req.body;
 
-    if (!prompt && !image) {
-      return res.status(400).json({ error: "Prompt or image required" });
-    }
+    if (!prompt && (!images || images.length === 0)) {
+  return res.status(400).json({ error: "Prompt or image required" });
+}
 
     const genAI = new GoogleGenerativeAI(apiKey);
 
@@ -37,14 +37,19 @@ export default async function handler(
       parts.push({ text: prompt });
     }
 
-    if (image?.base64 && image?.mimeType) {
+    if (Array.isArray(images)) {
+  for (const img of images) {
+    if (img?.base64 && img?.mimeType) {
       parts.push({
         inlineData: {
-          data: image.base64,
-          mimeType: image.mimeType,
+          data: img.base64,
+          mimeType: img.mimeType,
         },
       });
     }
+  }
+}
+
 
     const result = await model.generateContent({
       contents: [{ role: "user", parts }],
