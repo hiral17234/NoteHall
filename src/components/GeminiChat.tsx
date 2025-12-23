@@ -370,6 +370,9 @@ await sendMessage(message, imagePayloads);
       {/* Input */}
       <div className="p-4 border-t border-border">
         <div className="flex gap-2">
+          <p className="text-xs text-muted-foreground mt-1 text-center">
+  Supports images & PDFs
+</p>
           <input
   type="file"
   multiple
@@ -385,9 +388,9 @@ await sendMessage(message, imagePayloads);
             size="icon"
             onClick={() => fileInputRef.current?.click()}
             disabled={isLoading}
-            title="Attach image"
+            title="Attach image or PDF"
           >
-            <ImageIcon className="w-4 h-4" />
+            <FileText className="w-4 h-4" />
           </Button>
           <Input
             ref={inputRef}
