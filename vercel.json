@@ -1,6 +1,6 @@
 {
   "functions": {
-    "api/gemini.ts": {
+    "api/**/*.ts": {
       "runtime": "nodejs18.x"
     }
   }
