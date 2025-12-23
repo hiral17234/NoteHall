@@ -419,13 +419,6 @@ function MessageBubble({ message }: { message: ChatMessage }) {
           <div className="prose prose-sm dark:prose-invert max-w-none">
             <ReactMarkdown>{message.content}</ReactMarkdown>
           </div>
-        {isUser ? (
-  <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-) : (
-  <div className="prose prose-sm dark:prose-invert max-w-none">
-    <ReactMarkdown>{message.content}</ReactMarkdown>
-  </div>
-)}
 
 /* 👉 ADD RETRY BUTTON RIGHT HERE */
 {!isUser && message.content.includes("⚠️") && (
