@@ -40,7 +40,9 @@ const quickActions = [
 
 // ✅ ADD: helper to convert image to base64
 const fileToBase64 = (file: File): Promise<string> =>
-  new Promise((resolve) => {
+new Promise((resolve, reject) => {
+    img.onerror = () => reject("Image load failed");
+reader.onerror = () => reject("File read failed");
     const img = new Image();
     const reader = new FileReader();
 
@@ -96,7 +98,7 @@ const [imagePreviews, setImagePreviews] = useState<string[]>([]);
         setInput(contextMessage);
       }
     }
-}, [noteContext, setContext, messages]);
+}, [noteContext, setContext, messages.length]);
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -280,8 +282,8 @@ await sendMessage(message, imagePayloads);
       )}
 
       {/* Messages */}
-<ScrollArea ref={scrollRef} className="flex-1 p-4">
-    <div className="space-y-4">
+<ScrollArea className="flex-1 p-4">
+  <div ref={scrollRef} className="space-y-4">
         <div className="space-y-4">
           {messages.map((message) => (
             <MessageBubble key={message.id} message={message} />
