@@ -263,7 +263,8 @@ await sendMessage(message, imagePayloads);
       )}
 
       {/* Messages */}
-      <ScrollArea className="flex-1 p-4" ref={scrollRef}>
+<ScrollArea className="flex-1 p-4">
+    <div ref={scrollRef} className="space-y-4">
         <div className="space-y-4">
           {messages.map((message) => (
             <MessageBubble key={message.id} message={message} />
@@ -295,6 +296,10 @@ await sendMessage(message, imagePayloads);
     </button>
   </div>
 ))}
+          </div>
+  </div>
+)}
+
 
 
 
