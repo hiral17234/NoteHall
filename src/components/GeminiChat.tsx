@@ -48,16 +48,6 @@ const quickActions = [
   { id: "tips", label: "Study Tips", icon: BookOpen, prompt: "Give me effective study tips for this subject" },
 ];
 
-/* =======================
-   ✅ ADDED (REQUIRED)
-   ======================= */
-const fileToBase64 = (file: File): Promise<string> =>
-  new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
 
 export function GeminiChat({ noteContext, className }: GeminiChatProps) {
   const [input, setInput] = useState("");
