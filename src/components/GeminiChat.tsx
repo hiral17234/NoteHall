@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect } from "react";
+import * as pdfjsLib from "pdfjs-dist";
+import pdfWorker from "pdfjs-dist/build/pdf.worker?url";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -67,7 +69,35 @@ reader.onerror = () => reject("File read failed");
     reader.readAsDataURL(file);
   });
 
+const pdfToImages = async (file: File): Promise<string[]> => {
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
 
+  const images: string[] = [];
+
+  for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+    const page = await pdf.getPage(pageNum);
+    const viewport = page.getViewport({ scale: 2 });
+
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d")!;
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+
+    await page.render({
+      canvasContext: ctx,
+      viewport,
+    }).promise;
+
+    images.push(canvas.toDataURL("image/jpeg", 0.8));
+  }
+
+  return images;
+};
+
+
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
 
 export function GeminiChat({ noteContext, className }: GeminiChatProps) {
   const [input, setInput] = useState("");
@@ -107,20 +137,59 @@ const [imagePreviews, setImagePreviews] = useState<string[]>([]);
     }
   }, [messages]);
 
-  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
   const files = Array.from(e.target.files || []);
 
-  const images = files.filter(f => f.type.startsWith("image/"));
-  if (!images.length) {
-    toast({
-      title: "Invalid file",
-      description: "Only image files are allowed",
-      variant: "destructive",
-    });
-    return;
-  }
+  for (const file of files) {
+    // 🖼 IMAGE
+    if (file.type.startsWith("image/")) {
+      setSelectedImages(prev => [...prev, file]);
 
-  setSelectedImages(prev => [...prev, ...images]);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreviews(prev => [...prev, reader.result as string]);
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // 📄 PDF
+    else if (file.type === "application/pdf") {
+      try {
+        const pdfImages = await pdfToImages(file);
+
+        pdfImages.forEach((src) => {
+          setImagePreviews(prev => [...prev, src]);
+
+          // convert base64 → File so pipeline stays SAME
+          fetch(src)
+            .then(res => res.blob())
+            .then(blob => {
+              const imgFile = new File([blob], "pdf-page.jpg", {
+                type: "image/jpeg",
+              });
+              setSelectedImages(prev => [...prev, imgFile]);
+            });
+        });
+      } catch (err) {
+        toast({
+          title: "PDF error",
+          description: "Failed to read PDF file",
+          variant: "destructive",
+        });
+      }
+    }
+
+    // ❌ Unsupported
+    else {
+      toast({
+        title: "Unsupported file",
+        description: "Only images and PDFs are supported",
+        variant: "destructive",
+      });
+    }
+  }
+};
+
 
   images.forEach(file => {
     const reader = new FileReader();
@@ -154,7 +223,13 @@ const handleDrop = (e: React.DragEvent) => {
   setIsDragging(false);
 
   const files = Array.from(e.dataTransfer.files || []);
-  const images = files.filter(f => f.type.startsWith("image/"));
+for (const file of files) {
+  if (file.type.startsWith("image/")) {
+    handleFileSelect({ target: { files: [file] } } as any);
+  } else if (file.type === "application/pdf") {
+    handleFileSelect({ target: { files: [file] } } as any);
+  }
+}
 
   if (!images.length) {
     toast({
@@ -327,13 +402,14 @@ await sendMessage(message, imagePayloads);
       <div className="p-4 border-t border-border">
         <div className="flex gap-2">
           <input
-            type="file"
-            multiple
-            ref={fileInputRef}
-            onChange={handleImageSelect}
-            accept="image/*"
-            className="hidden"
-            />
+  type="file"
+  multiple
+  ref={fileInputRef}
+  onChange={handleFileSelect}
+  accept="image/*,application/pdf"
+  className="hidden"
+/>
+
           
           <Button
             variant="outline"
