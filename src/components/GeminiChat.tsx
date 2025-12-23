@@ -69,7 +69,7 @@ const fileToBase64 = (file: File): Promise<string> =>
 
     reader.readAsDataURL(file);
   });
-;
+
 
 const pdfToImages = async (file: File): Promise<string[]> => {
   const arrayBuffer = await file.arrayBuffer();
@@ -130,7 +130,7 @@ const [imagePreviews, setImagePreviews] = useState<string[]>([]);
         setInput(contextMessage);
       }
     }
-}, [noteContext, setContext, messages.length]);
+}, [noteContext, setContext, messages]);
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -163,7 +163,7 @@ const [imagePreviews, setImagePreviews] = useState<string[]>([]);
       setImagePreviews(prev => [...prev, src]);
 
       const blob = await (await fetch(src)).blob();
-      const imgFile = new File([blob], "pdf-page.jpg", {
+const imgFile = new File([blob], `pdf-page-${Date.now()}.jpg`, {
         type: "image/jpeg",
       });
 
