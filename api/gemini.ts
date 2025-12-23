@@ -18,19 +18,22 @@ export default async function handler(
 
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      console.error("GEMINI_API_KEY missing");
       return res.status(500).json({ error: "Server misconfigured" });
     }
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+
+    // ✅ FIXED MODEL
+    const model = genAI.getGenerativeModel({
+      model: "gemini-1.5-flash"
+    });
 
     const result = await model.generateContent(prompt);
     const text = result.response.text();
 
     return res.status(200).json({ text });
-  } catch (err: any) {
-    console.error("Gemini error:", err);
+  } catch (error) {
+    console.error("Gemini error:", error);
     return res.status(500).json({ error: "Gemini failed" });
   }
 }
