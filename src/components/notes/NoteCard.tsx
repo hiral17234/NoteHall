@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { 
   FileText, 
   Image, 
@@ -78,6 +79,7 @@ const difficultyColors = {
 };
 
 export function NoteCard({ note, onAskAI, onExpand }: NoteCardProps) {
+  const navigate = useNavigate();
   const { isNoteSaved, toggleSave } = useSavedNotes();
   
   // Interaction States
