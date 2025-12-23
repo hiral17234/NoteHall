@@ -9,6 +9,7 @@ import { ContributionCard } from "@/components/helpdesk/ContributionCard";
 import { StatDetailModal, AchievementsSection } from "@/components/profile/StatDetailModal";
 import { HelloWaveIcon } from "@/components/profile/HelloWaveIcon";
 import { useAuth } from "@/contexts/AuthContext";
+import { formatDate } from "@/lib/formatDate";
 import { 
   usersService, 
   notesService, 
@@ -329,7 +330,7 @@ export default function Profile() {
                       fileName: c.content,
                       contributorId: c.contributorId,
                       contributorName: c.contributorName,
-                      timestamp: c.createdAt?.toDate?.()?.toLocaleDateString() || 'Recently',
+timestamp: formatDate(c.createdAt),
                       likes: 0,
                     }} 
                   />
@@ -357,7 +358,7 @@ export default function Profile() {
                               </div>
                               <div>
                                 <p className="font-bold text-sm leading-none mb-1">{item.title}</p>
-                                <p className="text-xs text-muted-foreground">{item.subject} • {new Date(item.downloadedAt?.seconds * 1000).toLocaleDateString()}</p>
+                                <p className="text-xs text-muted-foreground">{item.subject} • {formatDate(item.downloadedAt)}</p>
                               </div>
                             </div>
                             <Button variant="ghost" size="icon" onClick={() => window.open(item.fileUrl, '_blank')}>
@@ -466,7 +467,10 @@ function StatCard({ icon: Icon, label, value, color, onClick }: any) {
         <div className={`p-3 rounded-2xl mb-3 ${color}`}>
           <Icon className="w-6 h-6" />
         </div>
-        <p className="text-2xl font-black tracking-tight leading-tight">{value.toLocaleString()}</p>
+<p className="text-2xl font-black tracking-tight leading-tight">
+  {(value ?? 0).toLocaleString()}
+</p>
+
         <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mt-1">{label}</p>
       </CardContent>
     </Card>
