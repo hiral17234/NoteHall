@@ -42,12 +42,12 @@ const quickActions = [
 
 // ✅ ADD: helper to convert image to base64
 const fileToBase64 = (file: File): Promise<string> =>
-new Promise((resolve, reject) => {
+  new Promise((resolve, reject) => {
     const img = new Image();
     const reader = new FileReader();
 
-  img.onerror = () => reject("Image load failed");
-reader.onerror = () => reject("File read failed");
+    reader.onerror = () => reject("File read failed");
+    img.onerror = () => reject("Image load failed");
 
     reader.onload = () => {
       img.src = reader.result as string;
@@ -69,6 +69,7 @@ reader.onerror = () => reject("File read failed");
 
     reader.readAsDataURL(file);
   });
+;
 
 const pdfToImages = async (file: File): Promise<string[]> => {
   const arrayBuffer = await file.arrayBuffer();
@@ -155,10 +156,6 @@ const [imagePreviews, setImagePreviews] = useState<string[]>([]);
 
     // 📄 PDF
     else if (file.type === "application/pdf") {
-      try {
-        const pdfImages = await pdfToImages(file);
-
-       else if (file.type === "application/pdf") {
   try {
     const pdfImages = await pdfToImages(file);
 
@@ -180,6 +177,7 @@ const [imagePreviews, setImagePreviews] = useState<string[]>([]);
     });
   }
 }
+
 
     // ❌ Unsupported
     else {
@@ -214,25 +212,13 @@ const handleDrop = (e: React.DragEvent) => {
   e.preventDefault();
   setIsDragging(false);
 
-  const files = Array.from(e.dataTransfer.files || []);
-for (const file of files) {
-  if (file.type.startsWith("image/")) {
-    handleFileSelect({ target: { files: [file] } } as any);
-  } else if (file.type === "application/pdf") {
-handleFileSelect(Array.from(e.dataTransfer.files));
-  }
-}
-
-  setSelectedImages(prev => [...prev, ...images]);
-
-  images.forEach(file => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setImagePreviews(prev => [...prev, reader.result as string]);
-    };
-    reader.readAsDataURL(file);
-  });
+  handleFileSelect({
+    target: { files: e.dataTransfer.files },
+  } as React.ChangeEvent<HTMLInputElement>);
 };
+
+
+  
 
 
   /* =======================
