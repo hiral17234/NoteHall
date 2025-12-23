@@ -30,10 +30,10 @@ export function useGemini() {
   const sendMessage = useCallback(
   async (
     content: string,
-    image?: { base64: string; mimeType: string }
+    image?: { base64: string; mimeType: string }[]
   ) => {
 
-    if (!content.trim() && !image) return;
+if (!content.trim() && (!images || images.length === 0)) return;
 
     
     setError(null);
@@ -59,7 +59,7 @@ export function useGemini() {
     setIsLoading(true);
 
     try {
-      const response = await geminiService.sendMessage(content, image);
+      const response = await geminiService.sendMessage(content, images);
 
       
       // Replace loading message with actual response
