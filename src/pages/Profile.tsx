@@ -162,14 +162,16 @@ export default function Profile() {
 
   // --- LOGIC HELPER ---
   const stats = {
-    uploads: totalUploadCount || liveStats.uploads,
+uploads: totalUploadCount > 0 ? totalUploadCount : liveStats.uploads,
     totalLikes: liveStats.totalLikes,
     totalViews: liveStats.totalViews,
     helpedRequests: helpedCount,
     contributionScore: profileData?.stats?.contributionScore || 0,
   };
 
-  const earnedAchievements = achievementsService.checkAchievements(stats, profileData?.streak || 0);
+const earnedAchievements = profileData
+  ? achievementsService.checkAchievements(stats, profileData.streak || 0)
+  : [];
 
   const handleShare = async () => {
     const url = window.location.href;
