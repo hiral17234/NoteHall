@@ -39,6 +39,11 @@ const quickActions = [
   { id: "questions", label: "Practice Questions", icon: HelpCircle, prompt: "Generate 5 practice questions for this topic" },
   { id: "tips", label: "Study Tips", icon: BookOpen, prompt: "Give me effective study tips for this subject" },
 ];
+const urlToFile = async (url: string, filename: string): Promise<File> => {
+  const res = await fetch(url);
+  const blob = await res.blob();
+  return new File([blob], filename, { type: blob.type });
+};
 
 // ✅ ADD: helper to convert image to base64
 const fileToBase64 = (file: File): Promise<string> =>
@@ -52,14 +57,6 @@ const fileToBase64 = (file: File): Promise<string> =>
     reader.onload = () => {
       img.src = reader.result as string;
     };
-
-    // ✅ ADD THIS HELPER
-const urlToFile = async (url: string, filename: string): Promise<File> => {
-  const res = await fetch(url);
-  const blob = await res.blob();
-  return new File([blob], filename, { type: blob.type });
-};
-
 
     img.onload = () => {
       const canvas = document.createElement("canvas");
