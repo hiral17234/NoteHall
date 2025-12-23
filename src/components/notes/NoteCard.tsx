@@ -252,23 +252,23 @@ export function NoteCard({ note, onExpand }: NoteCardProps) {
   const handleAskAI = (e: React.MouseEvent) => {
   e.stopPropagation();
 
-  if (!note.fileUrl) {
-    toast({
-      title: "No file found",
-      description: "This note has no attached PDF",
-      variant: "destructive",
-    });
-    return;
-  }
-
-  navigate("/gemini", {
-    state: {
-      pdfUrl: note.fileUrl,
-      title: note.title,
-      subject: note.subject,
-    },
+  if (!note.fileUrl && note.fileType !== "link") {
+  toast({
+    title: "No file found",
+    description: "This note has no attached media",
+    variant: "destructive",
   });
-};
+  return;
+}
+
+ navigate("/gemini", {
+  state: {
+    fileUrl: note.fileUrl,
+    fileType: note.fileType, // pdf | image | video | link
+    title: note.title,
+    subject: note.subject,
+  },
+});
 
 
   return (
@@ -418,9 +418,13 @@ export function NoteCard({ note, onExpand }: NoteCardProps) {
               </DropdownMenuContent>
             </DropdownMenu>
 
-            <Button 
-              size="sm" 
-              onClick={handleAskAI}
+           <Button
+            size="sm"
+            onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            handleAskAI(e);
+             }
               className="h-9 ml-1 rounded-full bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 border-none px-4 gap-2 transition-all hover:scale-105 active:scale-95"
             >
               <Bot className="w-4 h-4" />
