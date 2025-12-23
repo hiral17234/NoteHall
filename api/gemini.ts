@@ -9,8 +9,6 @@ export default async function handler(
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  console.log("ENV KEY EXISTS:", !!process.env.GEMINI_API_KEY);
-
   try {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
@@ -24,8 +22,9 @@ export default async function handler(
 
     const genAI = new GoogleGenerativeAI(apiKey);
 
+    // ✅ WORKING MODEL
     const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash"
+      model: "models/gemini-1.0-pro"
     });
 
     const result = await model.generateContent(prompt);
