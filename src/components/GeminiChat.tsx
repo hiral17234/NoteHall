@@ -280,8 +280,8 @@ await sendMessage(message, imagePayloads);
       )}
 
       {/* Messages */}
-<ScrollArea className="flex-1 p-4">
-    <div ref={scrollRef} className="space-y-4">
+<ScrollArea ref={scrollRef} className="flex-1 p-4">
+    <div className="space-y-4">
         <div className="space-y-4">
           {messages.map((message) => (
             <MessageBubble key={message.id} message={message} />
@@ -414,39 +414,32 @@ function MessageBubble({ message }: { message: ChatMessage }) {
         )}
       >
         {isUser ? (
-          <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-        ) : (
-          <div className="prose prose-sm dark:prose-invert max-w-none">
-            <ReactMarkdown>{message.content}</ReactMarkdown>
-          </div>
+  <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+) : (
+  <>
+    <div className="prose prose-sm dark:prose-invert max-w-none">
+      <ReactMarkdown>{message.content}</ReactMarkdown>
+    </div>
 
-/* 👉 ADD RETRY BUTTON RIGHT HERE */
-{!isUser && message.content.includes("⚠️") && (
-  <Button
-    variant="outline"
-    size="sm"
-    className="mt-2"
-    onClick={() => window.location.reload()}
-  >
-    Retry
-  </Button>
+    {!isUser && message.content.includes("⚠️") && (
+      <Button
+        variant="outline"
+        size="sm"
+        className="mt-2"
+        onClick={() => window.location.reload()}
+      >
+        Retry
+      </Button>
+    )}
+
+    <p className="text-[10px] opacity-60 mt-1">
+      {message.timestamp.toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      })}
+    </p>
+  </>
 )}
-
-<p className="text-[10px] opacity-60 mt-1">
-  {message.timestamp.toLocaleTimeString([], {
-    hour: "2-digit",
-    minute: "2-digit",
-  })}
-</p>
-
-        
-        )}
-        <p className="text-[10px] opacity-60 mt-1">
-          {message.timestamp.toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-          })}
-        </p>
       </div>
     </div>
   );
