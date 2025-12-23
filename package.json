@@ -11,6 +11,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "pdfjs-dist": "^4.0.379",
     "@vercel/node": "^3.0.0",
     "@google/generative-ai": "^0.7.1",
     "@hookform/resolvers": "^3.10.0",
