@@ -62,7 +62,7 @@ const examplePrompts = [
 
 export default function Gemini() {
   const { userProfile } = useAuth();
-  const [searchParams] = useSearchParams();
+  const location = useLocation();
   const [activeTab, setActiveTab] = useState("chat");
   const [noteContext, setNoteContext] = useState<{
     title?: string;
@@ -71,20 +71,22 @@ export default function Gemini() {
   } | undefined>(undefined);
 
   // Check for note context from URL params
-  useEffect(() => {
-    const noteId = searchParams.get('noteId');
-    const title = searchParams.get('title');
-    const subject = searchParams.get('subject');
-    const fileUrl = searchParams.get('fileUrl');
+useEffect(() => {
+  if (!location.state) return;
 
-    if (title) {
-      setNoteContext({
-        title: decodeURIComponent(title),
-        subject: subject ? decodeURIComponent(subject) : undefined,
-        fileUrl: fileUrl ? decodeURIComponent(fileUrl) : undefined,
-      });
-    }
-  }, [searchParams]);
+  const { title, subject, fileUrl } = location.state as {
+    title?: string;
+    subject?: string;
+    fileUrl?: string;
+  };
+
+  setNoteContext({
+    title,
+    subject,
+    fileUrl,
+  });
+}, [location.state]);
+  
 
   // Set user context for personalized responses
   useEffect(() => {
