@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { geminiService, GeminiMessage, GeminiContext } from "@/services/geminiService";
+import { geminiService, GeminiContext } from "@/services/geminiService";
 
 export interface ChatMessage {
   id: string;
@@ -30,7 +30,7 @@ export function useGemini() {
   const sendMessage = useCallback(
   async (
     content: string,
-    image?: { base64: string; mimeType: string }[]
+    images?: { base64: string; mimeType: string }[]
   ) => {
 
 if (!content.trim() && (!images || images.length === 0)) return;
