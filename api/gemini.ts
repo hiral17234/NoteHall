@@ -9,21 +9,21 @@ export default async function handler(
     return res.status(405).json({ error: "Method not allowed" });
   }
 
+  console.log("ENV KEY EXISTS:", !!process.env.GEMINI_API_KEY);
+
   try {
-    const { prompt } = req.body;
-
-    if (!prompt) {
-      return res.status(400).json({ error: "Prompt is required" });
-    }
-
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      return res.status(500).json({ error: "Server misconfigured" });
+      return res.status(500).json({ error: "API key missing" });
+    }
+
+    const { prompt } = req.body;
+    if (!prompt) {
+      return res.status(400).json({ error: "Prompt missing" });
     }
 
     const genAI = new GoogleGenerativeAI(apiKey);
 
-    // ✅ FIXED MODEL
     const model = genAI.getGenerativeModel({
       model: "gemini-1.5-flash"
     });
@@ -32,8 +32,8 @@ export default async function handler(
     const text = result.response.text();
 
     return res.status(200).json({ text });
-  } catch (error) {
-    console.error("Gemini error:", error);
+  } catch (err) {
+    console.error("FULL GEMINI ERROR:", err);
     return res.status(500).json({ error: "Gemini failed" });
   }
 }
