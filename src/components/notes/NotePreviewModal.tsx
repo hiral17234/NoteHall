@@ -276,7 +276,7 @@ export function NotePreviewModal({ note, open, onClose, onAskAI }: NotePreviewMo
   />
 </div>
 
-            />
+        
 
         {/* Actions */}
         <div className="p-6 pt-0 flex flex-wrap gap-2 border-t border-border mt-auto">
