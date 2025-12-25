@@ -262,14 +262,16 @@ export function NotePreviewModal({ note, open, onClose, onAskAI }: NotePreviewMo
 
             <Separator />
 
-            {/* Comments Section */}
+            
+          </div>
+        </ScrollArea>
+
+        {/* Comments Section */}
             <NoteCommentsSection 
               noteId={note.id}
               ownerId={note.authorId}
               noteTitle={note.title}
             />
-          </div>
-        </ScrollArea>
 
         {/* Actions */}
         <div className="p-6 pt-0 flex flex-wrap gap-2 border-t border-border mt-auto">
