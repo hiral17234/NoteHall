@@ -9,6 +9,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/firebase";
 import { collection, query, orderBy, onSnapshot, addDoc, deleteDoc, doc, serverTimestamp } from "firebase/firestore";
 import { commentsService } from "@/services/firestoreService";
+import { updateDoc, increment } from "firebase/firestore";
 
 interface NoteCommentsSectionProps {
   noteId: string;
@@ -53,6 +54,10 @@ export function NoteCommentsSection({ noteId, ownerId, noteTitle }: NoteComments
     setIsSubmitting(true);
     try {
       await commentsService.addNoteComment(noteId, userProfile.id, userProfile.name, newComment.trim(), ownerId, noteTitle);
+      await updateDoc(doc(db, "notes", noteId), {
+      commentsCount: increment(1),
+}
+);
       setNewComment("");
       toast({ title: "Comment added!" });
     } catch (e: any) {
