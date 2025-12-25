@@ -135,10 +135,16 @@ export function NotePreviewModal({ note, open, onClose, onAskAI }: NotePreviewMo
   };
 
   const handleAskAI = () => {
-    // Navigate to Gemini with note context
-    navigate(`/gemini?noteId=${note.id}&title=${encodeURIComponent(note.title)}&subject=${encodeURIComponent(note.subject)}&fileUrl=${encodeURIComponent(note.fileUrl || '')}`);
-    onClose();
-  };
+  navigate("/gemini", {
+    state: {
+      title: note.title,
+      subject: note.subject,
+      fileUrl: note.fileUrl,
+    },
+  });
+  onClose();
+};
+
 
   const renderMediaPreview = () => {
     if (!note.fileUrl) return null;
