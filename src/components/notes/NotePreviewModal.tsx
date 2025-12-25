@@ -28,6 +28,7 @@ import { useSavedNotes } from "@/contexts/SavedNotesContext";
 import { auth } from "@/lib/firebase";
 import { toast } from "@/hooks/use-toast";
 
+
 interface Note {
   id: string;
   title: string;
@@ -51,6 +52,9 @@ interface NotePreviewModalProps {
   onClose: () => void;
   onAskAI?: () => void;
 }
+
+const [commentCount, setCommentCount] = useState(0);
+
 
 const fileTypeIcons = {
   pdf: FileText,
@@ -221,7 +225,7 @@ export function NotePreviewModal({ note, open, onClose, onAskAI }: NotePreviewMo
           </div>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 max-h-[50vh]">
+        <ScrollArea className="flex-1 max-h-[70vh]">
           <div className="p-6 pt-4 space-y-6">
             {/* Tags */}
             <div className="flex flex-wrap gap-2">
@@ -259,15 +263,43 @@ export function NotePreviewModal({ note, open, onClose, onAskAI }: NotePreviewMo
                 <span>{note.views} views</span>
               </div>
             </div>
+            
 
             <Separator />
 
-            
+            <div className="flex items-center gap-1.5 px-3 text-muted-foreground/60">
+  <MessageSquare className="w-4 h-4" />
+  <span className="text-xs font-medium">{commentCount}</span>
+</div>
+
           </div>
         </ScrollArea>
 
+        {/* COMMENTS SECTION — SEPARATE SCROLL */}
+<div className="border-t border-border bg-background">
+  <div className="px-6 py-3 text-sm font-semibold">
+    Comments
+  </div>
+
+{commentsOpen && (
+  <ScrollArea id="comments-scroll" className="max-h-[250px] px-6 pb-4">
+    <NoteCommentsSection
+      noteId={note.id}
+      ownerId={note.authorId}
+      noteTitle={note.title}
+    />
+  </ScrollArea>
+</div>
+
+
        <div className="border-t border-border px-6 py-4">
-  <h3 className="text-sm font-semibold mb-3">Comments</h3>
+<Button
+  variant="ghost"
+  size="sm"
+  onClick={() => setCommentsOpen(prev => !prev)}
+>
+  {commentsOpen ? "Hide comments" : "Show comments"}
+</Button>
 
   <NoteCommentsSection 
     noteId={note.id}
