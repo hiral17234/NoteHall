@@ -7,7 +7,19 @@ import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/firebase";
-import { collection, query, orderBy, onSnapshot, addDoc, deleteDoc, doc, serverTimestamp } from "firebase/firestore";
+import { 
+  collection,
+  query,
+  orderBy,
+  onSnapshot,
+  addDoc,
+  deleteDoc,
+  doc,
+  serverTimestamp,
+  updateDoc,
+  increment
+} from "firebase/firestore";
+
 import { commentsService } from "@/services/firestoreService";
 import { updateDoc, increment } from "firebase/firestore";
 
@@ -97,6 +109,10 @@ export function NoteCommentsSection({ noteId, ownerId, noteTitle }: NoteComments
     if (!userProfile) return;
     try {
       await deleteDoc(doc(db, "notes", noteId, "comments", commentId));
+      await updateDoc(doc(db, "notes", noteId), {
+  commentsCount: increment(-1),
+});
+
       toast({ title: "Deleted", description: "Comment removed." });
     } catch (e: any) {
       console.error("Firestore deleteComment error:", e?.code || e);
