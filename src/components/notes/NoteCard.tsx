@@ -135,6 +135,7 @@ export function NoteCard({ note, onExpand }: NoteCardProps) {
         
         // --- ADD/EDIT THIS LINE BELOW ---
         setViews(data.views || 0); 
+        note.commentsCount = data.commentsCount || 0; 
         
         setCurrentRating(data.ratings?.average || 0);
         setRatingCount(data.ratings?.count || 0);
@@ -394,6 +395,16 @@ export function NoteCard({ note, onExpand }: NoteCardProps) {
               <span className="text-xs font-medium">{views}</span>
             </div>
           </div>
+
+          {note.commentsCount !== undefined && (
+  <div className="flex items-center gap-1.5 px-3 text-muted-foreground/60">
+    <MessageSquare className="w-4 h-4" />
+    <span className="text-xs font-medium">
+      {note.commentsCount}
+    </span>
+  </div>
+)}
+
 
           <div className="flex items-center gap-1">
             <Button
