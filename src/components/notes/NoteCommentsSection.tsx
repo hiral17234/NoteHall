@@ -7,24 +7,27 @@ import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/firebase";
-import { 
+import {
   collection,
   query,
   orderBy,
+  limit,
+  startAfter,
+  getDocs,
   onSnapshot,
   addDoc,
   deleteDoc,
   doc,
   serverTimestamp,
   updateDoc,
-  increment
+  increment,
+  Timestamp,
+  QueryDocumentSnapshot,
 } from "firebase/firestore";
+
 
 import { commentsService } from "@/services/firestoreService";
 import { Timestamp } from "firebase/firestore";
-
-createdAt?: Timestamp;
-
 
 interface NoteCommentsSectionProps {
   noteId: string;
@@ -39,9 +42,7 @@ interface Comment {
   userName: string;
   text: string;
   parentId: string | null;
-createdAt?: {
-  toDate?: () => Date;
-};
+  createdAt?: Timestamp;
 }
 
 export function NoteCommentsSection({
@@ -57,24 +58,44 @@ export function NoteCommentsSection({
   const [replyText, setReplyText] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Real-time listener for comments
-  useEffect(() => {
-    const q = query(
-      collection(db, "notes", noteId, "comments"),
-      orderBy("createdAt", "asc")
+  const PAGE_SIZE = 10;
+
+const [lastDoc, setLastDoc] =
+  useState<QueryDocumentSnapshot | null>(null);
+const [hasMore, setHasMore] = useState(true);
+const [loadingMore, setLoadingMore] = useState(false);
+
+
+useEffect(() => {
+  const initialQuery = query(
+    collection(db, "notes", noteId, "comments"),
+    orderBy("createdAt", "desc"),
+    limit(PAGE_SIZE)
+  );
+
+  const unsubscribe = onSnapshot(initialQuery, (snap) => {
+    if (snap.empty) {
+      setComments([]);
+      setHasMore(false);
+      return;
+    }
+
+    const docs = snap.docs.map(
+      (d) => ({ id: d.id, ...d.data() } as Comment)
     );
-  const unsubscribe = onSnapshot(q, (snap) => {
-  const data = snap.docs.map(doc => ({
-    id: doc.id,
-    ...doc.data(),
-  } as Comment));
 
-  setComments(data);
-  onCountChange?.(data.length);
-});
+    // reverse so oldest appears first in UI
+    setComments(docs.reverse());
 
-    return () => unsubscribe();
-  }, [noteId]);
+    setLastDoc(snap.docs[snap.docs.length - 1]);
+    setHasMore(snap.docs.length === PAGE_SIZE);
+
+    onCountChange?.(snap.size);
+  });
+
+  return () => unsubscribe();
+}, [noteId]);
+
 
   const handleAddComment = async () => {
     if (!newComment.trim() || !userProfile) {
@@ -137,6 +158,32 @@ if (!comment?.parentId) {
   });
 }
 
+      const loadMoreComments = async () => {
+  if (!lastDoc || !hasMore) return;
+
+  setLoadingMore(true);
+
+  const nextQuery = query(
+    collection(db, "notes", noteId, "comments"),
+    orderBy("createdAt", "desc"),
+    startAfter(lastDoc),
+    limit(PAGE_SIZE)
+  );
+
+  const snap = await getDocs(nextQuery);
+
+  const moreComments = snap.docs.map(
+    (d) => ({ id: d.id, ...d.data() } as Comment)
+  );
+
+  setComments((prev) => [...moreComments.reverse(), ...prev]);
+
+  setLastDoc(snap.docs[snap.docs.length - 1] || null);
+  setHasMore(snap.docs.length === PAGE_SIZE);
+  setLoadingMore(false);
+};
+
+
       toast({ title: "Deleted", description: "Comment removed." });
     } catch (e: any) {
       console.error("Firestore deleteComment error:", e?.code || e);
@@ -177,6 +224,17 @@ if (!comment?.parentId) {
 
       {/* Comments List */}
       <ScrollArea className="max-h-[300px]">
+        {hasMore && (
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={loadMoreComments}
+      disabled={loadingMore}
+      className="w-full text-xs mb-2"
+    >
+      {loadingMore ? "Loading..." : "Load older comments"}
+    </Button>
+  )}
         <div className="space-y-3">
           {topLevelComments.map((comment) => (
             <div key={comment.id} className="space-y-2">
