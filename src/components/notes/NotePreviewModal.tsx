@@ -55,7 +55,7 @@ interface NotePreviewModalProps {
 }
 
 
-const fileTypeIcons = {
+const fileTypeIcons: Record<Note["fileType"], React.ElementType> = {
   pdf: FileText,
   image: Image,
   video: Video,
@@ -70,7 +70,7 @@ const fileTypeColors: Record<Note["fileType"], string> = {
 };
 
 
-const getDownloadLabel = (fileType: string) => {
+const getDownloadLabel = (fileType: Note["fileType"]) => {
   switch (fileType) {
     case "pdf": return "Download PDF";
     case "image": return "Download Image";
@@ -80,8 +80,12 @@ const getDownloadLabel = (fileType: string) => {
   }
 };
 
-function timeAgo(dateString: string) {
+function timeAgo(dateString?: string) {
+  if (!dateString) return "just now";
+
   const date = new Date(dateString);
+  if (isNaN(date.getTime())) return "just now";
+
   const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
 
   const intervals = [
@@ -112,13 +116,8 @@ const [commentsOpen, setCommentsOpen] = useState(false);
 const [commentCount, setCommentCount] = useState(0);
 
   if (!note) return null;
+  const FileIcon = fileTypeIcons[note.fileType];
 
-const fileTypeIcons: Record<Note["fileType"], React.ElementType> = {
-  pdf: FileText,
-  image: Image,
-  video: Video,
-  link: Link,
-};
   const saved = isNoteSaved(note.id);
 
   const handleDownload = async () => {
@@ -161,7 +160,13 @@ const fileTypeIcons: Record<Note["fileType"], React.ElementType> = {
 
 
   const handleSave = () => {
-toggleSave(note);
+toggleSave({
+  id: note.id,
+  title: note.title,
+  subject: note.subject,
+  fileType: note.fileType,
+  fileUrl: note.fileUrl,
+});
     toast({ 
       title: saved ? "Removed from saved" : "Saved!", 
       description: saved ? "Note removed from your collection" : "Note added to your collection" 
