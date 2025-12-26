@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -27,7 +27,6 @@ import { notesService } from "@/services/firestoreService";
 import { useSavedNotes } from "@/contexts/SavedNotesContext";
 import { auth } from "@/lib/firebase";
 import { toast } from "@/hooks/use-toast";
-import { useEffect, useRef } from "react";
 
 
 
@@ -63,12 +62,13 @@ const fileTypeIcons = {
   link: Link,
 };
 
-const fileTypeColors = {
+const fileTypeColors: Record<Note["fileType"], string> = {
   pdf: "bg-destructive/10 text-destructive",
   image: "bg-chart-1/20 text-chart-4",
   video: "bg-primary/10 text-primary",
   link: "bg-secondary/20 text-secondary",
 };
+
 
 const getDownloadLabel = (fileType: string) => {
   switch (fileType) {
@@ -113,7 +113,12 @@ const [commentCount, setCommentCount] = useState(0);
 
   if (!note) return null;
 
-  const FileIcon = fileTypeIcons[note.fileType];
+const fileTypeIcons: Record<Note["fileType"], React.ElementType> = {
+  pdf: FileText,
+  image: Image,
+  video: Video,
+  link: Link,
+};
   const saved = isNoteSaved(note.id);
 
   const handleDownload = async () => {
@@ -156,7 +161,7 @@ const [commentCount, setCommentCount] = useState(0);
 
 
   const handleSave = () => {
-    toggleSave(note as any);
+toggleSave(note);
     toast({ 
       title: saved ? "Removed from saved" : "Saved!", 
       description: saved ? "Note removed from your collection" : "Note added to your collection" 
@@ -176,6 +181,7 @@ const [commentCount, setCommentCount] = useState(0);
   };
 
   const handleAskAI = () => {
+  onAskAI?.();
   navigate("/gemini", {
     state: {
       title: note.title,
@@ -185,6 +191,7 @@ const [commentCount, setCommentCount] = useState(0);
   });
   onClose();
 };
+
 
 
   const renderMediaPreview = () => {
@@ -241,7 +248,7 @@ const [commentCount, setCommentCount] = useState(0);
   };
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
+<Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
       <DialogContent className="max-w-2xl max-h-[90vh] p-0 flex flex-col">
         <DialogHeader className="p-6 pb-0">
           <div className="flex items-start gap-4">
