@@ -53,6 +53,12 @@ interface NotePreviewModalProps {
   onAskAI?: () => void;
 }
 
+interface NoteCommentsSectionProps {
+  noteId: string;
+  ownerId?: string;
+  noteTitle?: string;
+  onCountChange?: (count: number) => void;
+}
 
 const fileTypeIcons = {
   pdf: FileText,
@@ -269,22 +275,6 @@ export function NotePreviewModal({ note, open, onClose, onAskAI }: NotePreviewMo
           
           </div>
         </ScrollArea>
-
-        {/* COMMENTS SECTION — SEPARATE SCROLL */}
-<div className="border-t border-border bg-background">
-  <div className="px-6 py-3 text-sm font-semibold">
-    Comments
-  </div>
-
-{commentsOpen && (
-  <ScrollArea id="comments-scroll" className="max-h-[250px] px-6 pb-4">
-    <NoteCommentsSection
-      noteId={note.id}
-      ownerId={note.authorId}
-      noteTitle={note.title}
-    />
-  </ScrollArea>
-</div>
 
 
   {/* COMMENTS SECTION */}
