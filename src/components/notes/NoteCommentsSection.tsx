@@ -27,7 +27,6 @@ import {
 
 
 import { commentsService } from "@/services/firestoreService";
-import { Timestamp } from "firebase/firestore";
 
 interface NoteCommentsSectionProps {
   noteId: string;
@@ -67,6 +66,10 @@ const [loadingMore, setLoadingMore] = useState(false);
 
 
 useEffect(() => {
+  setComments([]);
+setLastDoc(null);
+setHasMore(true);
+
   const initialQuery = query(
     collection(db, "notes", noteId, "comments"),
     orderBy("createdAt", "desc"),
@@ -90,7 +93,7 @@ useEffect(() => {
     setLastDoc(snap.docs[snap.docs.length - 1]);
     setHasMore(snap.docs.length === PAGE_SIZE);
 
-    onCountChange?.(snap.size);
+onCountChange?.(comments.length);
   });
 
   return () => unsubscribe();
@@ -157,8 +160,14 @@ if (!comment?.parentId) {
     commentsCount: increment(-1),
   });
 }
+      toast({ title: "Deleted", description: "Comment removed." });
+    } catch (e: any) {
+      console.error("Firestore deleteComment error:", e?.code || e);
+      toast({ title: "Error", description: "Failed to delete comment.", variant: "destructive" });
+    }
+  };
 
-      const loadMoreComments = async () => {
+    const loadMoreComments = async () => {
   if (!lastDoc || !hasMore) return;
 
   setLoadingMore(true);
@@ -183,14 +192,7 @@ if (!comment?.parentId) {
   setLoadingMore(false);
 };
 
-
-      toast({ title: "Deleted", description: "Comment removed." });
-    } catch (e: any) {
-      console.error("Firestore deleteComment error:", e?.code || e);
-      toast({ title: "Error", description: "Failed to delete comment.", variant: "destructive" });
-    }
-  };
-
+  
   // Organize comments into threads
   const topLevelComments = comments.filter(c => !c.parentId);
   const replies = comments.filter(c => c.parentId);
