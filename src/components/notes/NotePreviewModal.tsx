@@ -53,8 +53,6 @@ interface NotePreviewModalProps {
   onAskAI?: () => void;
 }
 
-const [commentCount, setCommentCount] = useState(0);
-
 
 const fileTypeIcons = {
   pdf: FileText,
@@ -84,6 +82,7 @@ export function NotePreviewModal({ note, open, onClose, onAskAI }: NotePreviewMo
   const navigate = useNavigate();
   const { isNoteSaved, toggleSave } = useSavedNotes();
   const [isDownloading, setIsDownloading] = useState(false);
+  const [commentsOpen, setCommentsOpen] = useState(false);
 
   if (!note) return null;
 
@@ -267,11 +266,7 @@ export function NotePreviewModal({ note, open, onClose, onAskAI }: NotePreviewMo
 
             <Separator />
 
-            <div className="flex items-center gap-1.5 px-3 text-muted-foreground/60">
-  <MessageSquare className="w-4 h-4" />
-  <span className="text-xs font-medium">{commentCount}</span>
-</div>
-
+          
           </div>
         </ScrollArea>
 
@@ -292,21 +287,37 @@ export function NotePreviewModal({ note, open, onClose, onAskAI }: NotePreviewMo
 </div>
 
 
-       <div className="border-t border-border px-6 py-4">
-<Button
-  variant="ghost"
-  size="sm"
-  onClick={() => setCommentsOpen(prev => !prev)}
->
-  {commentsOpen ? "Hide comments" : "Show comments"}
-</Button>
+  {/* COMMENTS SECTION */}
+<div className="border-t border-border bg-background">
 
-  <NoteCommentsSection 
-    noteId={note.id}
-    ownerId={note.authorId}
-    noteTitle={note.title}
-  />
+  {/* Header */}
+  <div className="flex items-center justify-between px-6 py-3">
+    <h3 className="text-sm font-semibold">Comments</h3>
+
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={() => setCommentsOpen(prev => !prev)}
+    >
+      {commentsOpen ? "Hide comments" : "Show comments"}
+    </Button>
+  </div>
+
+  {/* Collapsible comments */}
+  {commentsOpen && (
+    <ScrollArea
+      id="comments-scroll"
+      className="max-h-[250px] px-6 pb-4"
+    >
+      <NoteCommentsSection
+        noteId={note.id}
+        ownerId={note.authorId}
+        noteTitle={note.title}
+      />
+    </ScrollArea>
+  )}
 </div>
+
 
         
 
