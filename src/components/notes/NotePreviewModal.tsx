@@ -27,6 +27,8 @@ import { notesService } from "@/services/firestoreService";
 import { useSavedNotes } from "@/contexts/SavedNotesContext";
 import { auth } from "@/lib/firebase";
 import { toast } from "@/hooks/use-toast";
+import { useEffect, useRef } from "react";
+
 
 
 interface Note {
@@ -141,6 +143,17 @@ const [commentCount, setCommentCount] = useState(0);
       setIsDownloading(false);
     }
   };
+
+  const commentsRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+  if (commentsOpen) {
+    setTimeout(() => {
+      commentsRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, 100);
+  }
+}, [commentsOpen]);
+
+
 
   const handleSave = () => {
     toggleSave(note as any);
@@ -291,22 +304,6 @@ const [commentCount, setCommentCount] = useState(0);
 
             <Separator />
 
-           <Button
-  variant="ghost"
-  size="sm"
-  onClick={() => {
-    if (!auth.currentUser) {
-      toast({
-        title: "Login required",
-        description: "Please sign in to view or add comments.",
-        variant: "destructive",
-      });
-      return;
-    }
-    setCommentsOpen(prev => !prev);
-  }}
->
-
 
           
           </div>
@@ -314,11 +311,21 @@ const [commentCount, setCommentCount] = useState(0);
 
 
   {/* COMMENTS SECTION */}
-<div className="border-t border-border bg-background">
+<div
+  ref={commentsRef}
+  className="border-t border-border bg-background"
+>
 
   {/* Header */}
   <div className="flex items-center justify-between px-6 py-3">
-    <h3 className="text-sm font-semibold">Comments</h3>
+<h3 className="text-sm font-semibold">
+  Comments
+  {commentCount > 0 && (
+    <span className="ml-2 text-xs text-muted-foreground">
+      ({commentCount})
+    </span>
+  )}
+</h3>
 
     <Button
       variant="ghost"
