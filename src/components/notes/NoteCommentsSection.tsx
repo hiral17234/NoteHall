@@ -60,7 +60,7 @@ export function NoteCommentsSection({
   const PAGE_SIZE = 10;
 
 const [lastDoc, setLastDoc] =
-  useState<QueryDocumentSnapshot | null>(null);
+useState<QueryDocumentSnapshot<DocumentData> | null>(null);
 const [hasMore, setHasMore] = useState(true);
 const [loadingMore, setLoadingMore] = useState(false);
 
@@ -88,12 +88,19 @@ setHasMore(true);
     );
 
     // reverse so oldest appears first in UI
-    setComments(docs.reverse());
+setComments((prev) => {
+  const existingIds = new Set(prev.map(c => c.id));
+  const merged = [
+    ...prev,
+    ...docs.reverse().filter(d => !existingIds.has(d.id)),
+  ];
+  return merged;
+});
 
     setLastDoc(snap.docs[snap.docs.length - 1]);
     setHasMore(snap.docs.length === PAGE_SIZE);
 
-onCountChange?.(comments.length);
+onCountChange?.(docs.length);
   });
 
   return () => unsubscribe();
