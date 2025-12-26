@@ -21,12 +21,16 @@ import {
 } from "firebase/firestore";
 
 import { commentsService } from "@/services/firestoreService";
-import { updateDoc, increment } from "firebase/firestore";
+import { Timestamp } from "firebase/firestore";
+
+createdAt?: Timestamp;
+
 
 interface NoteCommentsSectionProps {
   noteId: string;
   ownerId?: string;
   noteTitle?: string;
+    onCountChange?: (count: number) => void;
 }
 
 interface Comment {
@@ -35,10 +39,17 @@ interface Comment {
   userName: string;
   text: string;
   parentId: string | null;
-  createdAt: any;
+createdAt?: {
+  toDate?: () => Date;
+};
 }
 
-export function NoteCommentsSection({ noteId, ownerId, noteTitle }: NoteCommentsSectionProps) {
+export function NoteCommentsSection({
+  noteId,
+  ownerId,
+  noteTitle,
+  onCountChange,
+}: NoteCommentsSectionProps) {
   const { userProfile } = useAuth();
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState("");
@@ -52,9 +63,16 @@ export function NoteCommentsSection({ noteId, ownerId, noteTitle }: NoteComments
       collection(db, "notes", noteId, "comments"),
       orderBy("createdAt", "asc")
     );
-    const unsubscribe = onSnapshot(q, (snap) => {
-      setComments(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Comment)));
-    });
+  const unsubscribe = onSnapshot(q, (snap) => {
+  const data = snap.docs.map(doc => ({
+    id: doc.id,
+    ...doc.data(),
+  } as Comment));
+
+  setComments(data);
+  onCountChange?.(data.length);
+});
+
     return () => unsubscribe();
   }, [noteId]);
 
@@ -85,7 +103,10 @@ export function NoteCommentsSection({ noteId, ownerId, noteTitle }: NoteComments
   };
 
   const handleAddReply = async (parentId: string) => {
-    if (!replyText.trim() || !userProfile) return;
+if (!userProfile) {
+  toast({ title: "Please login", description: "You need an account to reply." });
+  return;
+}
     setIsSubmitting(true);
     try {
       await addDoc(collection(db, "notes", noteId, "comments"), {
@@ -109,9 +130,12 @@ export function NoteCommentsSection({ noteId, ownerId, noteTitle }: NoteComments
     if (!userProfile) return;
     try {
       await deleteDoc(doc(db, "notes", noteId, "comments", commentId));
-      await updateDoc(doc(db, "notes", noteId), {
-  commentsCount: increment(-1),
-});
+const comment = comments.find(c => c.id === commentId);
+if (!comment?.parentId) {
+  await updateDoc(doc(db, "notes", noteId), {
+    commentsCount: increment(-1),
+  });
+}
 
       toast({ title: "Deleted", description: "Comment removed." });
     } catch (e: any) {
