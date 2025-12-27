@@ -135,7 +135,11 @@ export function NoteCard({ note, onExpand }: NoteCardProps) {
         
         // --- ADD/EDIT THIS LINE BELOW ---
         setViews(data.views || 0); 
-        note.commentsCount = data.commentsCount || 0; 
+// create local state at top
+const [commentsCount, setCommentsCount] = useState(note.commentsCount || 0);
+
+// inside snapshot
+setCommentsCount(data.commentsCount || 0);
         
         setCurrentRating(data.ratings?.average || 0);
         setRatingCount(data.ratings?.count || 0);
@@ -429,7 +433,21 @@ export function NoteCard({ note, onExpand }: NoteCardProps) {
                 <DropdownMenuItem onClick={handleDownload}><Download className="w-4 h-4 mr-2" /> {note.fileType === 'pdf' ? 'Download PDF' : note.fileType === 'image' ? 'Download Image' : note.fileType === 'video' ? 'Download Video' : 'Open Link'}</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setRatingDialogOpen(true)}><Star className="w-4 h-4 mr-2" /> Rate Quality</DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={onExpand}><Expand className="w-4 h-4 mr-2" /> Full Details</DropdownMenuItem>
+                <DropdownMenuItem
+  onClick={(e) => {
+    e.stopPropagation();
+    if (!onExpand) {
+      toast({
+        title: "Error",
+        description: "Expand handler not connected",
+        variant: "destructive",
+      });
+      return;
+    }
+    onExpand();
+  }}
+>
+<Expand className="w-4 h-4 mr-2" /> Full Details</DropdownMenuItem>
                 <DropdownMenuItem onClick={handleAskAI} className="text-primary font-medium focus:text-primary">
                   <Bot className="w-4 h-4 mr-2 animate-pulse" /> Ask AI Gemini
                 </DropdownMenuItem>
