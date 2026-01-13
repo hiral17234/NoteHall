@@ -18,9 +18,13 @@ export type NoteCardNote = {
   isTrusted?: boolean;
   likedBy?: string[];
   dislikedBy?: string[];
+  savedBy?: string[];
   ratings?: Note["ratings"];
   difficulty?: "easy" | "medium" | "hard";
   createdAt?: any;
+  commentsCount?: number;
+  reportCount?: number;
+  isHidden?: boolean;
 };
 
 const pickDifficultyLabel = (difficulty: Note["difficulty"] | undefined): NoteCardNote["difficulty"] => {
@@ -50,10 +54,14 @@ export const mapFirestoreNoteToCardNote = (note: Note): NoteCardNote => {
     topic: note.topic,
     isTrusted: note.isTrusted,
     likedBy: note.likedBy,
+    savedBy: note.savedBy,
     // dislikedBy isn't declared on Note yet in firestoreService, but exists in docs in practice
     dislikedBy: (note as any).dislikedBy,
     ratings: note.ratings,
     difficulty: pickDifficultyLabel(note.difficulty),
     createdAt: note.createdAt,
+    commentsCount: (note as any).commentsCount ?? 0,
+    reportCount: (note as any).reportCount ?? 0,
+    isHidden: (note as any).isHidden ?? false,
   };
 };
