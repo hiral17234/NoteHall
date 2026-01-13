@@ -1,409 +1,144 @@
-import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { 
-  FileText, 
-  Image, 
-  Video, 
-  Link, 
-  ThumbsUp, 
-  ThumbsDown, 
-  Eye, 
-  Bookmark,
-  Bot,
-  Download,
-  Share2,
-  User,
-  ExternalLink,
-  Loader2
-} from "lucide-react";
-import { cn } from "@/lib/utils";
 import { NoteCommentsSection } from "./NoteCommentsSection";
+import { NoteCardNote } from "@/lib/noteCard";
+import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/hooks/use-toast";
+import { useNavigate } from "react-router-dom";
 import { notesService } from "@/services/firestoreService";
-import { useSavedNotes } from "@/contexts/SavedNotesContext";
-import { auth } from "@/lib/firebase";
-import { toast } from "@/hooks/use-toast";
+import { Download, ExternalLink, ThumbsUp, ThumbsDown, Star, Eye, Bookmark, BookmarkCheck, Share2, FileText, Image as ImageIcon, Video, Link as LinkIcon, Loader2, Sparkles } from "lucide-react";
+import { cn } from "@/lib/utils";
 
+interface NotePreviewModalProps { note: NoteCardNote | null; open: boolean; onClose: () => void; }
 
+const fileTypeIcons = { pdf: FileText, image: ImageIcon, video: Video, link: LinkIcon };
 
-interface Note {
-  id: string;
-  title: string;
-  subject: string;
-  branch: string;
-  year: string;
-  fileType: "pdf" | "image" | "video" | "link";
-  likes: number;
-  dislikes: number;
-  views: number;
-  author: string;
-  authorId?: string;
-  timestamp: string;
-  topic?: string;
-  fileUrl?: string;
-}
-
-interface NotePreviewModalProps {
-  note: Note | null;
-  open: boolean;
-  onClose: () => void;
-  onAskAI?: () => void;
-}
-
-
-const fileTypeIcons: Record<Note["fileType"], React.ElementType> = {
-  pdf: FileText,
-  image: Image,
-  video: Video,
-  link: Link,
-};
-
-const fileTypeColors: Record<Note["fileType"], string> = {
-  pdf: "bg-destructive/10 text-destructive",
-  image: "bg-chart-1/20 text-chart-4",
-  video: "bg-primary/10 text-primary",
-  link: "bg-secondary/20 text-secondary",
-};
-
-
-const getDownloadLabel = (fileType: Note["fileType"]) => {
-  switch (fileType) {
-    case "pdf": return "Download PDF";
-    case "image": return "Download Image";
-    case "video": return "Download Video";
-    case "link": return "Open Link";
-    default: return "Download";
-  }
-};
-
-function timeAgo(dateString?: string) {
-  if (!dateString) return "just now";
-
-  const date = new Date(dateString);
-  if (isNaN(date.getTime())) return "just now";
-
-  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
-
-  const intervals = [
-    { label: "year", seconds: 31536000 },
-    { label: "month", seconds: 2592000 },
-    { label: "day", seconds: 86400 },
-    { label: "hour", seconds: 3600 },
-    { label: "minute", seconds: 60 },
-  ];
-
-  for (const interval of intervals) {
-    const count = Math.floor(seconds / interval.seconds);
-    if (count >= 1) {
-      return `${count} ${interval.label}${count > 1 ? "s" : ""} ago`;
-    }
-  }
-
-  return "just now";
-}
-
-
-
-export function NotePreviewModal({ note, open, onClose, onAskAI }: NotePreviewModalProps) {
+export function NotePreviewModal({ note, open, onClose }: NotePreviewModalProps) {
   const navigate = useNavigate();
-  const { isNoteSaved, toggleSave } = useSavedNotes();
-  const [isDownloading, setIsDownloading] = useState(false);
-const [commentsOpen, setCommentsOpen] = useState(false);
-const [commentCount, setCommentCount] = useState(0);
+  const { userProfile } = useAuth();
+  const { toast } = useToast();
+  const [activeTab, setActiveTab] = useState("preview");
+  const [isLiked, setIsLiked] = useState(false);
+  const [isDisliked, setIsDisliked] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
+  const [likeCount, setLikeCount] = useState(0);
+  const [dislikeCount, setDislikeCount] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
+  const [rating, setRating] = useState(0);
+  const [difficulty, setDifficulty] = useState<"easy" | "medium" | "hard" | null>(null);
+  const [isRating, setIsRating] = useState(false);
+
+  useEffect(() => {
+    if (note) {
+      setIsLiked(userProfile ? note.likedBy?.includes(userProfile.id) ?? false : false);
+      setIsDisliked(userProfile ? note.dislikedBy?.includes(userProfile.id) ?? false : false);
+      setIsSaved(userProfile ? note.savedBy?.includes(userProfile.id) ?? false : false);
+      setLikeCount(note.likes);
+      setDislikeCount(note.dislikes);
+      setActiveTab("preview");
+      setRating(0);
+      setDifficulty(null);
+      notesService.incrementViews(note.id).catch(() => {});
+    }
+  }, [note, userProfile]);
 
   if (!note) return null;
-  const FileIcon = fileTypeIcons[note.fileType];
+  const FileIcon = fileTypeIcons[note.fileType] || FileText;
 
-  const saved = isNoteSaved(note.id);
+  const handleLike = async () => {
+    if (!userProfile) { toast({ title: "Login required", variant: "destructive" }); return; }
+    setIsLoading(true);
+    try {
+      const wasLiked = isLiked, wasDisliked = isDisliked;
+      if (wasLiked) { setIsLiked(false); setLikeCount(p => p - 1); } else { setIsLiked(true); setLikeCount(p => p + 1); if (wasDisliked) { setIsDisliked(false); setDislikeCount(p => p - 1); } }
+      await notesService.toggleLike(note.id, userProfile.id, userProfile.name, wasLiked);
+      if (wasDisliked && !wasLiked) await notesService.toggleDislike?.(note.id, userProfile.id, true);
+    } catch { toast({ title: "Error", variant: "destructive" }); }
+    finally { setIsLoading(false); }
+  };
+
+  const handleDislike = async () => {
+    if (!userProfile) { toast({ title: "Login required", variant: "destructive" }); return; }
+    setIsLoading(true);
+    try {
+      const wasLiked = isLiked, wasDisliked = isDisliked;
+      if (wasDisliked) { setIsDisliked(false); setDislikeCount(p => p - 1); } else { setIsDisliked(true); setDislikeCount(p => p + 1); if (wasLiked) { setIsLiked(false); setLikeCount(p => p - 1); } }
+      await notesService.toggleDislike?.(note.id, userProfile.id, wasDisliked);
+      if (wasLiked && !wasDisliked) await notesService.toggleLike(note.id, userProfile.id, userProfile.name, true);
+    } catch { toast({ title: "Error", variant: "destructive" }); }
+    finally { setIsLoading(false); }
+  };
+
+  const handleSave = async () => {
+    if (!userProfile) { toast({ title: "Login required", variant: "destructive" }); return; }
+    const was = isSaved; setIsSaved(!was);
+    try { was ? await notesService.unsaveNote(note.id, userProfile.id) : await notesService.saveNote(note.id, userProfile.id); toast({ title: was ? "Removed" : "Saved" }); }
+    catch { setIsSaved(was); toast({ title: "Error", variant: "destructive" }); }
+  };
 
   const handleDownload = async () => {
-    if (!note.fileUrl) {
-      toast({ title: "No file available", description: "This note doesn't have a downloadable file.", variant: "destructive" });
-      return;
-    }
-
-    setIsDownloading(true);
-    try {
-      if (note.fileType === "link") {
-        window.open(note.fileUrl, '_blank');
-      } else if (auth.currentUser) {
-        await notesService.downloadNote(note.id, auth.currentUser.uid, {
-          title: note.title,
-          subject: note.subject,
-          fileUrl: note.fileUrl,
-        });
-        toast({ title: "Download Started", description: "Your file is being prepared." });
-      } else {
-        window.open(note.fileUrl, '_blank');
-      }
-    } catch (error) {
-      console.error("Download error:", error);
-      window.open(note.fileUrl, '_blank');
-    } finally {
-      setIsDownloading(false);
-    }
+    if (!userProfile || !note.fileUrl) return;
+    try { await notesService.downloadNote(note.id, userProfile.id, { title: note.title, subject: note.subject, fileUrl: note.fileUrl }); toast({ title: "Download started" }); }
+    catch { toast({ title: "Error", variant: "destructive" }); }
   };
 
-  const commentsRef = useRef<HTMLDivElement | null>(null);
-  useEffect(() => {
-  if (commentsOpen) {
-    setTimeout(() => {
-      commentsRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, 100);
-  }
-}, [commentsOpen]);
-
-
-
-  const handleSave = () => {
-toggleSave({
-  id: note.id,
-  title: note.title,
-  subject: note.subject,
-  fileType: note.fileType,
-  fileUrl: note.fileUrl,
-});
-    toast({ 
-      title: saved ? "Removed from saved" : "Saved!", 
-      description: saved ? "Note removed from your collection" : "Note added to your collection" 
-    });
+  const handleSubmitRating = async () => {
+    if (!userProfile || rating === 0 || !difficulty) { toast({ title: "Select rating and difficulty", variant: "destructive" }); return; }
+    setIsRating(true);
+    try { await notesService.rateNote(note.id, userProfile.id, rating, difficulty); toast({ title: "Rating submitted" }); }
+    catch { toast({ title: "Error", variant: "destructive" }); }
+    finally { setIsRating(false); }
   };
 
-  const handleShare = async () => {
-    const url = `${window.location.origin}/notes/${note.id}`;
-    if (navigator.share) {
-      try {
-        await navigator.share({ title: note.title, url });
-      } catch (err) { console.error(err); }
-    } else {
-      await navigator.clipboard.writeText(url);
-      toast({ title: "Link Copied", description: "Share it with your friends!" });
-    }
-  };
-
-  const handleAskAI = () => {
-  onAskAI?.();
-  navigate("/gemini", {
-    state: {
-      title: note.title,
-      subject: note.subject,
-      fileUrl: note.fileUrl,
-    },
-  });
-  onClose();
-};
-
-
-
-  const renderMediaPreview = () => {
-    if (!note.fileUrl) return null;
-
+  const renderPreview = () => {
+    if (!note.fileUrl) return <div className="flex items-center justify-center h-[400px] bg-muted rounded-lg"><p className="text-muted-foreground">No preview available</p></div>;
     switch (note.fileType) {
-      case "image":
-        return (
-          <div className="mt-4 rounded-xl overflow-hidden border border-border">
-            <img 
-              src={note.fileUrl} 
-              alt={note.title} 
-              className="w-full max-h-[300px] object-contain bg-muted"
-            />
-          </div>
-        );
-      case "video":
-        return (
-          <div className="mt-4 aspect-video rounded-xl overflow-hidden border border-border">
-            <video 
-              src={note.fileUrl} 
-              controls 
-              className="w-full h-full bg-muted"
-            />
-          </div>
-        );
-      case "pdf":
-        return (
-          <div className="mt-4 rounded-xl overflow-hidden border border-border">
-            <iframe 
-              src={`${note.fileUrl}#view=FitH`}
-              title={note.title}
-              className="w-full h-[400px]"
-            />
-          </div>
-        );
-      case "link":
-        return (
-          <div className="mt-4 p-4 bg-muted/50 rounded-xl border border-border">
-            <a 
-              href={note.fileUrl} 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 text-primary hover:underline"
-            >
-              <ExternalLink className="w-4 h-4" />
-              Open External Resource
-            </a>
-          </div>
-        );
-      default:
-        return null;
+      case "pdf": return <iframe src={`${note.fileUrl}#view=FitH`} className="w-full h-[500px] rounded-lg border" title={note.title} />;
+      case "image": return <div className="flex items-center justify-center bg-muted rounded-lg p-4"><img src={note.fileUrl} alt={note.title} className="max-w-full max-h-[500px] object-contain rounded-lg" /></div>;
+      case "video": return <video src={note.fileUrl} controls className="w-full max-h-[500px] rounded-lg" preload="metadata" />;
+      case "link": return <div className="flex flex-col items-center justify-center h-[300px] bg-muted rounded-lg gap-4"><LinkIcon className="w-12 h-12 text-muted-foreground" /><Button onClick={() => window.open(note.fileUrl, "_blank")}><ExternalLink className="w-4 h-4 mr-2" />Open Link</Button></div>;
+      default: return <div className="flex items-center justify-center h-[400px] bg-muted rounded-lg"><p className="text-muted-foreground">Preview not available</p></div>;
     }
   };
 
   return (
-<Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <DialogContent className="max-w-2xl max-h-[90vh] p-0 flex flex-col">
-        <DialogHeader className="p-6 pb-0">
-          <div className="flex items-start gap-4">
-            <div className={cn("p-3 rounded-xl", fileTypeColors[note.fileType])}>
-              <FileIcon className="w-6 h-6" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <DialogTitle className="text-xl font-semibold text-foreground leading-tight">
-                {note.title}
-              </DialogTitle>
-              <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
-                <User className="w-4 h-4" />
-                <span>{note.author}</span>
-                <span>•</span>
-                <span>{timeAgo(note.timestamp)}</span>
-              </div>
-            </div>
-          </div>
+    <Dialog open={open} onOpenChange={isOpen => !isOpen && onClose()}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogHeader className="shrink-0">
+          <div className="flex items-center gap-3"><div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center"><FileIcon className="w-5 h-5 text-primary" /></div><div><DialogTitle>{note.title}</DialogTitle><div className="flex items-center gap-2 mt-1"><Badge variant="secondary">{note.subject}</Badge><Badge variant="outline">{note.branch}</Badge><Badge variant="outline">{note.year}</Badge></div></div></div>
+          <div className="flex items-center gap-4 mt-4 text-sm text-muted-foreground"><span className="flex items-center gap-1"><Eye className="w-4 h-4" />{note.views}</span>{note.ratings?.count > 0 && <span className="flex items-center gap-1"><Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />{note.ratings.average.toFixed(1)}</span>}<span>by {note.authorName}</span></div>
         </DialogHeader>
-
-        <ScrollArea className="flex-1 max-h-[70vh]">
-          <div className="p-6 pt-4 space-y-6">
-            {/* Tags */}
-            <div className="flex flex-wrap gap-2">
-              <Badge variant="secondary" className="bg-muted text-foreground">
-                {note.subject}
-              </Badge>
-              <Badge variant="secondary" className="bg-muted text-foreground">
-                {note.branch}
-              </Badge>
-              <Badge variant="secondary" className="bg-muted text-foreground">
-                {note.year}
-              </Badge>
-              {note.topic && (
-                <Badge variant="outline" className="border-primary/30 text-primary">
-                  {note.topic}
-                </Badge>
-              )}
-            </div>
-
-            {/* Media Preview */}
-            {renderMediaPreview()}
-
-            {/* Stats */}
-            <div className="flex items-center gap-6 text-sm text-muted-foreground">
-              <div className="flex items-center gap-1.5">
-                <ThumbsUp className="w-4 h-4" />
-                <span>{note.likes} likes</span>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 overflow-hidden flex flex-col">
+          <TabsList className="shrink-0 bg-muted"><TabsTrigger value="preview">Preview</TabsTrigger><TabsTrigger value="comments">Comments</TabsTrigger><TabsTrigger value="rate">Rate</TabsTrigger></TabsList>
+          <ScrollArea className="flex-1 mt-4">
+            <TabsContent value="preview" className="mt-0">{renderPreview()}</TabsContent>
+            <TabsContent value="comments" className="mt-0"><NoteCommentsSection noteId={note.id} ownerId={note.authorId} noteTitle={note.title} /></TabsContent>
+            <TabsContent value="rate" className="mt-0">
+              <div className="space-y-6 max-w-md">
+                <div><h4 className="font-medium mb-3">Quality Rating</h4><div className="flex gap-1">{[1,2,3,4,5].map(s => <button key={s} onClick={() => setRating(s)} className="p-1 hover:scale-110 transition-transform"><Star className={cn("w-8 h-8", rating >= s ? "text-yellow-500 fill-yellow-500" : "text-muted-foreground")} /></button>)}</div></div>
+                <div><h4 className="font-medium mb-3">Difficulty</h4><div className="flex gap-2">{(["easy","medium","hard"] as const).map(l => <Button key={l} variant={difficulty === l ? "default" : "outline"} onClick={() => setDifficulty(l)} className="capitalize">{l}</Button>)}</div></div>
+                <Button onClick={handleSubmitRating} disabled={rating === 0 || !difficulty || isRating} className="w-full">{isRating ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Submitting...</> : "Submit Rating"}</Button>
               </div>
-              <div className="flex items-center gap-1.5">
-                <ThumbsDown className="w-4 h-4" />
-                <span>{note.dislikes} dislikes</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <Eye className="w-4 h-4" />
-                <span>{note.views} views</span>
-              </div>
-            </div>
-            
-
-            <Separator />
-
-
-          
+            </TabsContent>
+          </ScrollArea>
+        </Tabs>
+        <Separator className="my-4" />
+        <div className="flex items-center justify-between gap-2 shrink-0">
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="sm" onClick={handleLike} disabled={isLoading} className={cn(isLiked && "text-primary bg-primary/10")}><ThumbsUp className={cn("w-4 h-4 mr-1", isLiked && "fill-current")} />{likeCount}</Button>
+            <Button variant="ghost" size="sm" onClick={handleDislike} disabled={isLoading} className={cn(isDisliked && "text-destructive bg-destructive/10")}><ThumbsDown className={cn("w-4 h-4 mr-1", isDisliked && "fill-current")} />{dislikeCount}</Button>
+            <Button variant="ghost" size="sm" onClick={handleSave} className={cn(isSaved && "text-chart-1 bg-chart-1/10")}>{isSaved ? <BookmarkCheck className="w-4 h-4 mr-1 fill-current" /> : <Bookmark className="w-4 h-4 mr-1" />}{isSaved ? "Saved" : "Save"}</Button>
+            <Button variant="ghost" size="sm" onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/note/${note.id}`); toast({ title: "Link copied" }); }}><Share2 className="w-4 h-4 mr-1" />Share</Button>
           </div>
-        </ScrollArea>
-
-
-  {/* COMMENTS SECTION */}
-<div
-  ref={commentsRef}
-  className="border-t border-border bg-background"
->
-
-  {/* Header */}
-  <div className="flex items-center justify-between px-6 py-3">
-<h3 className="text-sm font-semibold">
-  Comments
-  {commentCount > 0 && (
-    <span className="ml-2 text-xs text-muted-foreground">
-      ({commentCount})
-    </span>
-  )}
-</h3>
-
-    <Button
-      variant="ghost"
-      size="sm"
-      onClick={() => setCommentsOpen(prev => !prev)}
-    >
-      {commentsOpen ? "Hide comments" : "Show comments"}
-    </Button>
-  </div>
-
-  {/* Collapsible comments */}
-  {commentsOpen && (
-    <ScrollArea
-      id="comments-scroll"
-      className="max-h-[250px] px-6 pb-4"
-    >
-     <NoteCommentsSection
-  noteId={note.id}
-  ownerId={note.authorId}
-  noteTitle={note.title}
-  onCountChange={setCommentCount}
-/>
-
-    </ScrollArea>
-  )}
-</div>
-
-
-        
-
-        {/* Actions */}
-        <div className="p-6 pt-0 flex flex-wrap gap-2 border-t border-border mt-auto">
-          <Button 
-            onClick={handleDownload}
-            disabled={isDownloading}
-            className="bg-primary hover:bg-primary/90 text-primary-foreground gap-2 flex-1"
-          >
-            {isDownloading ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : note.fileType === "link" ? (
-              <ExternalLink className="w-4 h-4" />
-            ) : (
-              <Download className="w-4 h-4" />
-            )}
-            {getDownloadLabel(note.fileType)}
-          </Button>
-          <Button 
-            variant="outline" 
-            onClick={handleSave}
-            className={cn("gap-2 flex-1", saved && "text-primary border-primary/30")}
-          >
-            <Bookmark className={cn("w-4 h-4", saved && "fill-current")} />
-            {saved ? "Saved" : "Save"}
-          </Button>
-          <Button variant="outline" onClick={handleShare} className="gap-2 flex-1">
-            <Share2 className="w-4 h-4" />
-            Share
-          </Button>
-          <Button 
-            variant="outline" 
-            onClick={handleAskAI}
-            className="gap-2 flex-1 border-primary/30 text-primary hover:bg-primary hover:text-primary-foreground"
-          >
-            <Bot className="w-4 h-4" />
-            Ask AI
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => { navigate("/gemini", { state: { title: note.title, subject: note.subject, fileUrl: note.fileUrl } }); onClose(); }}><Sparkles className="w-4 h-4 mr-1" />Ask Gemini</Button>
+            {note.fileUrl && note.fileType !== "link" && <Button size="sm" onClick={handleDownload}><Download className="w-4 h-4 mr-1" />Download</Button>}
+          </div>
         </div>
       </DialogContent>
     </Dialog>

@@ -1,568 +1,124 @@
 import { useState, useRef, useEffect } from "react";
-import * as pdfjsLib from "pdfjs-dist";
-import pdfWorker from "pdfjs-dist/build/pdf.worker?url";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card } from "@/components/ui/card";
+import { Textarea } from "@/components/ui/textarea";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { useGemini, ChatMessage } from "@/hooks/useGemini";
-import { 
-  Send, 
-  Trash2, 
-  Sparkles, 
-  BookOpen, 
-  HelpCircle, 
-  FileText,
-  Lightbulb,
-  Loader2,
-  ImageIcon,
-  X
-} from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
+import { useGemini } from "@/hooks/useGemini";
+import { useAuth } from "@/contexts/AuthContext";
 import ReactMarkdown from "react-markdown";
-import { toast } from "@/hooks/use-toast";
+import { Send, Loader2, Sparkles, User, Image as ImageIcon, X, AlertCircle, Trash2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface GeminiChatProps {
-  noteContext?: {
-    title?: string;
-    content?: string;
-    subject?: string;
-    fileUrl?: string;
-  };
   className?: string;
+  noteContext?: { title?: string; subject?: string; fileUrl?: string };
 }
 
-const quickActions = [
-  { id: "summarize", label: "Summarize", icon: FileText, prompt: "Summarize the key concepts from my current study material" },
-  { id: "explain", label: "Explain Simply", icon: Lightbulb, prompt: "Explain this concept in simple terms" },
-  { id: "questions", label: "Practice Questions", icon: HelpCircle, prompt: "Generate 5 practice questions for this topic" },
-  { id: "tips", label: "Study Tips", icon: BookOpen, prompt: "Give me effective study tips for this subject" },
-];
-const urlToFile = async (url: string, filename: string): Promise<File> => {
-  const res = await fetch(url);
-  const blob = await res.blob();
-  return new File([blob], filename, { type: blob.type });
-};
-
-// ✅ ADD: helper to convert image to base64
-const fileToBase64 = (file: File): Promise<string> =>
-  new Promise((resolve, reject) => {
-    const img = new Image();
-    const reader = new FileReader();
-
-    reader.onerror = () => reject("File read failed");
-    img.onerror = () => reject("Image load failed");
-
-    reader.onload = () => {
-      img.src = reader.result as string;
-    };
-
-    img.onload = () => {
-      const canvas = document.createElement("canvas");
-      const MAX = 1024;
-      const scale = Math.min(MAX / img.width, MAX / img.height, 1);
-
-      canvas.width = img.width * scale;
-      canvas.height = img.height * scale;
-
-      const ctx = canvas.getContext("2d")!;
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-      resolve(canvas.toDataURL("image/jpeg", 0.8));
-    };
-
-    reader.readAsDataURL(file);
-  });
-
-
-const pdfToImages = async (file: File): Promise<string[]> => {
-  const arrayBuffer = await file.arrayBuffer();
-  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-
-  const images: string[] = [];
-
-  for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-    const page = await pdf.getPage(pageNum);
-    const viewport = page.getViewport({ scale: 2 });
-
-    const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d")!;
-    canvas.width = viewport.width;
-    canvas.height = viewport.height;
-
-    await page.render({
-      canvasContext: ctx,
-      viewport,
-    }).promise;
-
-    images.push(canvas.toDataURL("image/jpeg", 0.8));
-  }
-
-  return images;
-};
-
-
-
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
-
-export function GeminiChat({ noteContext, className }: GeminiChatProps) {
+export function GeminiChat({ className, noteContext }: GeminiChatProps) {
+  const { userProfile } = useAuth();
+  const { messages, isLoading, error, sendMessage, clearChat, setContext, isConfigured } = useGemini();
   const [input, setInput] = useState("");
-  const [selectedImages, setSelectedImages] = useState<File[]>([]);
-const [imagePreviews, setImagePreviews] = useState<string[]>([]);
-  const [isDragging, setIsDragging] = useState(false);
+  const [images, setImages] = useState<{ base64: string; mimeType: string; preview: string }[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const {
-  messages,
-  isLoading,
-  sendMessage,
-  clearChat,
-  setContext
-} = useGemini();
 
-  // Set context when note context changes
   useEffect(() => {
-    if (noteContext) {
-      setContext({
-        noteTitle: noteContext.title,
-        noteContent: noteContext.content,
-        selectedSubject: noteContext.subject,
-      });
-      if (noteContext.title && messages.length <= 1) {
-        const contextMessage = `I'm asking about the note: "${noteContext.title}" (${noteContext.subject || 'Unknown subject'})`;
-        setInput(contextMessage);
-      }
-    }
-}, [noteContext, setContext, messages]);
+    if (noteContext) setContext({ noteTitle: noteContext.title, selectedSubject: noteContext.subject });
+  }, [noteContext, setContext]);
 
-  // ✅ AUTO-LOAD FILE FROM NOTE INTO GEMINI
-useEffect(() => {
-  if (!noteContext?.fileUrl) return;
+  useEffect(() => {
+    if (userProfile) setContext({ userBranch: userProfile.branch, userYear: userProfile.year });
+  }, [userProfile, setContext]);
 
-  const loadNoteFile = async () => {
-    try {
-   console.log("Loading file into Gemini:", noteContext.fileUrl);
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  }, [messages]);
 
-const response = await fetch(noteContext.fileUrl, {
-  mode: "cors",
-});
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if ((!input.trim() && images.length === 0) || isLoading) return;
+    const imageData = images.map(img => ({ base64: img.base64, mimeType: img.mimeType }));
+    await sendMessage(input, imageData.length > 0 ? imageData : undefined);
+    setInput("");
+    setImages([]);
+  };
 
-if (!response.ok) {
-  throw new Error("File fetch failed");
-}
-
-const blob = await response.blob();
-
-const file = new File(
-  [blob],
-  noteContext.title || "note-file",
-  { type: blob.type }
-);
-
-      // 🖼 IMAGE
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+    Array.from(files).forEach((file) => {
       if (file.type.startsWith("image/")) {
-        setSelectedImages([file]);
-
         const reader = new FileReader();
-        reader.onloadend = () => {
-          setImagePreviews([reader.result as string]);
+        reader.onload = () => {
+          const base64 = (reader.result as string).split(",")[1];
+          setImages((prev) => [...prev, { base64, mimeType: file.type, preview: URL.createObjectURL(file) }]);
         };
         reader.readAsDataURL(file);
       }
-
-      // 📄 PDF
-      else if (file.type === "application/pdf") {
-        const pdfImages = await pdfToImages(file);
-
-        const files: File[] = [];
-
-        for (const src of pdfImages) {
-          const blob = await (await fetch(src)).blob();
-          files.push(
-            new File([blob], `pdf-page-${Date.now()}.jpg`, {
-              type: "image/jpeg",
-            })
-          );
-        }
-
-        setSelectedImages(files);
-        setImagePreviews(pdfImages);
-      }
-    } catch (err) {
-      console.error("Gemini file load failed", err);
-      toast({
-        title: "File load failed",
-        description: "Could not attach note to Gemini",
-        variant: "destructive",
-      });
-    }
-  };
-
-  loadNoteFile();
-}, [noteContext]);
-
-
-  // Auto-scroll to bottom
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [messages]);
-
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-  const files = Array.from(e.target.files || []);
-
-  for (const file of files) {
-    // 🖼 IMAGE
-    if (file.type.startsWith("image/")) {
-      setSelectedImages(prev => [...prev, file]);
-
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreviews(prev => [...prev, reader.result as string]);
-      };
-      reader.readAsDataURL(file);
-    }
-
-    // 📄 PDF
-    else if (file.type === "application/pdf") {
-  try {
-    const pdfImages = await pdfToImages(file);
-
-    for (const src of pdfImages) {
-      setImagePreviews(prev => [...prev, src]);
-
-      const blob = await (await fetch(src)).blob();
-const imgFile = new File([blob], `pdf-page-${Date.now()}.jpg`, {
-        type: "image/jpeg",
-      });
-
-      setSelectedImages(prev => [...prev, imgFile]);
-    }
-  } catch {
-    toast({
-      title: "PDF error",
-      description: "Failed to read PDF file",
-      variant: "destructive",
     });
-  }
-}
-
-
-    // ❌ Unsupported
-    else {
-      toast({
-        title: "Unsupported file",
-        description: "Only images and PDFs are supported",
-        variant: "destructive",
-      });
-    }
-  }
-};
-  
-  const clearImages = () => {
-  setSelectedImages([]);
-  setImagePreviews([]);
-  if (fileInputRef.current) fileInputRef.current.value = "";
-};
-
-/* =======================
-   DRAG & DROP HANDLERS
-======================= */
-const handleDragOver = (e: React.DragEvent) => {
-  e.preventDefault();
-  setIsDragging(true);
-};
-
-const handleDragLeave = () => {
-  setIsDragging(false);
-};
-
-const handleDrop = (e: React.DragEvent) => {
-  e.preventDefault();
-  setIsDragging(false);
-
-  handleFileSelect({
-    target: { files: e.dataTransfer.files },
-  } as React.ChangeEvent<HTMLInputElement>);
-};
-
-
-  
-
-
-  /* =======================
-     ✅ EDITED (CORE FIX)
-     ======================= */
-  const handleSend = async () => {
-    if ((!input.trim() && selectedImages.length === 0) || isLoading) return;
-
-    const message = input || "Please analyze this image.";
-
-    setInput("");
-
-    const imagePayloads = await Promise.all(
-  selectedImages.map(async file => {
-    const base64 = await fileToBase64(file);
-    return {
-      base64: base64.split(",")[1],
-      mimeType: file.type,
-    };
-  })
-);
-
-await sendMessage(message, imagePayloads);
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
+  const removeImage = (index: number) => {
+    setImages((prev) => { URL.revokeObjectURL(prev[index].preview); return prev.filter((_, i) => i !== index); });
   };
 
-  const handleQuickAction = async (prompt: string) => {
-  if (isLoading) return;
-  await sendMessage(prompt);
-};
-
-  return (
-   <Card
-  onDragOver={handleDragOver}
-  onDragLeave={handleDragLeave}
-  onDrop={handleDrop}
-  className={cn(
-    "bg-card border-border flex flex-col h-full",
-    isDragging && "ring-2 ring-primary ring-dashed",
-    className
-  )}
-> 
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-border">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-            <Sparkles className="w-4 h-4 text-primary" />
-          </div>
-          <div>
-            <h3 className="font-semibold text-foreground">Gemini</h3>
-            <p className="text-xs text-muted-foreground">AI Study Assistant</p>
-          </div>
-        </div>
-        <Button variant="ghost" size="icon" onClick={clearChat} title="Clear chat">
-          <Trash2 className="w-4 h-4" />
-        </Button>
-      </div>
-
-      {/* Note Context Banner */}
-      {noteContext?.title && (
-        <div className="px-4 py-2 bg-primary/5 border-b border-border">
-          <p className="text-xs text-muted-foreground">
-            Asking about:{" "}
-            <span className="font-medium text-foreground">
-              {noteContext.title}
-            </span>
-            {noteContext.subject && (
-              <span className="text-primary ml-1">
-                ({noteContext.subject})
-              </span>
-            )}
-          </p>
-        </div>
-      )}
-
-      {/* Quick Actions */}
-      {messages.length <= 1 && !noteContext?.title && (
-        <div className="p-4 border-b border-border">
-          <p className="text-xs text-muted-foreground mb-2">
-            Quick actions:
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {quickActions.map((action) => (
-              <Button
-                key={action.id}
-                variant="outline"
-                size="sm"
-                className="gap-1.5"
-                onClick={() => handleQuickAction(action.prompt)}
-                disabled={isLoading}
-              >
-                <action.icon className="w-3.5 h-3.5" />
-                {action.label}
-              </Button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Messages */}
-<ScrollArea className="flex-1 p-4">
-  <div ref={scrollRef} className="space-y-4">
-        <div className="space-y-4">
-          {messages.map((message) => (
-            <MessageBubble key={message.id} message={message} />
-          ))}
-        </div>
-    </div>
-      </ScrollArea>
-
-      {/* Image Preview */}
-     {imagePreviews.length > 0 && (
-  <div className="px-4 py-2 border-t border-border">
-    <div className="flex gap-2 flex-wrap">
-      {imagePreviews.map((src, index) => (
-  <div key={index} className="relative">
-    <img
-      src={src}
-      className="h-20 rounded-lg border border-border"
-    />
-
-    {/* REMOVE SINGLE IMAGE */}
-    <button
-      type="button"
-      onClick={() => {
-        setImagePreviews(prev => prev.filter((_, i) => i !== index));
-        setSelectedImages(prev => prev.filter((_, i) => i !== index));
-      }}
-      className="absolute -top-2 -right-2 bg-destructive text-white rounded-full p-1"
-    >
-      <X className="w-3 h-3" />
-    </button>
-  </div>
-))}
-          </div>
-  </div>
-)}
-
-
-
-
-      {/* Input */}
-      <div className="p-4 border-t border-border">
-        <div className="flex gap-2">
-          <p className="text-xs text-muted-foreground mt-1 text-center">
-  Supports images & PDFs
-</p>
-          <input
-  type="file"
-  multiple
-  ref={fileInputRef}
-  onChange={handleFileSelect}
-  accept="image/*,application/pdf"
-  className="hidden"
-/>
-
-          
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isLoading}
-            title="Attach image or PDF"
-          >
-            <FileText className="w-4 h-4" />
-          </Button>
-          <Input
-            ref={inputRef}
-            placeholder="Ask Gemini anything..."
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            disabled={isLoading}
-            className="flex-1"
-          />
-          <Button
-            onClick={handleSend}
-            disabled={(!input.trim() && selectedImages.length === 0) || isLoading}
-            className="bg-primary hover:bg-primary/90"
-          >
-            {isLoading ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Send className="w-4 h-4" />
-            )}
-          </Button>
-        </div>
-        <p className="text-xs text-muted-foreground mt-2 text-center">
-          Powered by Google Gemini
-        </p>
-      </div>
-    </Card>
-  );
-}
-
-function MessageBubble({ message }: { message: ChatMessage }) {
-  const isUser = message.role === "user";
-
-  if (message.isLoading) {
+  if (!isConfigured) {
     return (
-      <div className="flex items-start gap-3">
-        <Avatar className="w-8 h-8 flex-shrink-0">
-          <AvatarFallback className="bg-primary/10 text-primary">
-            <Sparkles className="w-4 h-4" />
-          </AvatarFallback>
-        </Avatar>
-        <div className="flex-1 bg-muted rounded-lg p-3">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Loader2 className="w-4 h-4 animate-spin" />
-            <span className="text-sm">Gemini is thinking...</span>
-          </div>
-        </div>
-      </div>
+      <Card className={cn("bg-card border-border", className)}>
+        <CardContent className="flex flex-col items-center justify-center h-full py-12">
+          <AlertCircle className="w-12 h-12 text-muted-foreground mb-4" />
+          <p className="text-muted-foreground">AI assistant unavailable</p>
+        </CardContent>
+      </Card>
     );
   }
 
   return (
-    <div className={cn("flex items-start gap-3", isUser && "flex-row-reverse")}>
-      <Avatar className="w-8 h-8 flex-shrink-0">
-        <AvatarFallback
-          className={cn(
-            isUser
-              ? "bg-secondary text-secondary-foreground"
-              : "bg-primary/10 text-primary"
+    <Card className={cn("bg-card border-border flex flex-col", className)}>
+      <CardHeader className="pb-3 shrink-0">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-lg flex items-center gap-2"><Sparkles className="w-5 h-5 text-primary" />Gemini Chat</CardTitle>
+          {messages.length > 0 && <Button variant="ghost" size="sm" onClick={clearChat}><Trash2 className="w-4 h-4 mr-1" />Clear</Button>}
+        </div>
+        {noteContext?.title && <Badge variant="secondary" className="w-fit mt-2">Context: {noteContext.title}</Badge>}
+      </CardHeader>
+      <CardContent className="flex-1 flex flex-col overflow-hidden p-0">
+        <ScrollArea className="flex-1 px-4" ref={scrollRef}>
+          {messages.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full py-12 text-center">
+              <Sparkles className="w-12 h-12 text-primary/50 mb-4" />
+              <p className="text-muted-foreground">Ask me anything about your studies</p>
+            </div>
+          ) : (
+            <div className="space-y-4 py-4">
+              {messages.map((msg, i) => (
+                <div key={i} className={cn("flex gap-3", msg.role === "user" ? "justify-end" : "justify-start")}>
+                  {msg.role === "assistant" && <Avatar className="w-8 h-8"><AvatarFallback className="bg-primary/20"><Sparkles className="w-4 h-4 text-primary" /></AvatarFallback></Avatar>}
+                  <div className={cn("max-w-[80%] rounded-2xl px-4 py-3", msg.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted")}>
+                    {msg.role === "assistant" ? <div className="prose prose-sm dark:prose-invert max-w-none"><ReactMarkdown>{msg.content}</ReactMarkdown></div> : <p className="text-sm whitespace-pre-wrap">{msg.content}</p>}
+                  </div>
+                  {msg.role === "user" && <Avatar className="w-8 h-8"><AvatarFallback className="bg-secondary"><User className="w-4 h-4" /></AvatarFallback></Avatar>}
+                </div>
+              ))}
+              {isLoading && <div className="flex gap-3"><Avatar className="w-8 h-8"><AvatarFallback className="bg-primary/20"><Sparkles className="w-4 h-4 text-primary" /></AvatarFallback></Avatar><div className="bg-muted rounded-2xl px-4 py-3"><Loader2 className="w-4 h-4 animate-spin" /></div></div>}
+            </div>
           )}
-        >
-          {isUser ? "U" : <Sparkles className="w-4 h-4" />}
-        </AvatarFallback>
-      </Avatar>
-      <div
-        className={cn(
-          "flex-1 rounded-lg p-3 max-w-[85%]",
-          isUser
-            ? "bg-primary text-primary-foreground ml-auto"
-            : "bg-muted"
-        )}
-      >
-        {isUser ? (
-  <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-) : (
-  <>
-    <div className="prose prose-sm dark:prose-invert max-w-none">
-      <ReactMarkdown>{message.content}</ReactMarkdown>
-    </div>
-
-    {!isUser && message.content.includes("⚠️") && (
-      <Button
-        variant="outline"
-        size="sm"
-        className="mt-2"
-        onClick={clearChat}
-      >
-        Retry
-      </Button>
-    )}
-
-    <p className="text-[10px] opacity-60 mt-1">
-      {message.timestamp.toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-      })}
-    </p>
-  </>
-)}
-      </div>
-    </div>
+        </ScrollArea>
+        {error && <div className="mx-4 mb-2 p-3 bg-destructive/10 text-destructive text-sm rounded-lg flex items-center gap-2"><AlertCircle className="w-4 h-4" />{error}</div>}
+        {images.length > 0 && <div className="px-4 pb-2 flex gap-2">{images.map((img, i) => <div key={i} className="relative"><img src={img.preview} className="w-16 h-16 object-cover rounded-lg" /><button onClick={() => removeImage(i)} className="absolute -top-1 -right-1 w-5 h-5 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center"><X className="w-3 h-3" /></button></div>)}</div>}
+        <form onSubmit={handleSubmit} className="p-4 pt-2 shrink-0">
+          <div className="flex gap-2">
+            <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleImageUpload} />
+            <Button type="button" variant="outline" size="icon" onClick={() => fileInputRef.current?.click()} disabled={isLoading}><ImageIcon className="w-4 h-4" /></Button>
+            <Textarea value={input} onChange={(e) => setInput(e.target.value)} placeholder="Ask me anything..." className="flex-1 min-h-[44px] max-h-[120px] resize-none bg-background" disabled={isLoading} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSubmit(e); } }} />
+            <Button type="submit" disabled={isLoading || (!input.trim() && images.length === 0)}>{isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}</Button>
+          </div>
+        </form>
+      </CardContent>
+    </Card>
   );
 }
 
