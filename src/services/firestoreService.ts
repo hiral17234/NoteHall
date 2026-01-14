@@ -197,6 +197,7 @@ export const notesService = {
   isCurrentlyLiked: boolean // frontend state (we will NOT trust it)
 ): Promise<void> {
   const noteRef = doc(db, "notes", noteId);
+    let didLike = false;
 
   await runTransaction(db, async (transaction) => {
     const noteSnap = await transaction.get(noteRef);
@@ -253,7 +254,7 @@ export const notesService = {
   } catch (err) {
     console.warn("Notification failed:", err);
   }
-}
+},
 
 
   async toggleDislike(
@@ -302,7 +303,7 @@ export const notesService = {
       likedBy: newLikedBy,
     });
   });
-}
+},
 
            
   async reportNote(noteId: string, userId: string, reason: string): Promise<void> {
