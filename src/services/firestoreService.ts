@@ -15,6 +15,7 @@ import {
   arrayUnion,
   arrayRemove,
   onSnapshot,
+  runTransaction,
 } from 'firebase/firestore';
 import { db, getServerTimestamp } from '@/lib/firebase';
 import { createNotification } from '@/services/notificationService';
@@ -193,118 +194,115 @@ export const notesService = {
   noteId: string,
   userId: string,
   userName: string,
-  isCurrentlyLiked: boolean
+  isCurrentlyLiked: boolean // frontend state (we will NOT trust it)
 ): Promise<void> {
   const noteRef = doc(db, "notes", noteId);
-  const noteSnap = await getDoc(noteRef);
-  if (!noteSnap.exists()) return;
 
-  const note = noteSnap.data() as Note;
-  const authorRef = doc(db, "users", note.authorId);
+  await runTransaction(db, async (transaction) => {
+    const noteSnap = await transaction.get(noteRef);
+    if (!noteSnap.exists()) return;
 
-  if (isCurrentlyLiked) {
-    // ✅ UNLIKE
-    await updateDoc(noteRef, {
-      likes: increment(-1),
-      likedBy: arrayRemove(userId),
-    });
+    const noteData = noteSnap.data() as any;
 
-    // update author stats
-    try {
-      await updateDoc(authorRef, {
-        "stats.totalLikes": increment(-1),
-        "stats.contributionScore": increment(-5),
+    const likedBy: string[] = noteData.likedBy || [];
+    const dislikedBy: string[] = noteData.dislikedBy || [];
+
+    const alreadyLiked = likedBy.includes(userId);
+    const alreadyDisliked = dislikedBy.includes(userId);
+
+    // ✅ If already liked → UNLIKE
+    if (alreadyLiked) {
+      transaction.update(noteRef, {
+        likes: Math.max((noteData.likes || 0) - 1, 0),
+        likedBy: likedBy.filter((id) => id !== userId),
       });
-    } catch (err) {
-      console.warn("Author stats update failed:", err);
+      return;
     }
 
-    return;
-  }
+    // ✅ If not liked → LIKE and remove dislike if exists
+    const newLikedBy = [...likedBy, userId];
+    const newDislikedBy = alreadyDisliked
+      ? dislikedBy.filter((id) => id !== userId)
+      : dislikedBy;
 
-  // ✅ LIKE (first remove dislike if exists)
-  const dislikedBy = (note as any).dislikedBy || [];
-  if (dislikedBy.includes(userId)) {
-    await updateDoc(noteRef, {
-      dislikes: increment(-1),
-      dislikedBy: arrayRemove(userId),
+    const newLikes = (noteData.likes || 0) + 1;
+    const newDislikes = alreadyDisliked
+      ? Math.max((noteData.dislikes || 0) - 1, 0)
+      : (noteData.dislikes || 0);
+
+    transaction.update(noteRef, {
+      likes: newLikes,
+      dislikes: newDislikes,
+      likedBy: newLikedBy,
+      dislikedBy: newDislikedBy,
     });
-  }
-
-  // ✅ LIKE ADD
-  await updateDoc(noteRef, {
-    likes: increment(1),
-    likedBy: arrayUnion(userId),
   });
 
-  // ✅ notification only if liking someone else's note
-  if (note.authorId !== userId) {
-    try {
+  // ✅ Notification AFTER transaction
+  // (don’t do notification inside transaction)
+  try {
+    const updatedNote = await this.getById(noteId);
+    if (updatedNote && updatedNote.authorId !== userId) {
       await createNotification.like(
-        note.authorId,
+        updatedNote.authorId,
         { id: userId, name: userName },
-        note.title,
+        updatedNote.title,
         noteId
       );
-    } catch (err) {
-      console.warn("createNotification.like failed:", err);
     }
-  }
-
-  // ✅ update author stats
-  try {
-    await updateDoc(authorRef, {
-      "stats.totalLikes": increment(1),
-      "stats.contributionScore": increment(5),
-    });
   } catch (err) {
-    console.warn("Author stats update failed:", err);
+    console.warn("Notification failed:", err);
   }
-},
+}
 
 
   async toggleDislike(
   noteId: string,
   userId: string,
-  isCurrentlyDisliked: boolean
+  isCurrentlyDisliked: boolean // frontend state (we will NOT trust it)
 ): Promise<void> {
   const noteRef = doc(db, "notes", noteId);
-  const noteSnap = await getDoc(noteRef);
-  if (!noteSnap.exists()) return;
 
-  const note = noteSnap.data() as Note;
+  await runTransaction(db, async (transaction) => {
+    const noteSnap = await transaction.get(noteRef);
+    if (!noteSnap.exists()) return;
 
-  if (isCurrentlyDisliked) {
-    await updateDoc(noteRef, {
-      dislikes: increment(-1),
-      dislikedBy: arrayRemove(userId),
-    });
-  } else {
-    // Remove like first if exists
-    const likedBy = note.likedBy || [];
+    const noteData = noteSnap.data() as any;
 
-    if (likedBy.includes(userId)) {
-      await updateDoc(noteRef, {
-        likes: increment(-1),
-        likedBy: arrayRemove(userId),
+    const likedBy: string[] = noteData.likedBy || [];
+    const dislikedBy: string[] = noteData.dislikedBy || [];
+
+    const alreadyLiked = likedBy.includes(userId);
+    const alreadyDisliked = dislikedBy.includes(userId);
+
+    // ✅ If already disliked → REMOVE DISLIKE
+    if (alreadyDisliked) {
+      transaction.update(noteRef, {
+        dislikes: Math.max((noteData.dislikes || 0) - 1, 0),
+        dislikedBy: dislikedBy.filter((id) => id !== userId),
       });
-
-      try {
-        await updateDoc(doc(db, "users", note.authorId), {
-          "stats.totalLikes": increment(-1),
-          "stats.contributionScore": increment(-5),
-        });
-      } catch (err) {
-        console.warn("Author stats update failed:", err);
-      }
+      return;
     }
 
-    await updateDoc(noteRef, {
-      dislikes: increment(1),
-      dislikedBy: arrayUnion(userId),
+    // ✅ If not disliked → DISLIKE and remove like if exists
+    const newDislikedBy = [...dislikedBy, userId];
+    const newLikedBy = alreadyLiked
+      ? likedBy.filter((id) => id !== userId)
+      : likedBy;
+
+    const newDislikes = (noteData.dislikes || 0) + 1;
+    const newLikes = alreadyLiked
+      ? Math.max((noteData.likes || 0) - 1, 0)
+      : (noteData.likes || 0);
+
+    transaction.update(noteRef, {
+      dislikes: newDislikes,
+      likes: newLikes,
+      dislikedBy: newDislikedBy,
+      likedBy: newLikedBy,
     });
-  }
-},
+  });
+}
 
            
   async reportNote(noteId: string, userId: string, reason: string): Promise<void> {
