@@ -31,7 +31,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { db } from "@/lib/firebase";
-import { collection, query, where, onSnapshot, orderBy, limit, getDocs } from "firebase/firestore";
+import { collection, query, where, onSnapshot, orderBy, limit, getDocs, doc, getDoc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { 
   Edit2, Github, Linkedin, Globe, FileText, HandHelping, BarChart3,
@@ -62,6 +62,8 @@ export default function Profile() {
   // Live Computed Stats
   const [liveStats, setLiveStats] = useState({ uploads: 0, totalLikes: 0, totalViews: 0 });
   const [helpedCount, setHelpedCount] = useState(0);
+  const [isOnline, setIsOnline] = useState(false);
+  const [showOnlineStatus, setShowOnlineStatus] = useState(true);
 
   const isOwnProfile = useMemo(() => 
     !userId || userId === "current-user" || userId === currentUser?.id, 
@@ -113,7 +115,31 @@ export default function Profile() {
       setContributions(data);
     });
 
-    // 6. User-Specific Private Data
+    // 6. Check online status and privacy settings
+    const checkOnlineStatus = async () => {
+      try {
+        const userDoc = await getDoc(doc(db, 'users', targetUserId));
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          // Check if user has showOnlineStatus enabled (default true)
+          const privacyShowOnline = userData.privacy?.showOnlineStatus !== false;
+          setShowOnlineStatus(privacyShowOnline);
+          
+          // Check if user is currently online (last active within 5 minutes)
+          const lastActive = userData.lastActiveDate;
+          if (lastActive) {
+            const lastActiveTime = new Date(lastActive).getTime();
+            const now = Date.now();
+            setIsOnline(now - lastActiveTime < 5 * 60 * 1000); // 5 minutes
+          }
+        }
+      } catch (error) {
+        console.error("Error checking online status:", error);
+      }
+    };
+    checkOnlineStatus();
+
+    // 7. User-Specific Private Data
     let unsubSaved = () => {};
     let unsubDownloads = () => {};
 
@@ -217,11 +243,17 @@ const earnedAchievements = profileData
                 {!isOwnProfile && <HelloWaveIcon show={!isOwnProfile} />}
                 
                 <Avatar className="w-36 h-36 border-4 border-background shadow-2xl transition-transform group-hover:scale-105 duration-300">
-                  <AvatarImage src={profileData.avatar} />
+                  <AvatarImage src={profileData.avatar} className="object-cover" />
                   <AvatarFallback className="bg-primary text-primary-foreground text-4xl font-bold">
                     {profileData.name?.[0]}
                   </AvatarFallback>
                 </Avatar>
+                
+                {/* Online Status Indicator - respects privacy settings */}
+                {showOnlineStatus && isOnline && (
+                  <span className="absolute bottom-10 right-4 w-4 h-4 bg-green-500 border-2 border-background rounded-full" title="Online" />
+                )}
+                
                 <Badge className="absolute -bottom-2 right-4 px-3 py-1 bg-orange-500 hover:bg-orange-600 border-2 border-background shadow-lg flex items-center gap-1">
                   <Flame className="w-3.5 h-3.5 fill-current" />
                   <span className="font-bold">{profileData.streak || 0}</span>
@@ -303,7 +335,21 @@ const earnedAchievements = profileData
               <EmptyState type="notes" title="No notes found" description={isOwnProfile ? "Start by uploading your study materials!" : "This user hasn't shared any notes yet."} />
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                {uploadedNotes.map(n => <NoteCard key={n.id} note={mapFirestoreNoteToCardNote(n)} />)}
+                {uploadedNotes.map(n => (
+                  <NoteCard 
+                    key={n.id} 
+                    note={mapFirestoreNoteToCardNote(n)} 
+                    showDelete={isOwnProfile}
+                    onDelete={async () => {
+                      try {
+                        await notesService.deleteNote(n.id);
+                        toast({ title: "Note deleted", description: "Your note has been removed." });
+                      } catch (error) {
+                        toast({ title: "Error", description: "Failed to delete note.", variant: "destructive" });
+                      }
+                    }}
+                  />
+                ))}
               </div>
             )}
           </TabsContent>

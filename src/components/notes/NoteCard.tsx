@@ -9,18 +9,18 @@ import { NoteCardNote } from "@/lib/noteCard";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { notesService, commentsService } from "@/services/firestoreService";
-import { ThumbsUp, ThumbsDown, Eye, Download, Bookmark, BookmarkCheck, MessageCircle, Share2, FileText, Image as ImageIcon, Video, Link as LinkIcon, Star, Expand, MoreVertical, Flag, Loader2, Play, Sparkles, Volume2, VolumeX } from "lucide-react";
+import { ThumbsUp, ThumbsDown, Eye, Download, Bookmark, BookmarkCheck, MessageCircle, Share2, FileText, Image as ImageIcon, Video, Link as LinkIcon, Star, Expand, MoreVertical, Flag, Loader2, Play, Sparkles, Volume2, VolumeX, Trash2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 
-interface NoteCardProps { note: NoteCardNote; onExpand?: () => void; compact?: boolean; }
+interface NoteCardProps { note: NoteCardNote; onExpand?: () => void; compact?: boolean; showDelete?: boolean; onDelete?: () => Promise<void>; }
 
 const fileTypeIcons = { pdf: FileText, image: ImageIcon, video: Video, link: LinkIcon };
 const fileTypeColors = { pdf: "bg-red-500/10 text-red-500", image: "bg-green-500/10 text-green-500", video: "bg-purple-500/10 text-purple-500", link: "bg-blue-500/10 text-blue-500" };
 
-export function NoteCard({ note, onExpand, compact = false }: NoteCardProps) {
+export function NoteCard({ note, onExpand, compact = false, showDelete = false, onDelete }: NoteCardProps) {
   const navigate = useNavigate();
   const { userProfile } = useAuth();
   const { toast } = useToast();
@@ -35,6 +35,7 @@ export function NoteCard({ note, onExpand, compact = false }: NoteCardProps) {
   const [reportReason, setReportReason] = useState("");
   const [isReporting, setIsReporting] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
+  const [isDeleting, setIsDeleting] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   useEffect(() => {
     if (userProfile?.id) {
@@ -159,6 +160,21 @@ export function NoteCard({ note, onExpand, compact = false }: NoteCardProps) {
               <DropdownMenuContent align="end" className="bg-popover z-50">
                 <DropdownMenuItem onClick={handleShare}><Share2 className="w-4 h-4 mr-2" />Share</DropdownMenuItem>
                 {userProfile && note.authorId !== userProfile.id && <DropdownMenuItem onClick={e => { e.stopPropagation(); setShowReportDialog(true); }} className="text-destructive"><Flag className="w-4 h-4 mr-2" />Report</DropdownMenuItem>}
+                {showDelete && onDelete && (
+                  <DropdownMenuItem 
+                    onClick={async (e) => { 
+                      e.stopPropagation(); 
+                      setIsDeleting(true);
+                      await onDelete();
+                      setIsDeleting(false);
+                    }} 
+                    className="text-destructive"
+                    disabled={isDeleting}
+                  >
+                    {isDeleting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Trash2 className="w-4 h-4 mr-2" />}
+                    Delete
+                  </DropdownMenuItem>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
             <Button variant="default" size="sm" onClick={handleAskAI} className="gap-1.5 h-7 px-2 bg-yellow-500 hover:bg-yellow-600 text-black"><Sparkles className="w-3.5 h-3.5" />Ask AI</Button>
