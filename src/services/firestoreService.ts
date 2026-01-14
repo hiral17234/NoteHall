@@ -189,7 +189,75 @@ export const notesService = {
     }
   },
 
-  await notesService.toggleLike(note.id, userProfile.id, userProfile.name, wasLiked);
+  async toggleLike(
+  noteId: string,
+  userId: string,
+  userName: string,
+  isCurrentlyLiked: boolean
+): Promise<void> {
+  const noteRef = doc(db, "notes", noteId);
+  const noteSnap = await getDoc(noteRef);
+  if (!noteSnap.exists()) return;
+
+  const note = noteSnap.data() as Note;
+  const authorRef = doc(db, "users", note.authorId);
+
+  // ✅ If already liked → remove like
+  if (isCurrentlyLiked) {
+    await updateDoc(noteRef, {
+      likes: increment(-1),
+      likedBy: arrayRemove(userId),
+    });
+
+    try {
+      await updateDoc(authorRef, {
+        "stats.totalLikes": increment(-1),
+        "stats.contributionScore": increment(-5),
+      });
+    } catch (err) {
+      console.warn("Author stats update failed:", err);
+    }
+
+    return;
+  }
+
+  // ✅ If not liked → add like (remove dislike first)
+  const dislikedBy = (note as any).dislikedBy || [];
+  if (dislikedBy.includes(userId)) {
+    await updateDoc(noteRef, {
+      dislikes: increment(-1),
+      dislikedBy: arrayRemove(userId),
+    });
+  }
+
+  await updateDoc(noteRef, {
+    likes: increment(1),
+    likedBy: arrayUnion(userId),
+  });
+
+  try {
+    await updateDoc(authorRef, {
+      "stats.totalLikes": increment(1),
+      "stats.contributionScore": increment(5),
+    });
+  } catch (err) {
+    console.warn("Author stats update failed:", err);
+  }
+
+  // ✅ notification only when liking
+  if (note.authorId !== userId) {
+    try {
+      await createNotification.like(
+        note.authorId,
+        { id: userId, name: userName },
+        note.title,
+        noteId
+      );
+    } catch (err) {
+      console.warn("createNotification.like failed:", err);
+    }
+  }
+},
 
 
   async toggleDislike(
