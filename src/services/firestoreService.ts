@@ -50,6 +50,7 @@ export interface Note {
   };
   savedBy: string[];
   likedBy: string[];
+  dislikedBy: string[];
   createdAt: any;
   updatedAt: any;
 }
@@ -163,6 +164,7 @@ export const notesService = {
       difficulty: { easy: 0, medium: 0, hard: 0 },
       savedBy: [],
       likedBy: [],
+      dislikedBy: [],   // ✅ ADD THIS
       createdAt: getServerTimestamp(),
       updatedAt: getServerTimestamp(),
     });
