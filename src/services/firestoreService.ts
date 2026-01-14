@@ -278,16 +278,6 @@ await updateDoc(authorRef, { 'stats.totalLikes': increment(1), 'stats.contributi
   }
 }
 
-);
-        } catch (err) {
-          console.warn("Author stats update failed:", err);
-        }
-      }
-
-      await updateDoc(noteRef, { dislikes: increment(1), dislikedBy: arrayUnion(userId) });
-    }
-  },
-
   async reportNote(noteId: string, userId: string, reason: string): Promise<void> {
     const noteRef = doc(db, 'notes', noteId);
     const noteSnap = await getDoc(noteRef);
