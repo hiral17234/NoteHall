@@ -206,23 +206,22 @@ export const notesService = {
       if (dislikedBy.includes(userId)) {
         await updateDoc(noteRef, { dislikes: increment(-1), dislikedBy: arrayRemove(userId) });
       }
-            await updateDoc(noteRef, { likes: increment(1), likedBy: arrayUnion(userId) });
+           await updateDoc(noteRef, { likes: increment(1), likedBy: arrayUnion(userId) });
 
-      // ✅ Notification should NOT break like feature
-      if (note.authorId !== userId) {
-        try {
-          await createNotification.like(
-            note.authorId,
-            { id: userId, name: userName },
-            note.title,
-            noteId
-          );
-        } catch (err) {
-          console.warn("createNotification.like failed:", err);
-        }
-      }
+if (note.authorId !== userId) {
+  try {
+    await createNotification.like(
+      note.authorId,
+      { id: userId, name: userName },
+      note.title,
+      noteId
+    );
+  } catch (err) {
+    console.warn("createNotification.like failed:", err);
+  }
+}
 
-      await updateDoc(authorRef, { 'stats.totalLikes': increment(1), 'stats.contributionScore': increment(5) });
+await updateDoc(authorRef, { 'stats.totalLikes': increment(1), 'stats.contributionScore': increment(5) });
 
     }
   },
@@ -240,14 +239,18 @@ export const notesService = {
       // Remove like first if exists
       const likedBy = note.likedBy || [];
             if (likedBy.includes(userId)) {
-        await updateDoc(noteRef, { likes: increment(-1), likedBy: arrayRemove(userId) });
+  await updateDoc(noteRef, { likes: increment(-1), likedBy: arrayRemove(userId) });
 
-        // ✅ If author stats update fails, still keep dislike working
-        try {
-          await updateDoc(doc(db, 'users', note.authorId), {
-            'stats.totalLikes': increment(-1),
-            'stats.contributionScore': increment(-5),
-          });
+  try {
+    await updateDoc(doc(db, 'users', note.authorId), {
+      'stats.totalLikes': increment(-1),
+      'stats.contributionScore': increment(-5),
+    });
+  } catch (err) {
+    console.warn("Author stats update failed:", err);
+  }
+}
+);
         } catch (err) {
           console.warn("Author stats update failed:", err);
         }
