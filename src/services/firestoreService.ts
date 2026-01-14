@@ -202,13 +202,14 @@ export const notesService = {
   const note = noteSnap.data() as Note;
   const authorRef = doc(db, "users", note.authorId);
 
-  // ✅ If already liked → remove like
   if (isCurrentlyLiked) {
+    // ✅ UNLIKE
     await updateDoc(noteRef, {
       likes: increment(-1),
       likedBy: arrayRemove(userId),
     });
 
+    // update author stats
     try {
       await updateDoc(authorRef, {
         "stats.totalLikes": increment(-1),
@@ -221,7 +222,7 @@ export const notesService = {
     return;
   }
 
-  // ✅ If not liked → add like (remove dislike first)
+  // ✅ LIKE (first remove dislike if exists)
   const dislikedBy = (note as any).dislikedBy || [];
   if (dislikedBy.includes(userId)) {
     await updateDoc(noteRef, {
@@ -230,21 +231,13 @@ export const notesService = {
     });
   }
 
+  // ✅ LIKE ADD
   await updateDoc(noteRef, {
     likes: increment(1),
     likedBy: arrayUnion(userId),
   });
 
-  try {
-    await updateDoc(authorRef, {
-      "stats.totalLikes": increment(1),
-      "stats.contributionScore": increment(5),
-    });
-  } catch (err) {
-    console.warn("Author stats update failed:", err);
-  }
-
-  // ✅ notification only when liking
+  // ✅ notification only if liking someone else's note
   if (note.authorId !== userId) {
     try {
       await createNotification.like(
@@ -256,6 +249,16 @@ export const notesService = {
     } catch (err) {
       console.warn("createNotification.like failed:", err);
     }
+  }
+
+  // ✅ update author stats
+  try {
+    await updateDoc(authorRef, {
+      "stats.totalLikes": increment(1),
+      "stats.contributionScore": increment(5),
+    });
+  } catch (err) {
+    console.warn("Author stats update failed:", err);
   }
 },
 
