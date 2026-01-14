@@ -268,6 +268,7 @@ await updateDoc(authorRef, { 'stats.totalLikes': increment(1), 'stats.contributi
     });
   }
 },
+
            
   async reportNote(noteId: string, userId: string, reason: string): Promise<void> {
     const noteRef = doc(db, 'notes', noteId);
