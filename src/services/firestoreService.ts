@@ -199,12 +199,62 @@ export const notesService = {
       await updateDoc(noteRef, { likes: increment(-1), likedBy: arrayRemove(userId) });
       await updateDoc(authorRef, { 'stats.totalLikes': increment(-1), 'stats.contributionScore': increment(-5) });
     } else {
+      // Remove dislike first if exists
+      const dislikedBy = (note as any).dislikedBy || [];
+      if (dislikedBy.includes(userId)) {
+        await updateDoc(noteRef, { dislikes: increment(-1), dislikedBy: arrayRemove(userId) });
+      }
       await updateDoc(noteRef, { likes: increment(1), likedBy: arrayUnion(userId) });
       if (note.authorId !== userId) {
         await createNotification.like(note.authorId, { id: userId, name: userName }, note.title, noteId);
       }
       await updateDoc(authorRef, { 'stats.totalLikes': increment(1), 'stats.contributionScore': increment(5) });
     }
+  },
+
+  async toggleDislike(noteId: string, userId: string, isCurrentlyDisliked: boolean): Promise<void> {
+    const noteRef = doc(db, 'notes', noteId);
+    const noteSnap = await getDoc(noteRef);
+    if (!noteSnap.exists()) return;
+    
+    const note = noteSnap.data() as Note;
+    
+    if (isCurrentlyDisliked) {
+      await updateDoc(noteRef, { dislikes: increment(-1), dislikedBy: arrayRemove(userId) });
+    } else {
+      // Remove like first if exists
+      const likedBy = note.likedBy || [];
+      if (likedBy.includes(userId)) {
+        await updateDoc(noteRef, { likes: increment(-1), likedBy: arrayRemove(userId) });
+        await updateDoc(doc(db, 'users', note.authorId), { 'stats.totalLikes': increment(-1), 'stats.contributionScore': increment(-5) });
+      }
+      await updateDoc(noteRef, { dislikes: increment(1), dislikedBy: arrayUnion(userId) });
+    }
+  },
+
+  async reportNote(noteId: string, userId: string, reason: string): Promise<void> {
+    const noteRef = doc(db, 'notes', noteId);
+    const noteSnap = await getDoc(noteRef);
+    if (!noteSnap.exists()) return;
+
+    // Add report to subcollection
+    await addDoc(collection(db, 'notes', noteId, 'reports'), {
+      userId,
+      reason,
+      createdAt: getServerTimestamp(),
+    });
+
+    // Increment report count on note
+    const note = noteSnap.data();
+    const currentReportCount = note.reportCount || 0;
+    const newReportCount = currentReportCount + 1;
+
+    await updateDoc(noteRef, { 
+      reportCount: newReportCount,
+      reportedBy: arrayUnion(userId),
+      isHidden: newReportCount >= 15,
+      updatedAt: getServerTimestamp(),
+    });
   },
 
   async saveNote(noteId: string, userId: string): Promise<void> {
@@ -229,7 +279,11 @@ export const notesService = {
     return results.filter((n): n is Note => n !== null);
   },
 
-  async downloadNote(noteId: string, userId: string, note: { title: string; subject: string; fileUrl: string }): Promise<void> {
+  async deleteNote(noteId: string): Promise<void> {
+    await deleteDoc(doc(db, 'notes', noteId));
+  },
+
+  async downloadNote(noteId: string, userId: string, note: { title: string; subject: string; fileUrl: string; fileType?: string }): Promise<void> {
     try {
       await setDoc(doc(db, 'users', userId, 'downloadedNotes', noteId), { 
         noteId,
@@ -248,6 +302,25 @@ export const notesService = {
       downloadUrl = downloadUrl.replace('/upload/', '/upload/fl_attachment/');
     }
     
+    // Determine file extension based on fileType
+    const getFileExtension = (fileType?: string, url?: string): string => {
+      if (fileType === 'video') {
+        if (url?.includes('.mp4')) return 'mp4';
+        if (url?.includes('.webm')) return 'webm';
+        if (url?.includes('.mov')) return 'mov';
+        return 'mp4';
+      }
+      if (fileType === 'image') {
+        if (url?.includes('.png')) return 'png';
+        if (url?.includes('.jpg') || url?.includes('.jpeg')) return 'jpg';
+        if (url?.includes('.webp')) return 'webp';
+        return 'jpg';
+      }
+      return 'pdf';
+    };
+
+    const fileExtension = getFileExtension(note.fileType, note.fileUrl);
+    
     try {
       const response = await fetch(downloadUrl);
       const blob = await response.blob();
@@ -255,7 +328,7 @@ export const notesService = {
       const link = document.createElement('a');
       link.href = url;
       const fileName = note.title.replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_');
-      link.setAttribute('download', `${fileName}.pdf`);
+      link.setAttribute('download', `${fileName}.${fileExtension}`);
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -449,11 +522,12 @@ export const commentsService = {
   },
 
   // Add comment to a note (path: notes/{noteId}/comments)
-  async addNoteComment(noteId: string, userId: string, userName: string, text: string, ownerId?: string, itemTitle?: string) {
+  async addNoteComment(noteId: string, userId: string, userName: string, text: string, ownerId?: string, itemTitle?: string, userAvatar?: string) {
     try {
       await addDoc(collection(db, 'notes', noteId, 'comments'), {
         userId, // Required for RLS delete rule
-        userName, 
+        userName,
+        userAvatar: userAvatar || '',
         text, 
         parentId: null, // For threading support
         createdAt: getServerTimestamp(),

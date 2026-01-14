@@ -279,11 +279,11 @@ const earnedAchievements = profileData
 
         {/* Real-time Stats Section */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-10">
-          <StatCard icon={FileText} label="Uploads" value={stats.uploads} color="bg-blue-500/10 text-blue-600" onClick={() => setStatModalOpen("uploads")} />
-          <StatCard icon={ThumbsUp} label="Likes" value={stats.totalLikes} color="bg-pink-500/10 text-pink-600" onClick={() => setStatModalOpen("likes")} />
-          <StatCard icon={Eye} label="Views" value={stats.totalViews} color="bg-indigo-500/10 text-indigo-600" onClick={() => setStatModalOpen("views")} />
-          <StatCard icon={HandHelping} label="Helped" value={stats.helpedRequests} color="bg-green-500/10 text-green-600" onClick={() => setStatModalOpen("helped")} />
-          <StatCard icon={BarChart3} label="Score" value={stats.contributionScore} color="bg-orange-500/10 text-orange-600" onClick={() => setStatModalOpen("score")} />
+          <StatCard icon={FileText} label="Uploads" value={stats.uploads} color="bg-blue-500/10 text-blue-600" />
+          <StatCard icon={ThumbsUp} label="Likes" value={stats.totalLikes} color="bg-pink-500/10 text-pink-600" />
+          <StatCard icon={Eye} label="Views" value={stats.totalViews} color="bg-indigo-500/10 text-indigo-600" />
+          <StatCard icon={HandHelping} label="Helped" value={stats.helpedRequests} color="bg-green-500/10 text-green-600" />
+          <StatCard icon={BarChart3} label="Score" value={stats.contributionScore} color="bg-orange-500/10 text-orange-600" />
         </div>
 
         {/* Achievements Component */}
@@ -462,17 +462,16 @@ function TabTrigger({ value, label, count, icon: Icon }: any) {
   );
 }
 
-function StatCard({ icon: Icon, label, value, color, onClick }: any) {
+function StatCard({ icon: Icon, label, value, color }: { icon: any; label: string; value: number; color: string }) {
   return (
-    <Card className="cursor-pointer border-none shadow-sm hover:shadow-md transition-all hover:-translate-y-1 bg-card/60" onClick={onClick}>
+    <Card className="border-none shadow-sm bg-card/60">
       <CardContent className="p-5 text-center flex flex-col items-center">
         <div className={`p-3 rounded-2xl mb-3 ${color}`}>
           <Icon className="w-6 h-6" />
         </div>
-<p className="text-2xl font-black tracking-tight leading-tight">
-  {(value ?? 0).toLocaleString()}
-</p>
-
+        <p className="text-2xl font-black tracking-tight leading-tight">
+          {(value ?? 0).toLocaleString()}
+        </p>
         <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mt-1">{label}</p>
       </CardContent>
     </Card>
