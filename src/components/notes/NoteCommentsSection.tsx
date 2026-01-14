@@ -12,7 +12,7 @@ import { formatDistanceToNow } from "date-fns";
 import { Send, Trash2, Loader2, MessageCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-interface Comment { id: string; userId: string; userName: string; text: string; createdAt: any; }
+interface Comment { id: string; userId: string; userName: string; userAvatar?: string; text: string; createdAt: any; }
 
 interface NoteCommentsSectionProps { noteId: string; ownerId?: string; noteTitle?: string; className?: string; }
 
@@ -35,7 +35,7 @@ export function NoteCommentsSection({ noteId, ownerId, noteTitle, className }: N
   const handleSubmit = async () => {
     if (!userProfile || !newComment.trim()) return;
     setIsSubmitting(true);
-    try { await commentsService.addNoteComment(noteId, userProfile.id, userProfile.name, newComment.trim(), ownerId, noteTitle); setNewComment(""); toast({ title: "Comment added" }); }
+    try { await commentsService.addNoteComment(noteId, userProfile.id, userProfile.name, newComment.trim(), ownerId, noteTitle, userProfile.avatar); setNewComment(""); toast({ title: "Comment added" }); }
     catch { toast({ title: "Error", variant: "destructive" }); }
     finally { setIsSubmitting(false); }
   };
@@ -68,7 +68,7 @@ export function NoteCommentsSection({ noteId, ownerId, noteTitle, className }: N
           <div className="space-y-4 pr-4">
             {comments.map(c => (
               <div key={c.id} className="flex gap-3 group">
-                <Avatar className="w-8 h-8"><AvatarFallback className="text-xs bg-secondary">{c.userName?.[0]}</AvatarFallback></Avatar>
+                <Avatar className="w-8 h-8"><AvatarImage src={c.userAvatar} /><AvatarFallback className="text-xs bg-primary/20 text-primary">{c.userName?.[0]}</AvatarFallback></Avatar>
                 <div className="flex-1 min-w-0"><div className="flex items-center gap-2"><span className="font-medium text-sm">{c.userName}</span><span className="text-xs text-muted-foreground">{formatTime(c.createdAt)}</span></div><p className="text-sm text-muted-foreground mt-1 break-words">{c.text}</p></div>
                 {userProfile?.id === c.userId && <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100" onClick={() => handleDelete(c.id)} disabled={deletingId === c.id}>{deletingId === c.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4 text-destructive" />}</Button>}
               </div>

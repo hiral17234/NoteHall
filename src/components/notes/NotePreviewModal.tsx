@@ -52,26 +52,36 @@ export function NotePreviewModal({ note, open, onClose }: NotePreviewModalProps)
 
   const handleLike = async () => {
     if (!userProfile) { toast({ title: "Login required", variant: "destructive" }); return; }
+    if (isLoading) return;
     setIsLoading(true);
+    const wasLiked = isLiked, wasDisliked = isDisliked;
+    if (wasLiked) { setIsLiked(false); setLikeCount(p => p - 1); } 
+    else { setIsLiked(true); setLikeCount(p => p + 1); if (wasDisliked) { setIsDisliked(false); setDislikeCount(p => p - 1); } }
     try {
-      const wasLiked = isLiked, wasDisliked = isDisliked;
-      if (wasLiked) { setIsLiked(false); setLikeCount(p => p - 1); } else { setIsLiked(true); setLikeCount(p => p + 1); if (wasDisliked) { setIsDisliked(false); setDislikeCount(p => p - 1); } }
       await notesService.toggleLike(note.id, userProfile.id, userProfile.name, wasLiked);
-      if (wasDisliked && !wasLiked) await notesService.toggleDislike?.(note.id, userProfile.id, true);
-    } catch { toast({ title: "Error", variant: "destructive" }); }
-    finally { setIsLoading(false); }
+    } catch {
+      if (wasLiked) { setIsLiked(true); setLikeCount(p => p + 1); } 
+      else { setIsLiked(false); setLikeCount(p => p - 1); if (wasDisliked) { setIsDisliked(true); setDislikeCount(p => p + 1); } }
+      toast({ title: "Error", variant: "destructive" });
+    }
+    setIsLoading(false);
   };
 
   const handleDislike = async () => {
     if (!userProfile) { toast({ title: "Login required", variant: "destructive" }); return; }
+    if (isLoading) return;
     setIsLoading(true);
+    const wasLiked = isLiked, wasDisliked = isDisliked;
+    if (wasDisliked) { setIsDisliked(false); setDislikeCount(p => p - 1); } 
+    else { setIsDisliked(true); setDislikeCount(p => p + 1); if (wasLiked) { setIsLiked(false); setLikeCount(p => p - 1); } }
     try {
-      const wasLiked = isLiked, wasDisliked = isDisliked;
-      if (wasDisliked) { setIsDisliked(false); setDislikeCount(p => p - 1); } else { setIsDisliked(true); setDislikeCount(p => p + 1); if (wasLiked) { setIsLiked(false); setLikeCount(p => p - 1); } }
-      await notesService.toggleDislike?.(note.id, userProfile.id, wasDisliked);
-      if (wasLiked && !wasDisliked) await notesService.toggleLike(note.id, userProfile.id, userProfile.name, true);
-    } catch { toast({ title: "Error", variant: "destructive" }); }
-    finally { setIsLoading(false); }
+      await notesService.toggleDislike(note.id, userProfile.id, wasDisliked);
+    } catch {
+      if (wasDisliked) { setIsDisliked(true); setDislikeCount(p => p + 1); } 
+      else { setIsDisliked(false); setDislikeCount(p => p - 1); if (wasLiked) { setIsLiked(true); setLikeCount(p => p + 1); } }
+      toast({ title: "Error", variant: "destructive" });
+    }
+    setIsLoading(false);
   };
 
   const handleSave = async () => {
@@ -83,8 +93,19 @@ export function NotePreviewModal({ note, open, onClose }: NotePreviewModalProps)
 
   const handleDownload = async () => {
     if (!userProfile || !note.fileUrl) return;
-    try { await notesService.downloadNote(note.id, userProfile.id, { title: note.title, subject: note.subject, fileUrl: note.fileUrl }); toast({ title: "Download started" }); }
+    try { await notesService.downloadNote(note.id, userProfile.id, { title: note.title, subject: note.subject, fileUrl: note.fileUrl, fileType: note.fileType }); toast({ title: "Download started" }); }
     catch { toast({ title: "Error", variant: "destructive" }); }
+  };
+
+  const handleShare = async () => {
+    const shareUrl = `${window.location.origin}/note/${note.id}`;
+    if (navigator.share) {
+      try { await navigator.share({ title: note.title, text: `Check out: ${note.title}`, url: shareUrl }); }
+      catch (err) { if ((err as Error).name !== 'AbortError') { navigator.clipboard.writeText(shareUrl); toast({ title: "Link copied" }); } }
+    } else {
+      navigator.clipboard.writeText(shareUrl);
+      toast({ title: "Link copied" });
+    }
   };
 
   const handleSubmitRating = async () => {
@@ -133,10 +154,10 @@ export function NotePreviewModal({ note, open, onClose }: NotePreviewModalProps)
             <Button variant="ghost" size="sm" onClick={handleLike} disabled={isLoading} className={cn(isLiked && "text-primary bg-primary/10")}><ThumbsUp className={cn("w-4 h-4 mr-1", isLiked && "fill-current")} />{likeCount}</Button>
             <Button variant="ghost" size="sm" onClick={handleDislike} disabled={isLoading} className={cn(isDisliked && "text-destructive bg-destructive/10")}><ThumbsDown className={cn("w-4 h-4 mr-1", isDisliked && "fill-current")} />{dislikeCount}</Button>
             <Button variant="ghost" size="sm" onClick={handleSave} className={cn(isSaved && "text-chart-1 bg-chart-1/10")}>{isSaved ? <BookmarkCheck className="w-4 h-4 mr-1 fill-current" /> : <Bookmark className="w-4 h-4 mr-1" />}{isSaved ? "Saved" : "Save"}</Button>
-            <Button variant="ghost" size="sm" onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/note/${note.id}`); toast({ title: "Link copied" }); }}><Share2 className="w-4 h-4 mr-1" />Share</Button>
+            <Button variant="ghost" size="sm" onClick={handleShare}><Share2 className="w-4 h-4 mr-1" />Share</Button>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => { navigate("/gemini", { state: { title: note.title, subject: note.subject, fileUrl: note.fileUrl } }); onClose(); }}><Sparkles className="w-4 h-4 mr-1" />Ask Gemini</Button>
+            <Button variant="default" size="sm" className="bg-yellow-500 hover:bg-yellow-600 text-black" onClick={() => { navigate("/gemini", { state: { title: note.title, subject: note.subject, fileUrl: note.fileUrl, fileType: note.fileType } }); onClose(); }}><Sparkles className="w-4 h-4 mr-1" />Ask AI</Button>
             {note.fileUrl && note.fileType !== "link" && <Button size="sm" onClick={handleDownload}><Download className="w-4 h-4 mr-1" />Download</Button>}
           </div>
         </div>

@@ -45,7 +45,7 @@ export function TopContributors({ onViewProfile }: { onViewProfile?: (userId: st
       try {
         // Query users ordered by contribution score
         const usersRef = collection(db, "users");
-        const q = query(usersRef, orderBy("stats.contributionScore", "desc"), limit(5));
+        const q = query(usersRef, orderBy("stats.contributionScore", "desc"), limit(3));
         const snapshot = await getDocs(q);
         
         const topUsers: Contributor[] = snapshot.docs

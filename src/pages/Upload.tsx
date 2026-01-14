@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SelectWithOther } from "@/components/ui/select-with-other";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { FileText, Image, Video, Link, Upload as UploadIcon, X, CheckCircle, Loader2 } from "lucide-react";
@@ -328,65 +328,56 @@ export default function Upload() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label>Subject *</Label>
-                  <Select
+                  <SelectWithOther
                     value={formData.subject}
                     onValueChange={(value) => handleInputChange("subject", value)}
                     disabled={isUploading}
-                  >
-                    <SelectTrigger className="bg-background">
-                      <SelectValue placeholder="Select subject" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="DSA">Data Structures</SelectItem>
-                      <SelectItem value="OS">Operating Systems</SelectItem>
-                      <SelectItem value="DBMS">DBMS</SelectItem>
-                      <SelectItem value="CN">Computer Networks</SelectItem>
-                      <SelectItem value="ML">Machine Learning</SelectItem>
-                      <SelectItem value="DE">Digital Electronics</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    placeholder="Select subject"
+                    inputPlaceholder="Enter subject name..."
+                    options={[
+                      { value: "DSA", label: "Data Structures" },
+                      { value: "OS", label: "Operating Systems" },
+                      { value: "DBMS", label: "DBMS" },
+                      { value: "CN", label: "Computer Networks" },
+                      { value: "ML", label: "Machine Learning" },
+                      { value: "DE", label: "Digital Electronics" },
+                    ]}
+                  />
                 </div>
 
                 <div className="space-y-2">
                   <Label>Branch *</Label>
-                  <Select
+                  <SelectWithOther
                     value={formData.branch}
                     onValueChange={(value) => handleInputChange("branch", value)}
                     disabled={isUploading}
-                  >
-                    <SelectTrigger className="bg-background">
-                      <SelectValue placeholder="Select branch" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="CSE">CSE</SelectItem>
-                      <SelectItem value="ECE">ECE</SelectItem>
-                      <SelectItem value="EEE">EEE</SelectItem>
-                      <SelectItem value="ME">ME</SelectItem>
-                      <SelectItem value="CE">CE</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    placeholder="Select branch"
+                    inputPlaceholder="Enter branch name..."
+                    options={[
+                      { value: "CSE", label: "CSE" },
+                      { value: "ECE", label: "ECE" },
+                      { value: "EEE", label: "EEE" },
+                      { value: "ME", label: "ME" },
+                      { value: "CE", label: "CE" },
+                    ]}
+                  />
                 </div>
 
                 <div className="space-y-2">
                   <Label>Year *</Label>
-                  <Select
+                  <SelectWithOther
                     value={formData.year}
                     onValueChange={(value) => handleInputChange("year", value)}
                     disabled={isUploading}
-                  >
-                    <SelectTrigger className="bg-background">
-                      <SelectValue placeholder="Select year" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1st Year">1st Year</SelectItem>
-                      <SelectItem value="2nd Year">2nd Year</SelectItem>
-                      <SelectItem value="3rd Year">3rd Year</SelectItem>
-                      <SelectItem value="4th Year">4th Year</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    placeholder="Select year"
+                    inputPlaceholder="Enter year..."
+                    options={[
+                      { value: "1st Year", label: "1st Year" },
+                      { value: "2nd Year", label: "2nd Year" },
+                      { value: "3rd Year", label: "3rd Year" },
+                      { value: "4th Year", label: "4th Year" },
+                    ]}
+                  />
                 </div>
               </div>
 

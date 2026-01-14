@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,7 @@ import { NoteCardNote } from "@/lib/noteCard";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { notesService, commentsService } from "@/services/firestoreService";
-import { ThumbsUp, ThumbsDown, Eye, Download, Bookmark, BookmarkCheck, MessageCircle, Share2, FileText, Image as ImageIcon, Video, Link as LinkIcon, Star, Expand, MoreVertical, Flag, Loader2, Play } from "lucide-react";
+import { ThumbsUp, ThumbsDown, Eye, Download, Bookmark, BookmarkCheck, MessageCircle, Share2, FileText, Image as ImageIcon, Video, Link as LinkIcon, Star, Expand, MoreVertical, Flag, Loader2, Play, Sparkles, Volume2, VolumeX } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
@@ -34,7 +34,8 @@ export function NoteCard({ note, onExpand, compact = false }: NoteCardProps) {
   const [showReportDialog, setShowReportDialog] = useState(false);
   const [reportReason, setReportReason] = useState("");
   const [isReporting, setIsReporting] = useState(false);
-
+  const [isMuted, setIsMuted] = useState(true);
+  const videoRef = useRef<HTMLVideoElement>(null);
   useEffect(() => {
     if (userProfile?.id) {
       setIsLiked(note.likedBy?.includes(userProfile.id) ?? false);
@@ -54,14 +55,19 @@ export function NoteCard({ note, onExpand, compact = false }: NoteCardProps) {
     if (!userProfile) { toast({ title: "Login required", variant: "destructive" }); return; }
     if (isLoading) return;
     setIsLoading(true);
+    const wasLiked = isLiked, wasDisliked = isDisliked;
+    // Optimistic update
+    if (wasLiked) { setIsLiked(false); setLikeCount(p => p - 1); }
+    else { setIsLiked(true); setLikeCount(p => p + 1); if (wasDisliked) { setIsDisliked(false); setDislikeCount(p => p - 1); } }
     try {
-      const wasLiked = isLiked, wasDisliked = isDisliked;
-      if (wasLiked) { setIsLiked(false); setLikeCount(p => p - 1); }
-      else { setIsLiked(true); setLikeCount(p => p + 1); if (wasDisliked) { setIsDisliked(false); setDislikeCount(p => p - 1); } }
       await notesService.toggleLike(note.id, userProfile.id, userProfile.name, wasLiked);
-      if (wasDisliked && !wasLiked) await notesService.toggleDislike?.(note.id, userProfile.id, true);
-    } catch { toast({ title: "Error", variant: "destructive" }); }
-    finally { setIsLoading(false); }
+    } catch (error) {
+      // Revert on error
+      if (wasLiked) { setIsLiked(true); setLikeCount(p => p + 1); }
+      else { setIsLiked(false); setLikeCount(p => p - 1); if (wasDisliked) { setIsDisliked(true); setDislikeCount(p => p + 1); } }
+      toast({ title: "Error", variant: "destructive" });
+    }
+    setIsLoading(false);
   };
 
   const handleDislike = async (e: React.MouseEvent) => {
@@ -69,14 +75,19 @@ export function NoteCard({ note, onExpand, compact = false }: NoteCardProps) {
     if (!userProfile) { toast({ title: "Login required", variant: "destructive" }); return; }
     if (isLoading) return;
     setIsLoading(true);
+    const wasLiked = isLiked, wasDisliked = isDisliked;
+    // Optimistic update
+    if (wasDisliked) { setIsDisliked(false); setDislikeCount(p => p - 1); }
+    else { setIsDisliked(true); setDislikeCount(p => p + 1); if (wasLiked) { setIsLiked(false); setLikeCount(p => p - 1); } }
     try {
-      const wasLiked = isLiked, wasDisliked = isDisliked;
-      if (wasDisliked) { setIsDisliked(false); setDislikeCount(p => p - 1); }
-      else { setIsDisliked(true); setDislikeCount(p => p + 1); if (wasLiked) { setIsLiked(false); setLikeCount(p => p - 1); } }
-      await notesService.toggleDislike?.(note.id, userProfile.id, wasDisliked);
-      if (wasLiked && !wasDisliked) await notesService.toggleLike(note.id, userProfile.id, userProfile.name, true);
-    } catch { toast({ title: "Error", variant: "destructive" }); }
-    finally { setIsLoading(false); }
+      await notesService.toggleDislike(note.id, userProfile.id, wasDisliked);
+    } catch (error) {
+      // Revert on error
+      if (wasDisliked) { setIsDisliked(true); setDislikeCount(p => p + 1); }
+      else { setIsDisliked(false); setDislikeCount(p => p - 1); if (wasLiked) { setIsLiked(true); setLikeCount(p => p + 1); } }
+      toast({ title: "Error", variant: "destructive" });
+    }
+    setIsLoading(false);
   };
 
   const handleSave = async (e: React.MouseEvent) => {
@@ -91,20 +102,44 @@ export function NoteCard({ note, onExpand, compact = false }: NoteCardProps) {
   const handleDownload = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!userProfile || !note.fileUrl) return;
-    try { await notesService.downloadNote(note.id, userProfile.id, { title: note.title, subject: note.subject, fileUrl: note.fileUrl }); toast({ title: "Download started" }); }
+    try { await notesService.downloadNote(note.id, userProfile.id, { title: note.title, subject: note.subject, fileUrl: note.fileUrl, fileType: note.fileType }); toast({ title: "Download started" }); }
     catch { toast({ title: "Error", variant: "destructive" }); }
+  };
+
+  const handleShare = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const shareUrl = `${window.location.origin}/note/${note.id}`;
+    if (navigator.share) {
+      try { await navigator.share({ title: note.title, text: `Check out this note: ${note.title}`, url: shareUrl }); }
+      catch (err) { if ((err as Error).name !== 'AbortError') { navigator.clipboard.writeText(shareUrl); toast({ title: "Link copied" }); } }
+    } else {
+      navigator.clipboard.writeText(shareUrl);
+      toast({ title: "Link copied" });
+    }
   };
 
   const handleReport = async () => {
     if (!userProfile || !reportReason.trim()) return;
     setIsReporting(true);
-    try { await notesService.reportNote?.(note.id, userProfile.id, reportReason); toast({ title: "Report submitted" }); setShowReportDialog(false); setReportReason(""); }
+    try { await notesService.reportNote(note.id, userProfile.id, reportReason); toast({ title: "Report submitted" }); setShowReportDialog(false); setReportReason(""); }
     catch { toast({ title: "Error", variant: "destructive" }); }
     finally { setIsReporting(false); }
   };
 
-  if (note.isHidden || (note.reportCount && note.reportCount >= 15)) return null;
+  const handleAskAI = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigate("/gemini", { state: { title: note.title, subject: note.subject, fileUrl: note.fileUrl, fileType: note.fileType } });
+  };
 
+  const toggleMute = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (videoRef.current) {
+      videoRef.current.muted = !videoRef.current.muted;
+      setIsMuted(!isMuted);
+    }
+  };
+
+  if (note.isHidden || (note.reportCount && note.reportCount >= 15)) return null;
   const FileIcon = fileTypeIcons[note.fileType] || FileText;
 
   return (
@@ -122,10 +157,11 @@ export function NoteCard({ note, onExpand, compact = false }: NoteCardProps) {
             <DropdownMenu>
               <DropdownMenuTrigger asChild onClick={e => e.stopPropagation()}><Button variant="ghost" size="icon" className="h-8 w-8"><MoreVertical className="w-4 h-4" /></Button></DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="bg-popover z-50">
-                <DropdownMenuItem onClick={e => { e.stopPropagation(); navigator.clipboard.writeText(`${window.location.origin}/note/${note.id}`); toast({ title: "Link copied" }); }}><Share2 className="w-4 h-4 mr-2" />Share</DropdownMenuItem>
+                <DropdownMenuItem onClick={handleShare}><Share2 className="w-4 h-4 mr-2" />Share</DropdownMenuItem>
                 {userProfile && note.authorId !== userProfile.id && <DropdownMenuItem onClick={e => { e.stopPropagation(); setShowReportDialog(true); }} className="text-destructive"><Flag className="w-4 h-4 mr-2" />Report</DropdownMenuItem>}
               </DropdownMenuContent>
             </DropdownMenu>
+            <Button variant="default" size="sm" onClick={handleAskAI} className="gap-1.5 h-7 px-2 bg-yellow-500 hover:bg-yellow-600 text-black"><Sparkles className="w-3.5 h-3.5" />Ask AI</Button>
           </div>
         </CardHeader>
         <CardContent className={cn("pb-3", compact && "p-0 pb-2")}>
@@ -134,7 +170,14 @@ export function NoteCard({ note, onExpand, compact = false }: NoteCardProps) {
             <span className="text-sm text-muted-foreground">{note.authorName}</span>
             {note.timestamp && <><span className="text-muted-foreground">•</span><span className="text-xs text-muted-foreground">{note.timestamp}</span></>}
           </div>
-          {note.fileType === "video" && note.fileUrl && <div className="relative w-full aspect-video rounded-lg overflow-hidden mb-3 bg-muted"><video src={note.fileUrl} className="w-full h-full object-cover" preload="metadata" /><div className="absolute inset-0 flex items-center justify-center bg-black/30"><div className="w-12 h-12 rounded-full bg-white/90 flex items-center justify-center"><Play className="w-6 h-6 text-primary ml-1" /></div></div></div>}
+          {note.fileType === "video" && note.fileUrl && (
+            <div className="relative w-full aspect-video rounded-lg overflow-hidden mb-3 bg-muted" onClick={e => e.stopPropagation()}>
+              <video ref={videoRef} src={note.fileUrl} className="w-full h-full object-cover" preload="metadata" muted={isMuted} controls />
+              <Button variant="ghost" size="icon" className="absolute top-2 right-2 h-8 w-8 bg-black/50 hover:bg-black/70" onClick={toggleMute}>
+                {isMuted ? <VolumeX className="w-4 h-4 text-white" /> : <Volume2 className="w-4 h-4 text-white" />}
+              </Button>
+            </div>
+          )}
           {note.fileType === "image" && note.fileUrl && <div className="w-full aspect-video rounded-lg overflow-hidden mb-3 bg-muted"><img src={note.fileUrl} alt={note.title} className="w-full h-full object-cover" /></div>}
           <div className="flex items-center gap-4 text-sm text-muted-foreground">
             <div className="flex items-center gap-1"><Eye className="w-4 h-4" />{note.views}</div>
