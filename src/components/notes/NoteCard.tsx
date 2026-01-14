@@ -62,11 +62,12 @@ export function NoteCard({ note, onExpand, compact = false, showDelete = false, 
     else { setIsLiked(true); setLikeCount(p => p + 1); if (wasDisliked) { setIsDisliked(false); setDislikeCount(p => p - 1); } }
     try {
       await notesService.toggleLike(note.id, userProfile.id, userProfile.name, wasLiked);
-    } catch (error) {
+    } catch (error: any) {
       // Revert on error
       if (wasLiked) { setIsLiked(true); setLikeCount(p => p + 1); }
       else { setIsLiked(false); setLikeCount(p => p - 1); if (wasDisliked) { setIsDisliked(true); setDislikeCount(p => p + 1); } }
-      toast({ title: "Error", variant: "destructive" });
+      console.error("Like error:", error?.code || error?.message || error);
+  toast({ title: "Error", variant: "destructive" });
     }
     setIsLoading(false);
   };
@@ -82,11 +83,12 @@ export function NoteCard({ note, onExpand, compact = false, showDelete = false, 
     else { setIsDisliked(true); setDislikeCount(p => p + 1); if (wasLiked) { setIsLiked(false); setLikeCount(p => p - 1); } }
     try {
       await notesService.toggleDislike(note.id, userProfile.id, wasDisliked);
-    } catch (error) {
+    } catch (error: any) {
       // Revert on error
       if (wasDisliked) { setIsDisliked(true); setDislikeCount(p => p + 1); }
       else { setIsDisliked(false); setDislikeCount(p => p - 1); if (wasLiked) { setIsLiked(true); setLikeCount(p => p + 1); } }
-      toast({ title: "Error", variant: "destructive" });
+ console.error("Dislike error:", error?.code || error?.message || error);
+  toast({ title: "Error", variant: "destructive" });
     }
     setIsLoading(false);
   };
