@@ -78,7 +78,8 @@ const wasDisliked = (note.dislikedBy || []).includes(userProfile.id);
     if (!userProfile) { toast({ title: "Login required", variant: "destructive" }); return; }
     if (isLoading) return;
     setIsLoading(true);
-    const wasLiked = isLiked, wasDisliked = isDisliked;
+const wasLiked = (note.likedBy || []).includes(userProfile.id);
+const wasDisliked = (note.dislikedBy || []).includes(userProfile.id);
     // Optimistic update
     if (wasDisliked) { setIsDisliked(false); setDislikeCount(p => p - 1); }
     else { setIsDisliked(true); setDislikeCount(p => p + 1); if (wasLiked) { setIsLiked(false); setLikeCount(p => p - 1); } }
