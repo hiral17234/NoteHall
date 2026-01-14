@@ -238,7 +238,7 @@ await updateDoc(authorRef, { 'stats.totalLikes': increment(1), 'stats.contributi
     } else {
       // Remove like first if exists
       const likedBy = note.likedBy || [];
-         async toggleDislike(noteId: string, userId: string, isCurrentlyDisliked: boolean): Promise<void> {
+        async toggleDislike(noteId: string, userId: string, isCurrentlyDisliked: boolean): Promise<void> {
   const noteRef = doc(db, 'notes', noteId);
   const noteSnap = await getDoc(noteRef);
   if (!noteSnap.exists()) return;
@@ -251,7 +251,6 @@ await updateDoc(authorRef, { 'stats.totalLikes': increment(1), 'stats.contributi
       dislikedBy: arrayRemove(userId),
     });
   } else {
-    // Remove like first if exists
     const likedBy = note.likedBy || [];
 
     if (likedBy.includes(userId)) {
@@ -260,7 +259,6 @@ await updateDoc(authorRef, { 'stats.totalLikes': increment(1), 'stats.contributi
         likedBy: arrayRemove(userId),
       });
 
-      // ✅ If author stats update fails, still keep dislike working
       try {
         await updateDoc(doc(db, 'users', note.authorId), {
           'stats.totalLikes': increment(-1),
@@ -277,6 +275,7 @@ await updateDoc(authorRef, { 'stats.totalLikes': increment(1), 'stats.contributi
     });
   }
 }
+
 
   async reportNote(noteId: string, userId: string, reason: string): Promise<void> {
     const noteRef = doc(db, 'notes', noteId);
