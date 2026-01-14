@@ -243,7 +243,30 @@ await updateDoc(authorRef, { 'stats.totalLikes': increment(1), 'stats.contributi
       dislikedBy: arrayRemove(userId),
     });
   } else {
-    const likedBy = note.likedBy || [];
+  // Remove like first if exists
+  const likedBy = note.likedBy || [];
+
+  if (likedBy.includes(userId)) {
+    await updateDoc(noteRef, {
+      likes: increment(-1),
+      likedBy: arrayRemove(userId),
+    });
+
+    try {
+      await updateDoc(doc(db, "users", note.authorId), {
+        "stats.totalLikes": increment(-1),
+        "stats.contributionScore": increment(-5),
+      });
+    } catch (err) {
+      console.warn("Author stats update failed:", err);
+    }
+  }
+
+  await updateDoc(noteRef, {
+    dislikes: increment(1),
+    dislikedBy: arrayUnion(userId),
+  });
+}
 
     // Remove like first if exists
     if (likedBy.includes(userId)) {
