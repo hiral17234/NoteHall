@@ -13,8 +13,10 @@ import { Plus, TrendingUp, Clock, Star, Sparkles, BookOpen, Award } from "lucide
 import { Link } from "react-router-dom";
 import { notesService, Note } from "@/services/firestoreService";
 import { mapFirestoreNoteToCardNote } from "@/lib/noteCard";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function Index() {
+  const { userProfile } = useAuth();
   const [selectedBranch, setSelectedBranch] = useState<string>("all");
   const [selectedYear, setSelectedYear] = useState<string>("all");
   const [loading, setLoading] = useState(true);
@@ -68,10 +70,32 @@ export default function Index() {
     return 0;
   });
 
-  // Get recommended notes (top 2 most liked)
-  const recommendedNotes = [...notes]
-    .sort((a, b) => b.likes - a.likes)
-    .slice(0, 2);
+  // Get recommended notes based on user's subject interests (top 2)
+  const recommendedNotes = (() => {
+    const userInterests = userProfile?.interests || [];
+    
+    if (userInterests.length > 0) {
+      // Filter notes that match user's interests
+      const interestMatches = notes.filter(note => 
+        userInterests.some(interest => 
+          note.subject.toLowerCase().includes(interest.toLowerCase()) ||
+          interest.toLowerCase().includes(note.subject.toLowerCase())
+        )
+      );
+      
+      // Sort by engagement and return top 2
+      if (interestMatches.length > 0) {
+        return [...interestMatches]
+          .sort((a, b) => (b.likes + b.views) - (a.likes + a.views))
+          .slice(0, 2);
+      }
+    }
+    
+    // Fallback to most liked if no interests or no matches
+    return [...notes]
+      .sort((a, b) => b.likes - a.likes)
+      .slice(0, 2);
+  })();
 
   const handleExpand = (note: any) => {
     setSelectedNote(note);
