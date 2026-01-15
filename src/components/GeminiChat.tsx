@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 
 interface GeminiChatProps {
   className?: string;
-  noteContext?: { title?: string; subject?: string; fileUrl?: string };
+  noteContext?: { title?: string; subject?: string; fileUrl?: string; fileType?: string };
 }
 
 export function GeminiChat({ className, noteContext }: GeminiChatProps) {
@@ -24,6 +24,8 @@ export function GeminiChat({ className, noteContext }: GeminiChatProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [hasAutoSent, setHasAutoSent] = useState(false);
+
   useEffect(() => {
     if (noteContext) setContext({ noteTitle: noteContext.title, selectedSubject: noteContext.subject });
   }, [noteContext, setContext]);
@@ -31,6 +33,15 @@ export function GeminiChat({ className, noteContext }: GeminiChatProps) {
   useEffect(() => {
     if (userProfile) setContext({ userBranch: userProfile.branch, userYear: userProfile.year });
   }, [userProfile, setContext]);
+
+  // Auto-send initial message when noteContext has a file
+  useEffect(() => {
+    if (noteContext?.fileUrl && noteContext?.title && !hasAutoSent && messages.length === 0) {
+      const initialPrompt = `I'm studying a note titled "${noteContext.title}"${noteContext.subject ? ` about ${noteContext.subject}` : ""}. The file is available at: ${noteContext.fileUrl}\n\nPlease help me understand this note. What would you like to know about it? You can:\n- Summarize the content\n- Explain key concepts\n- Generate practice questions\n- Answer specific questions about it`;
+      sendMessage(initialPrompt);
+      setHasAutoSent(true);
+    }
+  }, [noteContext, hasAutoSent, messages.length, sendMessage]);
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -83,7 +94,12 @@ export function GeminiChat({ className, noteContext }: GeminiChatProps) {
           <CardTitle className="text-lg flex items-center gap-2"><Sparkles className="w-5 h-5 text-primary" />Gemini Chat</CardTitle>
           {messages.length > 0 && <Button variant="ghost" size="sm" onClick={clearChat}><Trash2 className="w-4 h-4 mr-1" />Clear</Button>}
         </div>
-        {noteContext?.title && <Badge variant="secondary" className="w-fit mt-2">Context: {noteContext.title}</Badge>}
+          {noteContext?.title && (
+            <div className="flex items-center gap-2 mt-2 flex-wrap">
+              <Badge variant="secondary">Context: {noteContext.title}</Badge>
+              {noteContext.fileType && <Badge variant="outline" className="capitalize">{noteContext.fileType}</Badge>}
+            </div>
+          )}
       </CardHeader>
       <CardContent className="flex-1 flex flex-col overflow-hidden p-0">
         <ScrollArea className="flex-1 px-4" ref={scrollRef}>

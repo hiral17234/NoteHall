@@ -60,11 +60,25 @@ export function NoteCard({ note, onExpand, compact = false, showDelete = false, 
     commentsService.getByNote(note.id).then(c => setCommentsCount(c.length)).catch(() => {});
   }, [note.id]);
 
+  // Haptic feedback helper
+  const triggerHaptic = () => {
+    if (navigator.vibrate) navigator.vibrate(50);
+  };
+
+  // Animation states
+  const [likeAnimating, setLikeAnimating] = useState(false);
+  const [dislikeAnimating, setDislikeAnimating] = useState(false);
+
   const handleLike = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!userProfile) { toast({ title: "Login required", variant: "destructive" }); return; }
     if (isLoading) return;
     setIsLoading(true);
+    
+    // Trigger haptic and animation
+    triggerHaptic();
+    setLikeAnimating(true);
+    setTimeout(() => setLikeAnimating(false), 300);
     
     const wasLiked = localLikedBy.includes(userProfile.id);
     const wasDisliked = localDislikedBy.includes(userProfile.id);
@@ -114,6 +128,11 @@ export function NoteCard({ note, onExpand, compact = false, showDelete = false, 
     if (!userProfile) { toast({ title: "Login required", variant: "destructive" }); return; }
     if (isLoading) return;
     setIsLoading(true);
+    
+    // Trigger haptic and animation
+    triggerHaptic();
+    setDislikeAnimating(true);
+    setTimeout(() => setDislikeAnimating(false), 300);
     
     const wasLiked = localLikedBy.includes(userProfile.id);
     const wasDisliked = localDislikedBy.includes(userProfile.id);
@@ -265,8 +284,34 @@ export function NoteCard({ note, onExpand, compact = false, showDelete = false, 
           </div>
         </CardContent>
         <CardFooter className={cn("pt-0 pb-3 gap-1 flex-wrap", compact && "p-0")}>
-          <Button variant="ghost" size="sm" onClick={handleLike} disabled={isLoading} className={cn("gap-1.5 h-8", isLiked && "text-primary bg-primary/10")}><ThumbsUp className={cn("w-4 h-4", isLiked && "fill-current")} />{likeCount}</Button>
-          <Button variant="ghost" size="sm" onClick={handleDislike} disabled={isLoading} className={cn("gap-1.5 h-8", isDisliked && "text-destructive bg-destructive/10")}><ThumbsDown className={cn("w-4 h-4", isDisliked && "fill-current")} />{dislikeCount}</Button>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={handleLike} 
+            disabled={isLoading} 
+            className={cn(
+              "gap-1.5 h-8 transition-all duration-200",
+              isLiked && "text-primary bg-primary/10",
+              likeAnimating && "scale-125"
+            )}
+          >
+            <ThumbsUp className={cn("w-4 h-4 transition-transform", isLiked && "fill-current", likeAnimating && "animate-bounce")} />
+            {likeCount}
+          </Button>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={handleDislike} 
+            disabled={isLoading} 
+            className={cn(
+              "gap-1.5 h-8 transition-all duration-200",
+              isDisliked && "text-destructive bg-destructive/10",
+              dislikeAnimating && "scale-125"
+            )}
+          >
+            <ThumbsDown className={cn("w-4 h-4 transition-transform", isDisliked && "fill-current", dislikeAnimating && "animate-bounce")} />
+            {dislikeCount}
+          </Button>
           <Button variant="ghost" size="sm" className="gap-1.5 h-8"><MessageCircle className="w-4 h-4" />{commentsCount}</Button>
           <Button variant="ghost" size="sm" onClick={handleSave} className={cn("gap-1.5 h-8", isSaved && "text-chart-1 bg-chart-1/10")}>{isSaved ? <BookmarkCheck className="w-4 h-4 fill-current" /> : <Bookmark className="w-4 h-4" />}</Button>
           {note.fileUrl && note.fileType !== "link" && <Button variant="ghost" size="sm" onClick={handleDownload} className="gap-1.5 h-8"><Download className="w-4 h-4" /></Button>}
