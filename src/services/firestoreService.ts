@@ -191,119 +191,97 @@ export const notesService = {
   },
 
   async toggleLike(
-  noteId: string,
-  userId: string,
-  userName: string,
-  isCurrentlyLiked: boolean // frontend state (we will NOT trust it)
-): Promise<void> {
-  const noteRef = doc(db, "notes", noteId);
-    let didLike = false;
+    noteId: string,
+    userId: string,
+    userName: string,
+    isCurrentlyLiked: boolean
+  ): Promise<void> {
+    const noteRef = doc(db, "notes", noteId);
 
-  await runTransaction(db, async (transaction) => {
-    const noteSnap = await transaction.get(noteRef);
-    if (!noteSnap.exists()) return;
+    await runTransaction(db, async (transaction) => {
+      const noteSnap = await transaction.get(noteRef);
+      if (!noteSnap.exists()) return;
 
-    const noteData = noteSnap.data() as any;
+      const noteData = noteSnap.data() as any;
+      const likedBy: string[] = noteData.likedBy || [];
+      const dislikedBy: string[] = noteData.dislikedBy || [];
+      const alreadyLiked = likedBy.includes(userId);
+      const alreadyDisliked = dislikedBy.includes(userId);
 
-    const likedBy: string[] = noteData.likedBy || [];
-    const dislikedBy: string[] = noteData.dislikedBy || [];
+      if (alreadyLiked) {
+        transaction.update(noteRef, {
+          likes: Math.max((noteData.likes || 0) - 1, 0),
+          likedBy: likedBy.filter((id) => id !== userId),
+        });
+        return;
+      }
 
-    const alreadyLiked = likedBy.includes(userId);
-    const alreadyDisliked = dislikedBy.includes(userId);
+      const newLikedBy = [...likedBy, userId];
+      const newDislikedBy = alreadyDisliked ? dislikedBy.filter((id) => id !== userId) : dislikedBy;
+      const newLikes = (noteData.likes || 0) + 1;
+      const newDislikes = alreadyDisliked ? Math.max((noteData.dislikes || 0) - 1, 0) : (noteData.dislikes || 0);
 
-    // ✅ If already liked → UNLIKE
-    if (alreadyLiked) {
       transaction.update(noteRef, {
-        likes: Math.max((noteData.likes || 0) - 1, 0),
-        likedBy: likedBy.filter((id) => id !== userId),
+        likes: newLikes,
+        dislikes: newDislikes,
+        likedBy: newLikedBy,
+        dislikedBy: newDislikedBy,
       });
-      return;
-    }
-
-    // ✅ If not liked → LIKE and remove dislike if exists
-    const newLikedBy = [...likedBy, userId];
-    const newDislikedBy = alreadyDisliked
-      ? dislikedBy.filter((id) => id !== userId)
-      : dislikedBy;
-
-    const newLikes = (noteData.likes || 0) + 1;
-    const newDislikes = alreadyDisliked
-      ? Math.max((noteData.dislikes || 0) - 1, 0)
-      : (noteData.dislikes || 0);
-
-    transaction.update(noteRef, {
-      likes: newLikes,
-      dislikes: newDislikes,
-      likedBy: newLikedBy,
-      dislikedBy: newDislikedBy,
     });
-  });
 
-  // ✅ Notification AFTER transaction
-  // (don’t do notification inside transaction)
-  try {
-    const updatedNote = await this.getById(noteId);
-    if (updatedNote && updatedNote.authorId !== userId) {
-      await createNotification.like(
-        updatedNote.authorId,
-        { id: userId, name: userName },
-        updatedNote.title,
-        noteId
-      );
+    try {
+      const updatedNote = await this.getById(noteId);
+      if (updatedNote && updatedNote.authorId !== userId) {
+        await createNotification.like(
+          updatedNote.authorId,
+          { id: userId, name: userName },
+          updatedNote.title,
+          noteId
+        );
+      }
+    } catch (err) {
+      console.warn("Notification failed:", err);
     }
-  } catch (err) {
-    console.warn("Notification failed:", err);
-  }
-},
-
+  },
 
   async toggleDislike(
-  noteId: string,
-  userId: string,
-  isCurrentlyDisliked: boolean // frontend state (we will NOT trust it)
-): Promise<void> {
-  const noteRef = doc(db, "notes", noteId);
+    noteId: string,
+    userId: string,
+    isCurrentlyDisliked: boolean
+  ): Promise<void> {
+    const noteRef = doc(db, "notes", noteId);
 
-  await runTransaction(db, async (transaction) => {
-    const noteSnap = await transaction.get(noteRef);
-    if (!noteSnap.exists()) return;
+    await runTransaction(db, async (transaction) => {
+      const noteSnap = await transaction.get(noteRef);
+      if (!noteSnap.exists()) return;
 
-    const noteData = noteSnap.data() as any;
+      const noteData = noteSnap.data() as any;
+      const likedBy: string[] = noteData.likedBy || [];
+      const dislikedBy: string[] = noteData.dislikedBy || [];
+      const alreadyLiked = likedBy.includes(userId);
+      const alreadyDisliked = dislikedBy.includes(userId);
 
-    const likedBy: string[] = noteData.likedBy || [];
-    const dislikedBy: string[] = noteData.dislikedBy || [];
+      if (alreadyDisliked) {
+        transaction.update(noteRef, {
+          dislikes: Math.max((noteData.dislikes || 0) - 1, 0),
+          dislikedBy: dislikedBy.filter((id) => id !== userId),
+        });
+        return;
+      }
 
-    const alreadyLiked = likedBy.includes(userId);
-    const alreadyDisliked = dislikedBy.includes(userId);
+      const newDislikedBy = [...dislikedBy, userId];
+      const newLikedBy = alreadyLiked ? likedBy.filter((id) => id !== userId) : likedBy;
+      const newDislikes = (noteData.dislikes || 0) + 1;
+      const newLikes = alreadyLiked ? Math.max((noteData.likes || 0) - 1, 0) : (noteData.likes || 0);
 
-    // ✅ If already disliked → REMOVE DISLIKE
-    if (alreadyDisliked) {
       transaction.update(noteRef, {
-        dislikes: Math.max((noteData.dislikes || 0) - 1, 0),
-        dislikedBy: dislikedBy.filter((id) => id !== userId),
+        dislikes: newDislikes,
+        likes: newLikes,
+        dislikedBy: newDislikedBy,
+        likedBy: newLikedBy,
       });
-      return;
-    }
-
-    // ✅ If not disliked → DISLIKE and remove like if exists
-    const newDislikedBy = [...dislikedBy, userId];
-    const newLikedBy = alreadyLiked
-      ? likedBy.filter((id) => id !== userId)
-      : likedBy;
-
-    const newDislikes = (noteData.dislikes || 0) + 1;
-    const newLikes = alreadyLiked
-      ? Math.max((noteData.likes || 0) - 1, 0)
-      : (noteData.likes || 0);
-
-    transaction.update(noteRef, {
-      dislikes: newDislikes,
-      likes: newLikes,
-      dislikedBy: newDislikedBy,
-      likedBy: newLikedBy,
     });
-  });
-},
+  },
 
            
   async reportNote(noteId: string, userId: string, reason: string): Promise<void> {
