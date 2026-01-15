@@ -148,36 +148,75 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { ...newProfile, id: uid };
   };
 
-  // Listen to auth state changes
- // Replace your existing useEffect with this:
-useEffect(() => {
-  const unsubscribe = onAuthStateChanged(auth, async (user) => {
+  // Update lastActiveDate periodically for online status tracking
+  const updateLastActiveDate = useCallback(async (uid: string) => {
     try {
-      setFirebaseUser(user);
-      if (user) {
-        const profile = await fetchUserProfile(user.uid);
-        if (profile) {
-          setUserProfile(profile);
-          setNeedsOnboarding(!profile.onboardingComplete);
-          try {
-            await fcmService.requestPermission(user.uid);
-          } catch (e) { console.log("FCM skipped"); }
-        } else {
-          setNeedsOnboarding(true);
-        }
-      } else {
-        setUserProfile(null);
-        setNeedsOnboarding(false);
-      }
+      const userRef = doc(db, "users", uid);
+      await updateDoc(userRef, {
+        lastActiveDate: new Date().toISOString(),
+        isActive: true,
+      });
     } catch (error) {
-      console.error("Auth error:", error);
-    } finally {
-      setIsLoading(false); // THIS LINE IS CRITICAL
+      console.error("Error updating lastActiveDate:", error);
     }
-  });
+  }, []);
 
-  return () => unsubscribe();
-}, [fetchUserProfile]);
+  // Listen to auth state changes
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      try {
+        setFirebaseUser(user);
+        if (user) {
+          const profile = await fetchUserProfile(user.uid);
+          if (profile) {
+            setUserProfile(profile);
+            setNeedsOnboarding(!profile.onboardingComplete);
+            // Update lastActiveDate on login
+            await updateLastActiveDate(user.uid);
+            try {
+              await fcmService.requestPermission(user.uid);
+            } catch (e) { console.log("FCM skipped"); }
+          } else {
+            setNeedsOnboarding(true);
+          }
+        } else {
+          setUserProfile(null);
+          setNeedsOnboarding(false);
+        }
+      } catch (error) {
+        console.error("Auth error:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [fetchUserProfile, updateLastActiveDate]);
+
+  // Periodically update lastActiveDate every 2 minutes while user is active
+  useEffect(() => {
+    if (!firebaseUser) return;
+
+    const intervalId = setInterval(() => {
+      updateLastActiveDate(firebaseUser.uid);
+    }, 2 * 60 * 1000); // Every 2 minutes
+
+    // Also update on user activity events
+    const handleActivity = () => {
+      updateLastActiveDate(firebaseUser.uid);
+    };
+
+    window.addEventListener('click', handleActivity);
+    window.addEventListener('keydown', handleActivity);
+    window.addEventListener('scroll', handleActivity);
+
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener('click', handleActivity);
+      window.removeEventListener('keydown', handleActivity);
+      window.removeEventListener('scroll', handleActivity);
+    };
+  }, [firebaseUser, updateLastActiveDate]);
 
   const signUp = async (email: string, password: string, name: string, username: string) => {
     try {

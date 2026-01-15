@@ -9,11 +9,12 @@ import { NoteCardNote } from "@/lib/noteCard";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { notesService, commentsService } from "@/services/firestoreService";
-import { ThumbsUp, ThumbsDown, Eye, Download, Bookmark, BookmarkCheck, MessageCircle, Share2, FileText, Image as ImageIcon, Video, Link as LinkIcon, Star, Expand, MoreVertical, Flag, Loader2, Play, Sparkles, Volume2, VolumeX, Trash2 } from "lucide-react";
+import { ThumbsUp, ThumbsDown, Eye, Download, Bookmark, BookmarkCheck, MessageCircle, Share2, FileText, Image as ImageIcon, Video, Link as LinkIcon, Star, Expand, MoreVertical, Flag, Loader2, Sparkles, Volume2, VolumeX, Trash2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 interface NoteCardProps { note: NoteCardNote; onExpand?: () => void; compact?: boolean; showDelete?: boolean; onDelete?: () => Promise<void>; }
 
@@ -36,6 +37,7 @@ export function NoteCard({ note, onExpand, compact = false, showDelete = false, 
   const [isReporting, setIsReporting] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   useEffect(() => {
     if (userProfile?.id) {
@@ -166,17 +168,13 @@ const wasDisliked = (note.dislikedBy || []).includes(userProfile.id);
                 {userProfile && note.authorId !== userProfile.id && <DropdownMenuItem onClick={e => { e.stopPropagation(); setShowReportDialog(true); }} className="text-destructive"><Flag className="w-4 h-4 mr-2" />Report</DropdownMenuItem>}
                 {showDelete && onDelete && (
                   <DropdownMenuItem 
-                    onClick={async (e) => { 
+                    onClick={(e) => { 
                       e.stopPropagation(); 
-                      setIsDeleting(true);
-                      await onDelete();
-                      setIsDeleting(false);
+                      setShowDeleteConfirm(true);
                     }} 
                     className="text-destructive"
-                    disabled={isDeleting}
                   >
-                    {isDeleting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Trash2 className="w-4 h-4 mr-2" />}
-                    Delete
+                    <Trash2 className="w-4 h-4 mr-2" />Delete
                   </DropdownMenuItem>
                 )}
               </DropdownMenuContent>
@@ -221,6 +219,34 @@ const wasDisliked = (note.dislikedBy || []).includes(userProfile.id);
           <DialogFooter><Button variant="outline" onClick={() => setShowReportDialog(false)}>Cancel</Button><Button onClick={handleReport} disabled={!reportReason.trim() || isReporting} variant="destructive">{isReporting ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Submitting...</> : "Submit Report"}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent onClick={e => e.stopPropagation()}>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Note</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{note.title}"? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={async () => {
+                if (onDelete) {
+                  setIsDeleting(true);
+                  await onDelete();
+                  setIsDeleting(false);
+                  setShowDeleteConfirm(false);
+                }
+              }}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Deleting...</> : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
