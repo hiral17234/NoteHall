@@ -39,11 +39,18 @@ export function NoteCard({ note, onExpand, compact = false, showDelete = false, 
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
+
+  // Track likedBy/dislikedBy locally to prevent stale state issues
+  const [localLikedBy, setLocalLikedBy] = useState<string[]>(note.likedBy || []);
+  const [localDislikedBy, setLocalDislikedBy] = useState<string[]>(note.dislikedBy || []);
+
   useEffect(() => {
     if (userProfile?.id) {
       setIsLiked(note.likedBy?.includes(userProfile.id) ?? false);
       setIsDisliked(note.dislikedBy?.includes(userProfile.id) ?? false);
       setIsSaved(note.savedBy?.includes(userProfile.id) ?? false);
+      setLocalLikedBy(note.likedBy || []);
+      setLocalDislikedBy(note.dislikedBy || []);
     }
     setLikeCount(note.likes);
     setDislikeCount(note.dislikes);
@@ -58,19 +65,46 @@ export function NoteCard({ note, onExpand, compact = false, showDelete = false, 
     if (!userProfile) { toast({ title: "Login required", variant: "destructive" }); return; }
     if (isLoading) return;
     setIsLoading(true);
-const wasLiked = (note.likedBy || []).includes(userProfile.id);
-const wasDisliked = (note.dislikedBy || []).includes(userProfile.id);
-    // Optimistic update
-    if (wasLiked) { setIsLiked(false); setLikeCount(p => p - 1); }
-    else { setIsLiked(true); setLikeCount(p => p + 1); if (wasDisliked) { setIsDisliked(false); setDislikeCount(p => p - 1); } }
+    
+    const wasLiked = localLikedBy.includes(userProfile.id);
+    const wasDisliked = localDislikedBy.includes(userProfile.id);
+    
+    // Optimistic update using local state
+    if (wasLiked) {
+      setIsLiked(false);
+      setLikeCount(p => Math.max(p - 1, 0));
+      setLocalLikedBy(prev => prev.filter(id => id !== userProfile.id));
+    } else {
+      setIsLiked(true);
+      setLikeCount(p => p + 1);
+      setLocalLikedBy(prev => [...prev, userProfile.id]);
+      if (wasDisliked) {
+        setIsDisliked(false);
+        setDislikeCount(p => Math.max(p - 1, 0));
+        setLocalDislikedBy(prev => prev.filter(id => id !== userProfile.id));
+      }
+    }
+    
     try {
       await notesService.toggleLike(note.id, userProfile.id, userProfile.name, wasLiked);
     } catch (error: any) {
       // Revert on error
-      if (wasLiked) { setIsLiked(true); setLikeCount(p => p + 1); }
-      else { setIsLiked(false); setLikeCount(p => p - 1); if (wasDisliked) { setIsDisliked(true); setDislikeCount(p => p + 1); } }
+      if (wasLiked) {
+        setIsLiked(true);
+        setLikeCount(p => p + 1);
+        setLocalLikedBy(prev => [...prev, userProfile.id]);
+      } else {
+        setIsLiked(false);
+        setLikeCount(p => Math.max(p - 1, 0));
+        setLocalLikedBy(prev => prev.filter(id => id !== userProfile.id));
+        if (wasDisliked) {
+          setIsDisliked(true);
+          setDislikeCount(p => p + 1);
+          setLocalDislikedBy(prev => [...prev, userProfile.id]);
+        }
+      }
       console.error("Like error:", error?.code || error?.message || error);
-  toast({ title: "Error", variant: "destructive" });
+      toast({ title: "Error", variant: "destructive" });
     }
     setIsLoading(false);
   };
@@ -80,19 +114,46 @@ const wasDisliked = (note.dislikedBy || []).includes(userProfile.id);
     if (!userProfile) { toast({ title: "Login required", variant: "destructive" }); return; }
     if (isLoading) return;
     setIsLoading(true);
-const wasLiked = (note.likedBy || []).includes(userProfile.id);
-const wasDisliked = (note.dislikedBy || []).includes(userProfile.id);
-    // Optimistic update
-    if (wasDisliked) { setIsDisliked(false); setDislikeCount(p => p - 1); }
-    else { setIsDisliked(true); setDislikeCount(p => p + 1); if (wasLiked) { setIsLiked(false); setLikeCount(p => p - 1); } }
+    
+    const wasLiked = localLikedBy.includes(userProfile.id);
+    const wasDisliked = localDislikedBy.includes(userProfile.id);
+    
+    // Optimistic update using local state
+    if (wasDisliked) {
+      setIsDisliked(false);
+      setDislikeCount(p => Math.max(p - 1, 0));
+      setLocalDislikedBy(prev => prev.filter(id => id !== userProfile.id));
+    } else {
+      setIsDisliked(true);
+      setDislikeCount(p => p + 1);
+      setLocalDislikedBy(prev => [...prev, userProfile.id]);
+      if (wasLiked) {
+        setIsLiked(false);
+        setLikeCount(p => Math.max(p - 1, 0));
+        setLocalLikedBy(prev => prev.filter(id => id !== userProfile.id));
+      }
+    }
+    
     try {
       await notesService.toggleDislike(note.id, userProfile.id, wasDisliked);
     } catch (error: any) {
       // Revert on error
-      if (wasDisliked) { setIsDisliked(true); setDislikeCount(p => p + 1); }
-      else { setIsDisliked(false); setDislikeCount(p => p - 1); if (wasLiked) { setIsLiked(true); setLikeCount(p => p + 1); } }
- console.error("Dislike error:", error?.code || error?.message || error);
-  toast({ title: "Error", variant: "destructive" });
+      if (wasDisliked) {
+        setIsDisliked(true);
+        setDislikeCount(p => p + 1);
+        setLocalDislikedBy(prev => [...prev, userProfile.id]);
+      } else {
+        setIsDisliked(false);
+        setDislikeCount(p => Math.max(p - 1, 0));
+        setLocalDislikedBy(prev => prev.filter(id => id !== userProfile.id));
+        if (wasLiked) {
+          setIsLiked(true);
+          setLikeCount(p => p + 1);
+          setLocalLikedBy(prev => [...prev, userProfile.id]);
+        }
+      }
+      console.error("Dislike error:", error?.code || error?.message || error);
+      toast({ title: "Error", variant: "destructive" });
     }
     setIsLoading(false);
   };
