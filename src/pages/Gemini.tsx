@@ -68,24 +68,27 @@ export default function Gemini() {
     title?: string;
     subject?: string;
     fileUrl?: string;
+    fileType?: string;
   } | undefined>(undefined);
 
   // Check for note context from URL params
-useEffect(() => {
-  if (!location.state) return;
+  useEffect(() => {
+    if (!location.state) return;
 
-  const { title, subject, fileUrl } = location.state as {
-    title?: string;
-    subject?: string;
-    fileUrl?: string;
-  };
+    const { title, subject, fileUrl, fileType } = location.state as {
+      title?: string;
+      subject?: string;
+      fileUrl?: string;
+      fileType?: string;
+    };
 
-  setNoteContext({
-    title,
-    subject,
-    fileUrl,
-  });
-}, [location.state]);
+    setNoteContext({
+      title,
+      subject,
+      fileUrl,
+      fileType,
+    });
+  }, [location.state]);
   
 
   // Set user context for personalized responses
