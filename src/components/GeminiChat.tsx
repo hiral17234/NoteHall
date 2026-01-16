@@ -4,27 +4,33 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { useGemini } from "@/hooks/useGemini";
 import { useAuth } from "@/contexts/AuthContext";
 import ReactMarkdown from "react-markdown";
-import { Send, Loader2, Sparkles, User, Image as ImageIcon, X, AlertCircle, Trash2 } from "lucide-react";
+import { Send, Loader2, Sparkles, User, Image as ImageIcon, X, AlertCircle, Trash2, FileText, Link as LinkIcon, Video } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface GeminiChatProps {
   className?: string;
   noteContext?: { title?: string; subject?: string; fileUrl?: string; fileType?: string };
+  onClearContext?: () => void;
 }
 
-export function GeminiChat({ className, noteContext }: GeminiChatProps) {
+export function GeminiChat({ className, noteContext, onClearContext }: GeminiChatProps) {
   const { userProfile } = useAuth();
   const { messages, isLoading, error, sendMessage, clearChat, setContext, isConfigured } = useGemini();
   const [input, setInput] = useState("");
   const [images, setImages] = useState<{ base64: string; mimeType: string; preview: string }[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [attachedContext, setAttachedContext] = useState<typeof noteContext>(null);
 
-  const [hasAutoSent, setHasAutoSent] = useState(false);
+  // Set attached context from noteContext prop (don't auto-send)
+  useEffect(() => {
+    if (noteContext?.fileUrl) {
+      setAttachedContext(noteContext);
+    }
+  }, [noteContext]);
 
   useEffect(() => {
     if (noteContext) setContext({ noteTitle: noteContext.title, selectedSubject: noteContext.subject });
@@ -34,26 +40,31 @@ export function GeminiChat({ className, noteContext }: GeminiChatProps) {
     if (userProfile) setContext({ userBranch: userProfile.branch, userYear: userProfile.year });
   }, [userProfile, setContext]);
 
-  // Auto-send initial message when noteContext has a file
-  useEffect(() => {
-    if (noteContext?.fileUrl && noteContext?.title && !hasAutoSent && messages.length === 0) {
-      const initialPrompt = `I'm studying a note titled "${noteContext.title}"${noteContext.subject ? ` about ${noteContext.subject}` : ""}. The file is available at: ${noteContext.fileUrl}\n\nPlease help me understand this note. What would you like to know about it? You can:\n- Summarize the content\n- Explain key concepts\n- Generate practice questions\n- Answer specific questions about it`;
-      sendMessage(initialPrompt);
-      setHasAutoSent(true);
-    }
-  }, [noteContext, hasAutoSent, messages.length, sendMessage]);
-
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages]);
 
+  const handleRemoveContext = () => {
+    setAttachedContext(null);
+    onClearContext?.();
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if ((!input.trim() && images.length === 0) || isLoading) return;
+    
+    // Include attached context in the message
+    let fullMessage = input;
+    if (attachedContext?.fileUrl) {
+      const contextInfo = `[Attached: ${attachedContext.title || 'File'} (${attachedContext.fileType || 'file'}) - ${attachedContext.fileUrl}]\n\n`;
+      fullMessage = contextInfo + input;
+    }
+    
     const imageData = images.map(img => ({ base64: img.base64, mimeType: img.mimeType }));
-    await sendMessage(input, imageData.length > 0 ? imageData : undefined);
+    await sendMessage(fullMessage, imageData.length > 0 ? imageData : undefined);
     setInput("");
     setImages([]);
+    setAttachedContext(null); // Clear after sending
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -76,6 +87,16 @@ export function GeminiChat({ className, noteContext }: GeminiChatProps) {
     setImages((prev) => { URL.revokeObjectURL(prev[index].preview); return prev.filter((_, i) => i !== index); });
   };
 
+  const getFileIcon = (fileType?: string) => {
+    switch (fileType) {
+      case 'pdf': return <FileText className="w-6 h-6 text-destructive" />;
+      case 'image': return <ImageIcon className="w-6 h-6 text-primary" />;
+      case 'video': return <Video className="w-6 h-6 text-purple-500" />;
+      case 'link': return <LinkIcon className="w-6 h-6 text-blue-500" />;
+      default: return <FileText className="w-6 h-6 text-muted-foreground" />;
+    }
+  };
+
   if (!isConfigured) {
     return (
       <Card className={cn("bg-card border-border", className)}>
@@ -94,12 +115,6 @@ export function GeminiChat({ className, noteContext }: GeminiChatProps) {
           <CardTitle className="text-lg flex items-center gap-2"><Sparkles className="w-5 h-5 text-primary" />Gemini Chat</CardTitle>
           {messages.length > 0 && <Button variant="ghost" size="sm" onClick={clearChat}><Trash2 className="w-4 h-4 mr-1" />Clear</Button>}
         </div>
-          {noteContext?.title && (
-            <div className="flex items-center gap-2 mt-2 flex-wrap">
-              <Badge variant="secondary">Context: {noteContext.title}</Badge>
-              {noteContext.fileType && <Badge variant="outline" className="capitalize">{noteContext.fileType}</Badge>}
-            </div>
-          )}
       </CardHeader>
       <CardContent className="flex-1 flex flex-col overflow-hidden p-0">
         <ScrollArea className="flex-1 px-4" ref={scrollRef}>
@@ -107,6 +122,11 @@ export function GeminiChat({ className, noteContext }: GeminiChatProps) {
             <div className="flex flex-col items-center justify-center h-full py-12 text-center">
               <Sparkles className="w-12 h-12 text-primary/50 mb-4" />
               <p className="text-muted-foreground">Ask me anything about your studies</p>
+              {attachedContext && (
+                <p className="text-sm text-muted-foreground mt-2">
+                  Note attached below - type your question and send!
+                </p>
+              )}
             </div>
           ) : (
             <div className="space-y-4 py-4">
@@ -124,12 +144,52 @@ export function GeminiChat({ className, noteContext }: GeminiChatProps) {
           )}
         </ScrollArea>
         {error && <div className="mx-4 mb-2 p-3 bg-destructive/10 text-destructive text-sm rounded-lg flex items-center gap-2"><AlertCircle className="w-4 h-4" />{error}</div>}
+        
+        {/* Attached Note Context Preview */}
+        {attachedContext && (
+          <div className="mx-4 mb-2">
+            <div className="flex items-center gap-3 p-3 bg-muted/50 border border-border rounded-lg">
+              {/* Thumbnail/Icon */}
+              <div className="shrink-0">
+                {attachedContext.fileType === 'image' && attachedContext.fileUrl ? (
+                  <img 
+                    src={attachedContext.fileUrl} 
+                    alt={attachedContext.title || 'Image'} 
+                    className="w-12 h-12 object-cover rounded-lg border border-border"
+                  />
+                ) : (
+                  <div className="w-12 h-12 bg-muted rounded-lg flex items-center justify-center border border-border">
+                    {getFileIcon(attachedContext.fileType)}
+                  </div>
+                )}
+              </div>
+              
+              {/* Info */}
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate">{attachedContext.title || 'Attached File'}</p>
+                <p className="text-xs text-muted-foreground capitalize">
+                  {attachedContext.fileType || 'File'}{attachedContext.subject ? ` • ${attachedContext.subject}` : ''}
+                </p>
+              </div>
+              
+              {/* Remove Button */}
+              <button 
+                onClick={handleRemoveContext}
+                className="shrink-0 w-6 h-6 bg-muted hover:bg-destructive/20 text-muted-foreground hover:text-destructive rounded-full flex items-center justify-center transition-colors"
+                aria-label="Remove attachment"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+        
         {images.length > 0 && <div className="px-4 pb-2 flex gap-2">{images.map((img, i) => <div key={i} className="relative"><img src={img.preview} className="w-16 h-16 object-cover rounded-lg" /><button onClick={() => removeImage(i)} className="absolute -top-1 -right-1 w-5 h-5 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center"><X className="w-3 h-3" /></button></div>)}</div>}
         <form onSubmit={handleSubmit} className="p-4 pt-2 shrink-0">
           <div className="flex gap-2">
             <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleImageUpload} />
             <Button type="button" variant="outline" size="icon" onClick={() => fileInputRef.current?.click()} disabled={isLoading}><ImageIcon className="w-4 h-4" /></Button>
-            <Textarea value={input} onChange={(e) => setInput(e.target.value)} placeholder="Ask me anything..." className="flex-1 min-h-[44px] max-h-[120px] resize-none bg-background" disabled={isLoading} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSubmit(e); } }} />
+            <Textarea value={input} onChange={(e) => setInput(e.target.value)} placeholder={attachedContext ? `Ask about "${attachedContext.title}"...` : "Ask me anything..."} className="flex-1 min-h-[44px] max-h-[120px] resize-none bg-background" disabled={isLoading} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSubmit(e); } }} />
             <Button type="submit" disabled={isLoading || (!input.trim() && images.length === 0)}>{isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}</Button>
           </div>
         </form>

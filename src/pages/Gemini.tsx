@@ -137,7 +137,11 @@ export default function Gemini() {
             <div className="grid lg:grid-cols-3 gap-6">
               {/* Main Chat */}
               <div className="lg:col-span-2">
-                <GeminiChat className="h-[600px]" noteContext={noteContext} />
+                <GeminiChat 
+                  className="h-[600px]" 
+                  noteContext={noteContext} 
+                  onClearContext={() => setNoteContext(undefined)}
+                />
               </div>
 
               {/* Sidebar */}
