@@ -7,9 +7,10 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useGemini } from "@/hooks/useGemini";
 import { useAuth } from "@/contexts/AuthContext";
 import ReactMarkdown from "react-markdown";
-import { Send, Loader2, Sparkles, User, Image as ImageIcon, X, AlertCircle, Trash2, FileText, Link as LinkIcon, Video, ChevronLeft, ChevronRight, BookOpen, HelpCircle, ListChecks } from "lucide-react";
+import { Send, Loader2, Sparkles, User, Image as ImageIcon, X, AlertCircle, Trash2, FileText, Link as LinkIcon, Video, ChevronLeft, ChevronRight, BookOpen, HelpCircle, ListChecks, Maximize2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import * as pdfjsLib from "pdfjs-dist";
+import { PdfViewerModal } from "./pdf/PdfViewerModal";
 
 // Set PDF.js worker path
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
@@ -45,6 +46,8 @@ export function GeminiChat({ className, noteContext, onClearContext }: GeminiCha
   const [selectedPages, setSelectedPages] = useState<number[]>([]);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [currentPdfPage, setCurrentPdfPage] = useState(0);
+  const [totalPdfPages, setTotalPdfPages] = useState(0);
+  const [pdfViewerOpen, setPdfViewerOpen] = useState(false);
 
   // Load PDF pages when a PDF is attached
   const loadPdfPages = useCallback(async (url: string) => {
@@ -53,6 +56,8 @@ export function GeminiChat({ className, noteContext, onClearContext }: GeminiCha
       const loadingTask = pdfjsLib.getDocument(url);
       const pdf = await loadingTask.promise;
       const pages: PdfPageInfo[] = [];
+      
+      setTotalPdfPages(pdf.numPages);
       
       // Load first 10 pages max for thumbnails
       const maxPages = Math.min(pdf.numPages, 10);
@@ -80,6 +85,7 @@ export function GeminiChat({ className, noteContext, onClearContext }: GeminiCha
     } catch (err) {
       console.error('Error loading PDF:', err);
       setPdfPages([]);
+      setTotalPdfPages(0);
     } finally {
       setPdfLoading(false);
     }
@@ -116,6 +122,7 @@ export function GeminiChat({ className, noteContext, onClearContext }: GeminiCha
     setAttachedContext(null);
     setPdfPages([]);
     setSelectedPages([]);
+    setTotalPdfPages(0);
     onClearContext?.();
   };
 
@@ -138,7 +145,7 @@ export function GeminiChat({ className, noteContext, onClearContext }: GeminiCha
     const title = attachedContext.title || 'File';
     
     if (type === 'pdf' && selectedPages.length > 0) {
-      const pagesText = selectedPages.length === pdfPages.length 
+      const pagesText = selectedPages.length === totalPdfPages 
         ? 'all pages' 
         : `pages ${selectedPages.join(', ')}`;
       return `[Attached PDF: ${title} - ${pagesText}]\nURL: ${attachedContext.fileUrl}`;
@@ -181,6 +188,7 @@ export function GeminiChat({ className, noteContext, onClearContext }: GeminiCha
     setAttachedContext(null); // Clear after sending
     setPdfPages([]);
     setSelectedPages([]);
+    setTotalPdfPages(0);
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -292,14 +300,27 @@ export function GeminiChat({ className, noteContext, onClearContext }: GeminiCha
                 <p className="text-xs text-muted-foreground capitalize">
                   {attachedContext.fileType || 'File'}
                   {attachedContext.subject ? ` • ${attachedContext.subject}` : ''}
-                  {attachedContext.fileType === 'pdf' && pdfPages.length > 0 && (
-                    <span> • {pdfPages.length} pages{pdfPages.length === 10 ? '+' : ''}</span>
+                  {attachedContext.fileType === 'pdf' && totalPdfPages > 0 && (
+                    <span> • {totalPdfPages} pages</span>
                   )}
                   {selectedPages.length > 0 && attachedContext.fileType === 'pdf' && (
                     <span className="text-primary"> • {selectedPages.length} selected</span>
                   )}
                 </p>
               </div>
+              
+              {/* View Full PDF Button */}
+              {attachedContext.fileType === 'pdf' && totalPdfPages > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="shrink-0 h-8 gap-1.5"
+                  onClick={() => setPdfViewerOpen(true)}
+                >
+                  <Maximize2 className="w-4 h-4" />
+                  View
+                </Button>
+              )}
               
               {/* Remove Button */}
               <button 
@@ -424,6 +445,19 @@ export function GeminiChat({ className, noteContext, onClearContext }: GeminiCha
           </div>
         </form>
       </CardContent>
+      
+      {/* PDF Viewer Modal */}
+      {attachedContext?.fileType === 'pdf' && attachedContext.fileUrl && (
+        <PdfViewerModal
+          isOpen={pdfViewerOpen}
+          onClose={() => setPdfViewerOpen(false)}
+          pdfUrl={attachedContext.fileUrl}
+          title={attachedContext.title}
+          selectedPages={selectedPages}
+          onPagesSelect={setSelectedPages}
+          totalPages={totalPdfPages}
+        />
+      )}
     </Card>
   );
 }
