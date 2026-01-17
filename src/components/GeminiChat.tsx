@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,14 +7,29 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useGemini } from "@/hooks/useGemini";
 import { useAuth } from "@/contexts/AuthContext";
 import ReactMarkdown from "react-markdown";
-import { Send, Loader2, Sparkles, User, Image as ImageIcon, X, AlertCircle, Trash2, FileText, Link as LinkIcon, Video } from "lucide-react";
+import { Send, Loader2, Sparkles, User, Image as ImageIcon, X, AlertCircle, Trash2, FileText, Link as LinkIcon, Video, ChevronLeft, ChevronRight, BookOpen, HelpCircle, ListChecks } from "lucide-react";
 import { cn } from "@/lib/utils";
+import * as pdfjsLib from "pdfjs-dist";
+
+// Set PDF.js worker path
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
 interface GeminiChatProps {
   className?: string;
   noteContext?: { title?: string; subject?: string; fileUrl?: string; fileType?: string };
   onClearContext?: () => void;
 }
+
+interface PdfPageInfo {
+  pageNum: number;
+  thumbnail: string;
+}
+
+const QUICK_ACTIONS = [
+  { id: 'summarize', label: 'Summarize', icon: BookOpen, prompt: 'Please summarize the key points from this note in a clear and concise manner.' },
+  { id: 'explain', label: 'Explain', icon: HelpCircle, prompt: 'Please explain the main concepts from this note in simple terms, as if explaining to a beginner.' },
+  { id: 'mcqs', label: 'Generate MCQs', icon: ListChecks, prompt: 'Generate 5 multiple choice questions (MCQs) based on the content of this note. Include correct answers and brief explanations.' },
+];
 
 export function GeminiChat({ className, noteContext, onClearContext }: GeminiChatProps) {
   const { userProfile } = useAuth();
@@ -24,13 +39,66 @@ export function GeminiChat({ className, noteContext, onClearContext }: GeminiCha
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [attachedContext, setAttachedContext] = useState<typeof noteContext>(null);
+  
+  // PDF page selection state
+  const [pdfPages, setPdfPages] = useState<PdfPageInfo[]>([]);
+  const [selectedPages, setSelectedPages] = useState<number[]>([]);
+  const [pdfLoading, setPdfLoading] = useState(false);
+  const [currentPdfPage, setCurrentPdfPage] = useState(0);
+
+  // Load PDF pages when a PDF is attached
+  const loadPdfPages = useCallback(async (url: string) => {
+    setPdfLoading(true);
+    try {
+      const loadingTask = pdfjsLib.getDocument(url);
+      const pdf = await loadingTask.promise;
+      const pages: PdfPageInfo[] = [];
+      
+      // Load first 10 pages max for thumbnails
+      const maxPages = Math.min(pdf.numPages, 10);
+      
+      for (let i = 1; i <= maxPages; i++) {
+        const page = await pdf.getPage(i);
+        const scale = 0.3;
+        const viewport = page.getViewport({ scale });
+        
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
+        
+        await page.render({ canvasContext: context!, viewport }).promise;
+        
+        pages.push({
+          pageNum: i,
+          thumbnail: canvas.toDataURL('image/jpeg', 0.6),
+        });
+      }
+      
+      setPdfPages(pages);
+      setSelectedPages([1]); // Select first page by default
+    } catch (err) {
+      console.error('Error loading PDF:', err);
+      setPdfPages([]);
+    } finally {
+      setPdfLoading(false);
+    }
+  }, []);
 
   // Set attached context from noteContext prop (don't auto-send)
   useEffect(() => {
     if (noteContext?.fileUrl) {
       setAttachedContext(noteContext);
+      
+      // Load PDF pages if it's a PDF
+      if (noteContext.fileType === 'pdf') {
+        loadPdfPages(noteContext.fileUrl);
+      } else {
+        setPdfPages([]);
+        setSelectedPages([]);
+      }
     }
-  }, [noteContext]);
+  }, [noteContext, loadPdfPages]);
 
   useEffect(() => {
     if (noteContext) setContext({ noteTitle: noteContext.title, selectedSubject: noteContext.subject });
@@ -46,7 +114,53 @@ export function GeminiChat({ className, noteContext, onClearContext }: GeminiCha
 
   const handleRemoveContext = () => {
     setAttachedContext(null);
+    setPdfPages([]);
+    setSelectedPages([]);
     onClearContext?.();
+  };
+
+  const togglePageSelection = (pageNum: number) => {
+    setSelectedPages(prev => 
+      prev.includes(pageNum) 
+        ? prev.filter(p => p !== pageNum)
+        : [...prev, pageNum].sort((a, b) => a - b)
+    );
+  };
+
+  const selectAllPages = () => {
+    setSelectedPages(pdfPages.map(p => p.pageNum));
+  };
+
+  const getContextDescription = () => {
+    if (!attachedContext) return '';
+    
+    const type = attachedContext.fileType || 'file';
+    const title = attachedContext.title || 'File';
+    
+    if (type === 'pdf' && selectedPages.length > 0) {
+      const pagesText = selectedPages.length === pdfPages.length 
+        ? 'all pages' 
+        : `pages ${selectedPages.join(', ')}`;
+      return `[Attached PDF: ${title} - ${pagesText}]\nURL: ${attachedContext.fileUrl}`;
+    }
+    
+    if (type === 'video') {
+      return `[Attached Video Note: ${title}]\nSubject: ${attachedContext.subject || 'N/A'}\nVideo URL: ${attachedContext.fileUrl}\n\nNote: This is a video file. Please help with questions about the topic, but I cannot directly view the video content.`;
+    }
+    
+    if (type === 'link') {
+      return `[Attached Link: ${title}]\nSubject: ${attachedContext.subject || 'N/A'}\nURL: ${attachedContext.fileUrl}`;
+    }
+    
+    if (type === 'image') {
+      return `[Attached Image: ${title}]\nSubject: ${attachedContext.subject || 'N/A'}\nImage URL: ${attachedContext.fileUrl}`;
+    }
+    
+    return `[Attached ${type}: ${title}]\nURL: ${attachedContext.fileUrl}`;
+  };
+
+  const handleQuickAction = (prompt: string) => {
+    setInput(prompt);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -56,7 +170,7 @@ export function GeminiChat({ className, noteContext, onClearContext }: GeminiCha
     // Include attached context in the message
     let fullMessage = input;
     if (attachedContext?.fileUrl) {
-      const contextInfo = `[Attached: ${attachedContext.title || 'File'} (${attachedContext.fileType || 'file'}) - ${attachedContext.fileUrl}]\n\n`;
+      const contextInfo = getContextDescription() + '\n\n';
       fullMessage = contextInfo + input;
     }
     
@@ -65,6 +179,8 @@ export function GeminiChat({ className, noteContext, onClearContext }: GeminiCha
     setInput("");
     setImages([]);
     setAttachedContext(null); // Clear after sending
+    setPdfPages([]);
+    setSelectedPages([]);
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -147,7 +263,7 @@ export function GeminiChat({ className, noteContext, onClearContext }: GeminiCha
         
         {/* Attached Note Context Preview */}
         {attachedContext && (
-          <div className="mx-4 mb-2">
+          <div className="mx-4 mb-2 space-y-2">
             <div className="flex items-center gap-3 p-3 bg-muted/50 border border-border rounded-lg">
               {/* Thumbnail/Icon */}
               <div className="shrink-0">
@@ -155,6 +271,12 @@ export function GeminiChat({ className, noteContext, onClearContext }: GeminiCha
                   <img 
                     src={attachedContext.fileUrl} 
                     alt={attachedContext.title || 'Image'} 
+                    className="w-12 h-12 object-cover rounded-lg border border-border"
+                  />
+                ) : attachedContext.fileType === 'pdf' && pdfPages.length > 0 ? (
+                  <img 
+                    src={pdfPages[0].thumbnail} 
+                    alt="PDF preview" 
                     className="w-12 h-12 object-cover rounded-lg border border-border"
                   />
                 ) : (
@@ -168,7 +290,14 @@ export function GeminiChat({ className, noteContext, onClearContext }: GeminiCha
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate">{attachedContext.title || 'Attached File'}</p>
                 <p className="text-xs text-muted-foreground capitalize">
-                  {attachedContext.fileType || 'File'}{attachedContext.subject ? ` • ${attachedContext.subject}` : ''}
+                  {attachedContext.fileType || 'File'}
+                  {attachedContext.subject ? ` • ${attachedContext.subject}` : ''}
+                  {attachedContext.fileType === 'pdf' && pdfPages.length > 0 && (
+                    <span> • {pdfPages.length} pages{pdfPages.length === 10 ? '+' : ''}</span>
+                  )}
+                  {selectedPages.length > 0 && attachedContext.fileType === 'pdf' && (
+                    <span className="text-primary"> • {selectedPages.length} selected</span>
+                  )}
                 </p>
               </div>
               
@@ -180,6 +309,107 @@ export function GeminiChat({ className, noteContext, onClearContext }: GeminiCha
               >
                 <X className="w-4 h-4" />
               </button>
+            </div>
+            
+            {/* PDF Page Selector */}
+            {attachedContext.fileType === 'pdf' && (
+              <div className="bg-muted/30 border border-border rounded-lg p-3">
+                {pdfLoading ? (
+                  <div className="flex items-center justify-center py-4">
+                    <Loader2 className="w-5 h-5 animate-spin text-primary mr-2" />
+                    <span className="text-sm text-muted-foreground">Loading PDF pages...</span>
+                  </div>
+                ) : pdfPages.length > 0 ? (
+                  <>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-medium text-muted-foreground">Select pages to include</span>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-6 text-xs px-2"
+                        onClick={selectAllPages}
+                      >
+                        Select All
+                      </Button>
+                    </div>
+                    <div className="relative">
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="shrink-0 h-8 w-8"
+                          onClick={() => setCurrentPdfPage(Math.max(0, currentPdfPage - 4))}
+                          disabled={currentPdfPage === 0}
+                        >
+                          <ChevronLeft className="w-4 h-4" />
+                        </Button>
+                        <div className="flex-1 overflow-hidden">
+                          <div 
+                            className="flex gap-2 transition-transform duration-200"
+                            style={{ transform: `translateX(-${currentPdfPage * 68}px)` }}
+                          >
+                            {pdfPages.map((page) => (
+                              <button
+                                key={page.pageNum}
+                                onClick={() => togglePageSelection(page.pageNum)}
+                                className={cn(
+                                  "shrink-0 w-14 relative rounded-md overflow-hidden border-2 transition-all",
+                                  selectedPages.includes(page.pageNum) 
+                                    ? "border-primary ring-2 ring-primary/20" 
+                                    : "border-border hover:border-primary/50"
+                                )}
+                              >
+                                <img 
+                                  src={page.thumbnail} 
+                                  alt={`Page ${page.pageNum}`}
+                                  className="w-full h-20 object-cover"
+                                />
+                                <div className={cn(
+                                  "absolute bottom-0 inset-x-0 text-[10px] font-medium py-0.5 text-center",
+                                  selectedPages.includes(page.pageNum) 
+                                    ? "bg-primary text-primary-foreground" 
+                                    : "bg-background/80 text-foreground"
+                                )}>
+                                  {page.pageNum}
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="shrink-0 h-8 w-8"
+                          onClick={() => setCurrentPdfPage(Math.min(pdfPages.length - 4, currentPdfPage + 4))}
+                          disabled={currentPdfPage >= pdfPages.length - 4}
+                        >
+                          <ChevronRight className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-xs text-muted-foreground text-center py-2">
+                    Could not load PDF preview
+                  </p>
+                )}
+              </div>
+            )}
+            
+            {/* Quick Action Buttons */}
+            <div className="flex gap-2 flex-wrap">
+              {QUICK_ACTIONS.map((action) => (
+                <Button
+                  key={action.id}
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs gap-1.5"
+                  onClick={() => handleQuickAction(action.prompt)}
+                >
+                  <action.icon className="w-3.5 h-3.5" />
+                  {action.label}
+                </Button>
+              ))}
             </div>
           </div>
         )}
