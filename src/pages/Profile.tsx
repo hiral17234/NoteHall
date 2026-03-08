@@ -251,7 +251,7 @@ const earnedAchievements = profileData
                 
                 {/* Online Status Indicator - only shown on other users' profiles, respects privacy settings */}
                 {!isOwnProfile && showOnlineStatus && isOnline && (
-                  <span className="absolute bottom-10 right-4 w-4 h-4 bg-green-500 border-2 border-background rounded-full" title="Online" />
+                  <span className="absolute bottom-1 right-1 w-4 h-4 bg-green-500 border-2 border-background rounded-full z-10" title="Online" />
                 )}
                 
                 <Badge className="absolute -bottom-2 right-4 px-3 py-1 bg-orange-500 hover:bg-orange-600 border-2 border-background shadow-lg flex items-center gap-1">

@@ -171,9 +171,17 @@ export function UserProvider({ children }: { children: ReactNode }) {
     setPrivacy(prev => {
       const updated = { ...prev, ...updates };
       localStorage.setItem(STORAGE_KEYS.PRIVACY, JSON.stringify(updated));
+      // Sync privacy settings to Firestore so other users can see them
+      if (userProfile?.id) {
+        import('firebase/firestore').then(({ doc, updateDoc }) => {
+          import('@/lib/firebase').then(({ db }) => {
+            updateDoc(doc(db, 'users', userProfile.id), { privacy: updated }).catch(console.error);
+          });
+        });
+      }
       return updated;
     });
-  }, []);
+  }, [userProfile?.id]);
 
   const isOwner = useCallback((profileId: string) => {
     return profileId === userProfile?.id;
