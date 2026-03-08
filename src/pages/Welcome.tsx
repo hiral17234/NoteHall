@@ -403,13 +403,12 @@ const Welcome = () => {
                 whileTap={{ scale: 0.95 }}
                 className={`rounded-2xl border border-border bg-card p-6 shadow-md flex flex-col items-center gap-3 ${app.url ? "cursor-pointer" : "cursor-default"}`}
               >
-                <motion.div
+                <div
                   className="w-12 h-12 rounded-xl flex items-center justify-center"
                   style={{ background: "linear-gradient(135deg, hsl(37 92% 50%), hsl(45 96% 64%))" }}
-                  whileHover={{ rotate: [0, -10, 10, 0], transition: { duration: 0.5 } }}
                 >
                   <app.icon className="w-6 h-6 text-primary-foreground" />
-                </motion.div>
+                </div>
                 <span className="font-semibold text-sm md:text-base">{app.name}</span>
                 <span className="text-xs text-muted-foreground leading-tight text-center">{app.desc}</span>
                 {!app.url && (
