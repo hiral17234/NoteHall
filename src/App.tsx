@@ -19,6 +19,7 @@ import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import Placeholder from "./pages/Placeholder";
 import NotFound from "./pages/NotFound";
+import Welcome from "./pages/Welcome";
 import Notifications from "./pages/Notifications";
 import ScorePage from "./pages/ScorePage";
 import HelpedPage from "./pages/HelpedPage";
