@@ -326,46 +326,13 @@ const Welcome = () => {
       </section>
 
       {/* Stats Section */}
-      <section id="stats" className="relative z-10 py-20 md:py-32 px-4 overflow-hidden">
-        {/* Decorative background */}
-        <div className="absolute inset-0 pointer-events-none">
-          <div
-            className="absolute inset-0 opacity-[0.07]"
-            style={{
-              backgroundImage: `radial-gradient(circle at 20% 50%, hsl(37 92% 50%) 0%, transparent 50%), radial-gradient(circle at 80% 50%, hsl(45 96% 64%) 0%, transparent 50%), radial-gradient(circle at 50% 20%, hsl(37 92% 50% / 0.5) 0%, transparent 40%)`,
-            }}
-          />
-          {/* Floating decorative shapes */}
-          <motion.div
-            animate={{ y: [-20, 20, -20], rotate: [0, 10, 0] }}
-            transition={{ repeat: Infinity, duration: 8, ease: "easeInOut" }}
-            className="absolute top-10 left-[10%] w-32 h-32 rounded-full border border-primary/10"
-          />
-          <motion.div
-            animate={{ y: [20, -20, 20], rotate: [0, -15, 0] }}
-            transition={{ repeat: Infinity, duration: 10, ease: "easeInOut" }}
-            className="absolute bottom-10 right-[15%] w-24 h-24 rounded-2xl border border-primary/10 rotate-45"
-          />
-          <motion.div
-            animate={{ y: [10, -10, 10], x: [-10, 10, -10] }}
-            transition={{ repeat: Infinity, duration: 6, ease: "easeInOut" }}
-            className="absolute top-1/2 left-[5%] w-16 h-16 rounded-full"
-            style={{ background: "linear-gradient(135deg, hsl(37 92% 50% / 0.08), hsl(45 96% 64% / 0.08))" }}
-          />
-          <motion.div
-            animate={{ y: [-15, 15, -15], x: [5, -5, 5] }}
-            transition={{ repeat: Infinity, duration: 7, ease: "easeInOut" }}
-            className="absolute top-[20%] right-[8%] w-20 h-20 rounded-xl"
-            style={{ background: "linear-gradient(135deg, hsl(45 96% 64% / 0.06), hsl(37 92% 50% / 0.06))" }}
-          />
-        </div>
-
+      <section id="stats" className="relative z-10 py-20 md:py-32 px-4">
         <motion.h2
           variants={fadeUp}
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true }}
-          className="text-2xl md:text-4xl font-bold text-center mb-4 relative z-10"
+          className="text-2xl md:text-4xl font-bold text-center mb-4"
         >
           NoteHall in Numbers
         </motion.h2>
@@ -374,16 +341,16 @@ const Welcome = () => {
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true }}
-          className="text-center text-muted-foreground mb-16 max-w-md mx-auto relative z-10"
+          className="text-center text-muted-foreground mb-16 max-w-md mx-auto"
         >
           Real impact, real community.
         </motion.p>
 
-        <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8 text-center relative z-10">
+        <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
           {[
-            { end: realStats.notes, label: "Notes Shared", icon: FileText, gradient: "linear-gradient(135deg, hsl(37 92% 50%), hsl(45 96% 64%))" },
-            { end: realStats.users, label: "Students Connected", icon: UserPlus, gradient: "linear-gradient(135deg, hsl(25 95% 53%), hsl(37 92% 50%))" },
-            { end: realStats.subjects, label: "Subjects Covered", icon: Layers, gradient: "linear-gradient(135deg, hsl(45 96% 64%), hsl(50 90% 55%))" },
+            { end: realStats.notes, label: "Notes Shared", icon: FileText },
+            { end: realStats.users, label: "Students Connected", icon: UserPlus },
+            { end: realStats.subjects, label: "Subjects Covered", icon: Layers },
           ].map((stat, i) => (
             <motion.div
               key={i}
@@ -392,25 +359,18 @@ const Welcome = () => {
               whileInView="visible"
               viewport={{ once: true }}
               transition={{ delay: i * 0.15 }}
-              className="relative group"
+              className="rounded-2xl border border-border bg-card p-8 shadow-md hover:shadow-lg hover:-translate-y-1 transition-all duration-300"
             >
-              <div className="rounded-2xl border border-border bg-card/80 backdrop-blur-sm p-8 shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
-                {/* Glow effect on hover */}
-                <div
-                  className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 -z-10 blur-xl"
-                  style={{ background: stat.gradient, transform: "scale(0.9)" }}
-                />
-                <div
-                  className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-5"
-                  style={{ background: stat.gradient }}
-                >
-                  <stat.icon className="w-8 h-8 text-primary-foreground" />
-                </div>
-                <div className="text-4xl md:text-5xl font-bold text-primary mb-2">
-                  <CountUp end={stat.end} suffix="+" />
-                </div>
-                <p className="text-muted-foreground font-medium">{stat.label}</p>
+              <div
+                className="w-14 h-14 rounded-xl flex items-center justify-center mx-auto mb-5"
+                style={{ background: "linear-gradient(135deg, hsl(37 92% 50% / 0.15), hsl(45 96% 64% / 0.15))" }}
+              >
+                <stat.icon className="w-7 h-7 text-primary" />
               </div>
+              <div className="text-4xl md:text-5xl font-bold text-primary mb-2">
+                <CountUp end={stat.end} suffix="+" />
+              </div>
+              <p className="text-muted-foreground font-medium">{stat.label}</p>
             </motion.div>
           ))}
         </div>
