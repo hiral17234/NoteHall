@@ -305,7 +305,7 @@ export function TopContributorsPodium() {
 
         <CardContent className="px-6 pb-6 pt-2">
           {/* Podium - spread across full width */}
-          <div className="flex items-end justify-around pt-6 pb-2 px-2 sm:px-8">
+          <div className="flex items-end justify-evenly pt-4 pb-0 px-4">
             {topContributors.map((contributor) => (
               <PodiumProfile
                 key={contributor.id}
