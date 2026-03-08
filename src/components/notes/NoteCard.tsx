@@ -211,7 +211,7 @@ export function NoteCard({ note, onExpand, compact = false, showDelete = false, 
     if (!userProfile || !reportReason.trim()) return;
     setIsReporting(true);
     try { await notesService.reportNote(note.id, userProfile.id, reportReason); toast({ title: "Report submitted" }); setShowReportDialog(false); setReportReason(""); }
-    catch { toast({ title: "Error", variant: "destructive" }); }
+    catch (err: any) { toast({ title: err?.message || "Failed to submit report", variant: "destructive" }); }
     finally { setIsReporting(false); }
   };
 
