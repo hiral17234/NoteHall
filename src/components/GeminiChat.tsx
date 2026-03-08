@@ -321,10 +321,8 @@ export function GeminiChat({ className, noteContext, onClearContext }: GeminiCha
 
     setInput("");
     setImages([]);
-    setAttachedContext(null);
-    setPdfPages([]);
-    setSelectedPages([]);
-    setTotalPdfPages(0);
+    // Keep attachedContext, pdfPages, selectedPages so subsequent messages
+    // can still reference the same PDF/image throughout the conversation
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
