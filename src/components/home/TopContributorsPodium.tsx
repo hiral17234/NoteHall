@@ -55,43 +55,43 @@ const podiumStyles = `
 
 const rankConfig = {
   1: {
-    avatarSize: "w-[88px] h-[88px]",
+    avatarSize: "w-[80px] h-[80px]",
     borderStyle: "border-[3px]" as const,
     borderColor: "border-[#FFD700]",
-    crownSize: "w-8 h-8",
+    crownSize: "w-9 h-9",
     crownAnim: "crown-float",
     ringAnim: "ring-pulse-gold",
     badgeBg: "bg-[#FFD700]/20 text-[#B8860B] border-[#FFD700]/40",
     nameSize: "text-sm font-bold",
     scoreColor: "text-[#B8860B]",
-    podiumColor: "rgba(253, 230, 138, 0.4)",
-    podiumHeight: 56,
+    podiumColor: "rgba(253, 230, 138, 0.45)",
+    podiumHeight: 64,
   },
   2: {
-    avatarSize: "w-[70px] h-[70px]",
+    avatarSize: "w-[64px] h-[64px]",
     borderStyle: "border-[2.5px]" as const,
     borderColor: "border-[#C0C0C0]",
     crownSize: "w-6 h-6",
     crownAnim: "crown-float-silver",
     ringAnim: "ring-pulse-silver",
     badgeBg: "bg-[#C0C0C0]/20 text-[#6B6B6B] border-[#C0C0C0]/40",
-    nameSize: "text-xs font-semibold",
+    nameSize: "text-sm font-semibold",
     scoreColor: "text-[#6B6B6B]",
-    podiumColor: "#E5E7EB",
-    podiumHeight: 40,
+    podiumColor: "rgba(229, 231, 235, 0.7)",
+    podiumHeight: 44,
   },
   3: {
-    avatarSize: "w-[70px] h-[70px]",
+    avatarSize: "w-[64px] h-[64px]",
     borderStyle: "border-[2.5px]" as const,
     borderColor: "border-[#CD7F32]",
     crownSize: "w-6 h-6",
     crownAnim: "crown-float-bronze",
     ringAnim: "ring-pulse-bronze",
     badgeBg: "bg-[#CD7F32]/20 text-[#8B5E3C] border-[#CD7F32]/40",
-    nameSize: "text-xs font-semibold",
+    nameSize: "text-sm font-semibold",
     scoreColor: "text-[#8B5E3C]",
-    podiumColor: "#FED7AA",
-    podiumHeight: 32,
+    podiumColor: "rgba(254, 215, 170, 0.6)",
+    podiumHeight: 36,
   },
 };
 
@@ -107,7 +107,7 @@ function PodiumProfile({ contributor, onClick }: { contributor: Contributor; onC
         <TooltipTrigger asChild>
           <div
             className={cn(
-              "flex flex-col items-center cursor-pointer group transition-all duration-300 hover:-translate-y-1.5 flex-1 max-w-[160px]",
+              "flex flex-col items-center cursor-pointer group transition-all duration-300 hover:-translate-y-1.5 flex-1",
               isFirst ? "order-2" : contributor.rank === 2 ? "order-1" : "order-3"
             )}
             onClick={onClick}
@@ -139,11 +139,11 @@ function PodiumProfile({ contributor, onClick }: { contributor: Contributor; onC
             <div className="relative">
               {isFirst && (
                 <div
-                  className="absolute inset-0 -m-4 rounded-full pointer-events-none"
+                  className="absolute rounded-full pointer-events-none"
                   style={{
-                    background: "radial-gradient(circle, rgba(255,215,0,0.15) 0%, transparent 70%)",
-                    width: "120px",
-                    height: "120px",
+                    background: "radial-gradient(circle, rgba(255,215,0,0.18) 0%, transparent 70%)",
+                    width: "140px",
+                    height: "140px",
                     top: "50%",
                     left: "50%",
                     transform: "translate(-50%, -50%)",
@@ -158,40 +158,41 @@ function PodiumProfile({ contributor, onClick }: { contributor: Contributor; onC
               >
                 <Avatar className={cn(config.avatarSize, "ring-2 ring-background")}>
                   <AvatarImage src={contributor.avatar} className="object-cover" />
-                  <AvatarFallback className="bg-primary/10 text-primary font-bold text-base">
+                  <AvatarFallback className="bg-primary/10 text-primary font-bold text-lg">
                     {contributor.name.split(" ").map(n => n[0]).join("")}
                   </AvatarFallback>
                 </Avatar>
               </div>
             </div>
 
-            {/* Name & Score */}
+            {/* Rank badge */}
             <Badge
               variant="outline"
-              className={cn("mt-2 text-[10px] px-2 py-0 font-extrabold tracking-wide", config.badgeBg)}
+              className={cn("mt-2 text-[10px] px-2.5 py-0 font-extrabold tracking-wide", config.badgeBg)}
             >
               #{contributor.rank}
             </Badge>
 
+            {/* Name */}
             <p className={cn(
-              "mt-1 text-foreground text-center max-w-[120px] truncate group-hover:text-primary transition-colors",
+              "mt-1 text-foreground text-center max-w-[130px] truncate group-hover:text-primary transition-colors",
               config.nameSize
             )}>
               {contributor.name}
             </p>
 
+            {/* Score */}
             <div className={cn("flex items-center gap-1 mt-0.5", config.scoreColor)}>
-              <Star className="w-3 h-3 fill-current" />
+              <Star className="w-3.5 h-3.5 fill-current" />
               <span className="text-xs font-bold">{contributor.contributionScore} pts</span>
             </div>
 
             {/* Podium base */}
             <div
-              className="rounded-t-lg mt-2"
+              className="w-full max-w-[100px] rounded-t-xl mt-3"
               style={{
                 background: config.podiumColor,
                 height: `${config.podiumHeight}px`,
-                width: "72px",
               }}
             />
           </div>
@@ -304,7 +305,7 @@ export function TopContributorsPodium() {
 
         <CardContent className="px-6 pb-6 pt-2">
           {/* Podium - spread across full width */}
-          <div className="flex items-end justify-around pt-6 pb-2 px-2 sm:px-8">
+          <div className="flex items-end justify-evenly pt-4 pb-0 px-4">
             {topContributors.map((contributor) => (
               <PodiumProfile
                 key={contributor.id}
