@@ -25,20 +25,13 @@ export default function Index() {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("trending");
 
-  // Fetch notes from Firestore
+  // Real-time notes subscription for live views/ratings updates
   useEffect(() => {
-    const fetchNotes = async () => {
-      try {
-        const fetchedNotes = await notesService.getAll();
-        setNotes(fetchedNotes);
-      } catch (error) {
-        console.error("Error fetching notes:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchNotes();
+    const unsubscribe = notesService.subscribeAll((fetchedNotes) => {
+      setNotes(fetchedNotes);
+      setLoading(false);
+    });
+    return () => unsubscribe();
   }, []);
 
   // Memoize note conversion to avoid creating new objects on every render

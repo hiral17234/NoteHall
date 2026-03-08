@@ -142,6 +142,13 @@ export const notesService = {
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Note));
   },
 
+  subscribeAll(callback: (notes: Note[]) => void): () => void {
+    const q = query(collection(db, 'notes'), orderBy('createdAt', 'desc'));
+    return onSnapshot(q, (snapshot) => {
+      callback(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Note)));
+    });
+  },
+
   async getById(id: string): Promise<Note | null> {
     const docRef = doc(db, 'notes', id);
     const docSnap = await getDoc(docRef);
