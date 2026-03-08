@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Crown, TrendingUp, Loader2, ChevronDown, ChevronUp, Sparkles, Star, Eye } from "lucide-react";
+import { Crown, Loader2, ChevronDown, ChevronUp, Sparkles, Star, Eye } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -51,15 +51,11 @@ const podiumStyles = `
   0%, 100% { opacity: 0.3; transform: scale(0.8) rotate(0deg); }
   50% { opacity: 1; transform: scale(1.1) rotate(180deg); }
 }
-@keyframes score-count {
-  0% { opacity: 0; transform: translateY(6px); }
-  100% { opacity: 1; transform: translateY(0); }
-}
 `;
 
 const rankConfig = {
   1: {
-    avatarSize: "w-[72px] h-[72px]",
+    avatarSize: "w-20 h-20",
     borderStyle: "border-[3px]" as const,
     borderColor: "border-[#FFD700]",
     crownSize: "w-8 h-8",
@@ -68,11 +64,12 @@ const rankConfig = {
     badgeBg: "bg-[#FFD700]/20 text-[#B8860B] border-[#FFD700]/40",
     nameSize: "text-sm font-bold",
     scoreColor: "text-[#B8860B]",
-    elevation: "-mt-6",
-    order: "order-2",
+    podiumColor: "rgba(255, 215, 0, 0.12)",
+    podiumBorder: "rgba(255, 215, 0, 0.25)",
+    podiumHeight: "h-16",
   },
   2: {
-    avatarSize: "w-14 h-14",
+    avatarSize: "w-16 h-16",
     borderStyle: "border-[2.5px]" as const,
     borderColor: "border-[#C0C0C0]",
     crownSize: "w-6 h-6",
@@ -81,11 +78,12 @@ const rankConfig = {
     badgeBg: "bg-[#C0C0C0]/20 text-[#6B6B6B] border-[#C0C0C0]/40",
     nameSize: "text-xs font-semibold",
     scoreColor: "text-[#6B6B6B]",
-    elevation: "mt-4",
-    order: "order-1",
+    podiumColor: "rgba(192, 192, 192, 0.12)",
+    podiumBorder: "rgba(192, 192, 192, 0.25)",
+    podiumHeight: "h-10",
   },
   3: {
-    avatarSize: "w-14 h-14",
+    avatarSize: "w-16 h-16",
     borderStyle: "border-[2.5px]" as const,
     borderColor: "border-[#CD7F32]",
     crownSize: "w-6 h-6",
@@ -94,8 +92,9 @@ const rankConfig = {
     badgeBg: "bg-[#CD7F32]/20 text-[#8B5E3C] border-[#CD7F32]/40",
     nameSize: "text-xs font-semibold",
     scoreColor: "text-[#8B5E3C]",
-    elevation: "mt-4",
-    order: "order-3",
+    podiumColor: "rgba(205, 127, 50, 0.12)",
+    podiumBorder: "rgba(205, 127, 50, 0.25)",
+    podiumHeight: "h-8",
   },
 };
 
@@ -103,55 +102,73 @@ function PodiumProfile({ contributor, onClick }: { contributor: Contributor; onC
   const config = rankConfig[contributor.rank as keyof typeof rankConfig];
   if (!config) return null;
 
+  const isFirst = contributor.rank === 1;
+
   return (
     <TooltipProvider delayDuration={300}>
       <Tooltip>
         <TooltipTrigger asChild>
           <div
             className={cn(
-              "flex flex-col items-center cursor-pointer group transition-all duration-300 hover:-translate-y-1.5",
-              config.order,
-              config.elevation
+              "flex flex-col items-center cursor-pointer group transition-all duration-300 hover:-translate-y-1.5 flex-1 max-w-[160px]",
+              isFirst ? "order-2" : contributor.rank === 2 ? "order-1" : "order-3"
             )}
             onClick={onClick}
           >
             {/* Crown */}
             <div className="relative mb-1">
-              {contributor.rank === 1 && (
+              {isFirst && (
                 <>
                   <Sparkles
-                    className="absolute -left-4 -top-1 w-3 h-3 text-[#FFD700]/60"
+                    className="absolute -left-5 -top-1 w-3.5 h-3.5 text-[#FFD700]/60"
                     style={{ animation: "sparkle-drift 2.5s ease-in-out infinite" }}
                   />
                   <Sparkles
-                    className="absolute -right-4 top-0 w-2.5 h-2.5 text-[#FFD700]/50"
+                    className="absolute -right-5 top-0 w-3 h-3 text-[#FFD700]/50"
                     style={{ animation: "sparkle-drift 3s ease-in-out infinite 0.5s" }}
                   />
                 </>
               )}
               <Crown
-                className={cn(config.crownSize, "text-current")}
+                className={cn(config.crownSize)}
                 style={{
                   animation: `${config.crownAnim} 2.5s ease-in-out infinite`,
-                  color: contributor.rank === 1 ? "#FFD700" : contributor.rank === 2 ? "#C0C0C0" : "#CD7F32",
+                  color: isFirst ? "#FFD700" : contributor.rank === 2 ? "#C0C0C0" : "#CD7F32",
                 }}
               />
             </div>
 
-            {/* Avatar ring */}
-            <div
-              className={cn("rounded-full p-[3px]", config.borderStyle, config.borderColor)}
-              style={{ animation: `${config.ringAnim} 3s ease-in-out infinite` }}
-            >
-              <Avatar className={cn(config.avatarSize, "ring-2 ring-background")}>
-                <AvatarImage src={contributor.avatar} className="object-cover" />
-                <AvatarFallback className="bg-primary/10 text-primary font-bold text-base">
-                  {contributor.name.split(" ").map(n => n[0]).join("")}
-                </AvatarFallback>
-              </Avatar>
+            {/* Radial glow behind #1 */}
+            <div className="relative">
+              {isFirst && (
+                <div
+                  className="absolute inset-0 -m-4 rounded-full pointer-events-none"
+                  style={{
+                    background: "radial-gradient(circle, rgba(255,215,0,0.15) 0%, transparent 70%)",
+                    width: "120px",
+                    height: "120px",
+                    top: "50%",
+                    left: "50%",
+                    transform: "translate(-50%, -50%)",
+                  }}
+                />
+              )}
+
+              {/* Avatar ring */}
+              <div
+                className={cn("rounded-full p-[3px] relative z-10", config.borderStyle, config.borderColor)}
+                style={{ animation: `${config.ringAnim} 3s ease-in-out infinite` }}
+              >
+                <Avatar className={cn(config.avatarSize, "ring-2 ring-background")}>
+                  <AvatarImage src={contributor.avatar} className="object-cover" />
+                  <AvatarFallback className="bg-primary/10 text-primary font-bold text-base">
+                    {contributor.name.split(" ").map(n => n[0]).join("")}
+                  </AvatarFallback>
+                </Avatar>
+              </div>
             </div>
 
-            {/* Rank badge */}
+            {/* Name & Score */}
             <Badge
               variant="outline"
               className={cn("mt-2 text-[10px] px-2 py-0 font-extrabold tracking-wide", config.badgeBg)}
@@ -159,22 +176,26 @@ function PodiumProfile({ contributor, onClick }: { contributor: Contributor; onC
               #{contributor.rank}
             </Badge>
 
-            {/* Name */}
             <p className={cn(
-              "mt-1 text-foreground text-center max-w-[100px] truncate group-hover:text-primary transition-colors",
+              "mt-1 text-foreground text-center max-w-[120px] truncate group-hover:text-primary transition-colors",
               config.nameSize
             )}>
               {contributor.name}
             </p>
 
-            {/* Score */}
-            <div
-              className={cn("flex items-center gap-1 mt-0.5", config.scoreColor)}
-              style={{ animation: "score-count 0.5s ease-out forwards" }}
-            >
+            <div className={cn("flex items-center gap-1 mt-0.5", config.scoreColor)}>
               <Star className="w-3 h-3 fill-current" />
               <span className="text-xs font-bold">{contributor.contributionScore} pts</span>
             </div>
+
+            {/* Podium base block */}
+            <div
+              className={cn("w-full rounded-lg mt-2", config.podiumHeight)}
+              style={{
+                background: config.podiumColor,
+                border: `1px solid ${config.podiumBorder}`,
+              }}
+            />
           </div>
         </TooltipTrigger>
         <TooltipContent side="bottom" className="text-xs">
@@ -240,10 +261,11 @@ export function TopContributorsPodium() {
     navigate(`/profile/${userId}`);
   };
 
+  const cardBg = "linear-gradient(160deg, #F8F4EC 0%, #F3EDE3 100%)";
+
   if (loading) {
     return (
-      <Card className="mb-6 overflow-hidden border-primary/15"
-        style={{ background: "linear-gradient(135deg, hsl(40 40% 96%), hsl(43 50% 93%))" }}>
+      <Card className="mb-6 overflow-hidden border-primary/15 rounded-[20px]" style={{ background: cardBg }}>
         <div className="p-6 flex items-center justify-center py-16">
           <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
         </div>
@@ -253,8 +275,7 @@ export function TopContributorsPodium() {
 
   if (topContributors.length === 0) {
     return (
-      <Card className="mb-6 overflow-hidden border-primary/15"
-        style={{ background: "linear-gradient(135deg, hsl(40 40% 96%), hsl(43 50% 93%))" }}>
+      <Card className="mb-6 overflow-hidden border-primary/15 rounded-[20px]" style={{ background: cardBg }}>
         <div className="p-6 text-center text-muted-foreground py-10">
           <Crown className="w-8 h-8 mx-auto mb-2 text-primary/40" />
           <p className="text-sm font-medium">No contributors yet. Be the first!</p>
@@ -269,8 +290,8 @@ export function TopContributorsPodium() {
     <>
       <style>{podiumStyles}</style>
       <Card
-        className="mb-6 overflow-hidden border-primary/15 rounded-[20px] shadow-md"
-        style={{ background: "linear-gradient(145deg, hsl(42 35% 96%), hsl(40 45% 92%), hsl(37 40% 94%))" }}
+        className="mb-6 overflow-hidden border-primary/15 rounded-[20px] shadow-sm"
+        style={{ background: cardBg }}
       >
         {/* Header */}
         <div className="px-6 pt-6 pb-2 flex items-center gap-2.5">
@@ -280,12 +301,12 @@ export function TopContributorsPodium() {
           <h2 className="text-lg font-bold text-foreground tracking-tight">
             Top Contributors of the Week
           </h2>
-          <Sparkles className="w-4 h-4 text-primary/50 ml-auto" />
+          <Sparkles className="w-4 h-4 text-primary/40 ml-auto" />
         </div>
 
         <CardContent className="px-6 pb-6 pt-2">
-          {/* Podium */}
-          <div className="flex items-end justify-center gap-6 sm:gap-12 pt-8 pb-4">
+          {/* Podium - spread across full width */}
+          <div className="flex items-end justify-around pt-6 pb-2 px-2 sm:px-8">
             {topContributors.map((contributor) => (
               <PodiumProfile
                 key={contributor.id}
@@ -296,7 +317,7 @@ export function TopContributorsPodium() {
           </div>
 
           {/* Divider */}
-          <div className="h-px bg-border/60 my-3" />
+          <div className="h-px bg-border/50 my-3" />
 
           {/* View Full Leaderboard */}
           <Button
@@ -365,7 +386,6 @@ export function TopContributorsPodium() {
                 );
               })}
 
-              {/* Current user if unranked */}
               {currentUserRank === -1 && userProfile && (
                 <div className="flex items-center gap-3 p-2.5 rounded-xl bg-muted/30 border border-dashed border-muted-foreground/20 mt-1.5">
                   <span className="w-7 text-center text-xs font-bold text-muted-foreground">—</span>
