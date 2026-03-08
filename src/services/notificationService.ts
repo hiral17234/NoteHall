@@ -233,5 +233,27 @@ export const createNotification = {
       actionUrl: `/help-desk?id=${requestId}`,
     });
   },
+
+  async noteReported(authorId: string, noteTitle: string, noteId: string, reportCount: number) {
+    if (!authorId) return;
+    await notificationService.create({
+      type: 'system',
+      title: 'Note Reported',
+      message: `Your note "${noteTitle}" has been reported (${reportCount} report${reportCount !== 1 ? 's' : ''}).`,
+      toUserId: authorId,
+      relatedId: noteId,
+      actionUrl: `/note/${noteId}`,
+    });
+  },
+
+  async noteDeleted(authorId: string, noteTitle: string, fileType: string) {
+    if (!authorId) return;
+    await notificationService.create({
+      type: 'system',
+      title: 'Content Removed',
+      message: `Your ${fileType} "${noteTitle}" has been removed due to exceeding 15 reports from the community.`,
+      toUserId: authorId,
+    });
+  },
 };
 
