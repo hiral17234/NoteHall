@@ -54,8 +54,8 @@ const FloatingParticles = () => {
         y: Math.random() * canvas.height,
         vx: (Math.random() - 0.5) * 0.25,
         vy: (Math.random() - 0.5) * 0.25,
-        size: Math.random() * 2 + 0.6,
-        opacity: Math.random() * 0.2 + 0.05,
+        size: Math.random() * 3 + 1.2,
+        opacity: Math.random() * 0.4 + 0.15,
         hue: 30 + Math.random() * 20,
       });
     }
@@ -69,7 +69,7 @@ const FloatingParticles = () => {
         size: 30 + Math.random() * 70,
         rotation: Math.random() * Math.PI * 2,
         rotationSpeed: (Math.random() - 0.5) * 0.002,
-        opacity: 0.02 + Math.random() * 0.03,
+        opacity: 0.05 + Math.random() * 0.06,
         type: shapeTypes[Math.floor(Math.random() * shapeTypes.length)],
         parallaxFactor: 0.02 + Math.random() * 0.04,
         driftX: (Math.random() - 0.5) * 0.1,
@@ -185,7 +185,7 @@ const FloatingParticles = () => {
           const dy = particles[i].y - particles[j].y;
           const dist = Math.sqrt(dx * dx + dy * dy);
           if (dist < connectionDistance) {
-            const alpha = (1 - dist / connectionDistance) * 0.08;
+            const alpha = (1 - dist / connectionDistance) * 0.18;
             ctx.beginPath();
             ctx.strokeStyle = `hsla(37, 92%, 50%, ${alpha})`;
             ctx.lineWidth = 0.4;
@@ -227,7 +227,7 @@ const FloatingParticles = () => {
     <canvas
       ref={canvasRef}
       className="fixed inset-0 pointer-events-none z-0"
-      style={{ opacity: 0.6 }}
+      style={{ opacity: 0.85 }}
     />
   );
 };
