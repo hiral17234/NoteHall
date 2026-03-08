@@ -295,33 +295,18 @@ export const notesService = {
   async reportNote(noteId: string, userId: string, reason: string): Promise<void> {
     const noteRef = doc(db, 'notes', noteId);
     const noteSnap = await getDoc(noteRef);
-    if (!noteSnap.exists()) return;
+    if (!noteSnap.exists()) throw new Error('Note not found');
 
-    // Check if user already reported
-    const existingReports = await getDocs(
-      query(collection(db, 'notes', noteId, 'reports'), where('userId', '==', userId))
-    );
-    if (!existingReports.empty) {
+    const note = noteSnap.data();
+    
+    // Check if user already reported using the reportedBy array on the note doc
+    const reportedBy: string[] = note.reportedBy || [];
+    if (reportedBy.includes(userId)) {
       throw new Error('You have already reported this note');
     }
 
-    // Add report to subcollection
-    await addDoc(collection(db, 'notes', noteId, 'reports'), {
-      userId,
-      reason,
-      createdAt: getServerTimestamp(),
-    });
-
-    const note = noteSnap.data();
     const currentReportCount = note.reportCount || 0;
     const newReportCount = currentReportCount + 1;
-
-    // Notify uploader about each report
-    try {
-      await createNotification.noteReported(note.authorId, note.title, noteId, newReportCount);
-    } catch (err) {
-      console.warn('Report notification failed:', err);
-    }
 
     if (newReportCount >= 15) {
       // Auto-delete the note and notify uploader
@@ -336,9 +321,15 @@ export const notesService = {
       await updateDoc(noteRef, { 
         reportCount: newReportCount,
         reportedBy: arrayUnion(userId),
-        isHidden: newReportCount >= 15,
         updatedAt: getServerTimestamp(),
       });
+    }
+
+    // Notify uploader about each report
+    try {
+      await createNotification.noteReported(note.authorId, note.title, noteId, newReportCount);
+    } catch (err) {
+      console.warn('Report notification failed:', err);
     }
   },
 
