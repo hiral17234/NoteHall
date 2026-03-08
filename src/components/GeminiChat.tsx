@@ -35,6 +35,7 @@ interface DisplayMessage {
 
 const STORAGE_KEY = "notehall_gemini_messages";
 const CONTEXT_KEY = "notehall_gemini_context";
+const ATTACHMENT_IMAGES_KEY = "notehall_gemini_attachment_images";
 
 const QUICK_ACTIONS = [
   { id: 'summarize', label: 'Summarize', icon: BookOpen, prompt: 'Please summarize the key points from this note in a clear and concise manner.' },
@@ -64,6 +65,23 @@ function saveContext(ctx: GeminiChatProps["noteContext"] | null) {
   try {
     if (ctx) localStorage.setItem(CONTEXT_KEY, JSON.stringify(ctx));
     else localStorage.removeItem(CONTEXT_KEY);
+  } catch {}
+}
+
+function loadAttachmentImages(): { base64: string; mimeType: string }[] {
+  try {
+    const data = localStorage.getItem(ATTACHMENT_IMAGES_KEY);
+    return data ? JSON.parse(data) : [];
+  } catch { return []; }
+}
+
+function saveAttachmentImages(images: { base64: string; mimeType: string }[]) {
+  try {
+    if (images.length > 0) {
+      localStorage.setItem(ATTACHMENT_IMAGES_KEY, JSON.stringify(images));
+    } else {
+      localStorage.removeItem(ATTACHMENT_IMAGES_KEY);
+    }
   } catch {}
 }
 
