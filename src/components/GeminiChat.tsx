@@ -341,8 +341,16 @@ export function GeminiChat({ className, noteContext, onClearContext }: GeminiCha
       if (imgData) allImageData.push(imgData);
     }
 
+    const effectiveImages = allImageData.length > 0 ? allImageData : persistentAttachmentImages;
+    if (allImageData.length > 0) {
+      setPersistentAttachmentImages(allImageData);
+    }
+
     try {
-      const response = await geminiService.sendMessage(fullMessage, allImageData.length > 0 ? allImageData : undefined);
+      const response = await geminiService.sendMessage(
+        fullMessage,
+        effectiveImages.length > 0 ? effectiveImages : undefined
+      );
       const assistantMsg: DisplayMessage = { role: 'assistant', content: response };
       setMessages(prev => [...prev, assistantMsg]);
     } catch (err) {
