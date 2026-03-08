@@ -243,12 +243,14 @@ export function GeminiChat({ className, noteContext, onClearContext }: GeminiCha
     setInput("");
     setImages([]);
     setAttachedContext(null);
+    setPersistentAttachmentImages([]);
     setPdfPages([]);
     setSelectedPages([]);
     setTotalPdfPages(0);
     geminiService.clearHistory();
     saveMessages([]);
     saveContext(null);
+    saveAttachmentImages([]);
     onClearContext?.();
   };
 
