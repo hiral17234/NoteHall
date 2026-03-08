@@ -330,13 +330,7 @@ const Welcome = () => {
         >
           Connect with seniors, alumni, and peers across batches.
         </motion.p>
-        <motion.div
-          variants={staggerContainer}
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true }}
-          className="max-w-6xl mx-auto grid md:grid-cols-3 gap-10"
-        >
+        <div className="max-w-5xl mx-auto space-y-10">
           {[
             { icon: UserCheck, title: "Seniors Helping Juniors", desc: "Seniors share exam tips, important questions, and proven study strategies." },
             { icon: Award, title: "Alumni Guidance", desc: "Pass-outs and alumni contribute their notes and experiences to guide future students." },
@@ -344,17 +338,24 @@ const Welcome = () => {
           ].map((item, i) => (
             <motion.div
               key={i}
-              variants={fadeUp}
-              className={glassCard}
+              variants={i % 2 === 0 ? slideLeft : slideRight}
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true }}
+              className={`flex flex-col md:flex-row items-center gap-8 ${glassCard} ${i % 2 !== 0 ? "md:flex-row-reverse" : ""}`}
             >
-              <div className={iconBox} style={{ background: iconBoxSubtle }}>
-                <item.icon className="w-7 h-7 text-primary" />
+              <div className="flex-shrink-0">
+                <div className="w-20 h-20 rounded-2xl flex items-center justify-center" style={{ background: iconBoxSubtle }}>
+                  <item.icon className="w-10 h-10 text-primary" />
+                </div>
               </div>
-              <h3 className="text-2xl font-semibold mb-3">{item.title}</h3>
-              <p className="text-base text-muted-foreground leading-relaxed">{item.desc}</p>
+              <div className={i % 2 !== 0 ? "md:text-right" : ""}>
+                <h3 className="text-2xl font-semibold mb-3">{item.title}</h3>
+                <p className="text-base text-muted-foreground leading-relaxed">{item.desc}</p>
+              </div>
             </motion.div>
           ))}
-        </motion.div>
+        </div>
       </section>
 
       {/* ── Stats Section ── */}
