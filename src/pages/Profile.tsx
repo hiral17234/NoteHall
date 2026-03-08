@@ -249,8 +249,8 @@ const earnedAchievements = profileData
                   </AvatarFallback>
                 </Avatar>
                 
-                {/* Online Status Indicator - respects privacy settings */}
-                {showOnlineStatus && isOnline && (
+                {/* Online Status Indicator - only shown on other users' profiles, respects privacy settings */}
+                {!isOwnProfile && showOnlineStatus && isOnline && (
                   <span className="absolute bottom-10 right-4 w-4 h-4 bg-green-500 border-2 border-background rounded-full" title="Online" />
                 )}
                 
