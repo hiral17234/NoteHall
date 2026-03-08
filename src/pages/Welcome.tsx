@@ -164,13 +164,13 @@ const Welcome = () => {
       </section>
 
       {/* ── Problem Section ── */}
-      <section id="problem" className="relative z-10 py-24 md:py-36 px-4">
+      <section id="problem" className="relative z-10 py-28 md:py-40 px-4">
         <motion.h2
           variants={fadeUp}
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true }}
-          className="text-2xl md:text-4xl font-bold text-center mb-16"
+          className="text-3xl md:text-5xl font-bold text-center mb-20"
         >
           The Problem Students Face
         </motion.h2>
@@ -193,21 +193,21 @@ const Welcome = () => {
               <div className={iconBox} style={{ background: iconBoxSubtle }}>
                 <item.icon className="w-7 h-7 text-primary" />
               </div>
-              <h3 className="text-xl font-semibold mb-3">{item.title}</h3>
-              <p className="text-muted-foreground leading-relaxed">{item.desc}</p>
+              <h3 className="text-2xl font-semibold mb-3">{item.title}</h3>
+              <p className="text-base text-muted-foreground leading-relaxed">{item.desc}</p>
             </motion.div>
           ))}
         </motion.div>
       </section>
 
       {/* ── Solution Section ── */}
-      <section id="solution" className="relative z-10 py-24 md:py-36 px-4">
+      <section id="solution" className="relative z-10 py-28 md:py-40 px-4">
         <motion.h2
           variants={fadeUp}
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true }}
-          className="text-2xl md:text-4xl font-bold text-center mb-4"
+          className="text-3xl md:text-5xl font-bold text-center mb-5"
         >
           The{" "}
           <span style={gradientText}>NoteHall</span>{" "}
@@ -218,7 +218,7 @@ const Welcome = () => {
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true }}
-          className="text-center text-muted-foreground mb-16 max-w-xl mx-auto"
+          className="text-center text-lg text-muted-foreground mb-20 max-w-xl mx-auto"
         >
           Everything students need to learn smarter, in one place.
         </motion.p>
@@ -227,7 +227,7 @@ const Welcome = () => {
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true }}
-          className="max-w-5xl mx-auto grid md:grid-cols-3 gap-8"
+          className="max-w-6xl mx-auto grid md:grid-cols-3 gap-10"
         >
           {[
             { icon: BookOpen, title: "Centralized Knowledge Library", desc: "All notes organized by branch, year, and subject so students can easily discover the best study material." },
@@ -242,26 +242,26 @@ const Welcome = () => {
               <div className={iconBox} style={{ background: iconBoxGradient }}>
                 <item.icon className="w-7 h-7 text-primary-foreground" />
               </div>
-              <h3 className="text-xl font-semibold mb-3">{item.title}</h3>
-              <p className="text-muted-foreground leading-relaxed">{item.desc}</p>
+              <h3 className="text-2xl font-semibold mb-3">{item.title}</h3>
+              <p className="text-base text-muted-foreground leading-relaxed">{item.desc}</p>
             </motion.div>
           ))}
         </motion.div>
       </section>
 
       {/* ── How It Works Section ── */}
-      <section id="how-it-works" className="relative z-10 py-24 md:py-36 px-4">
+      <section id="how-it-works" className="relative z-10 py-28 md:py-40 px-4">
         <motion.h2
           variants={fadeUp}
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true }}
-          className="text-2xl md:text-4xl font-bold text-center mb-16"
+          className="text-3xl md:text-5xl font-bold text-center mb-20"
         >
           How It Works
         </motion.h2>
-        <div className="max-w-5xl mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 md:gap-4 relative">
+        <div className="max-w-6xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-10 md:gap-6 relative">
             {/* Gradient connector line (desktop) */}
             <div
               className="hidden md:block absolute top-10 left-[12.5%] right-[12.5%] h-0.5"
@@ -301,8 +301,8 @@ const Welcome = () => {
                   </span>
                   <item.icon className="w-8 h-8 text-primary" />
                 </div>
-                <h3 className="text-lg font-semibold mb-2">{item.title}</h3>
-                <p className="text-sm text-muted-foreground max-w-[200px]">{item.desc}</p>
+                <h3 className="text-xl font-semibold mb-2">{item.title}</h3>
+                <p className="text-base text-muted-foreground max-w-[220px]">{item.desc}</p>
               </motion.div>
             ))}
           </div>
@@ -310,13 +310,13 @@ const Welcome = () => {
       </section>
 
       {/* ── Community Section ── */}
-      <section id="community" className="relative z-10 py-24 md:py-36 px-4">
+      <section id="community" className="relative z-10 py-28 md:py-40 px-4">
         <motion.h2
           variants={fadeUp}
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true }}
-          className="text-2xl md:text-4xl font-bold text-center mb-4"
+          className="text-3xl md:text-5xl font-bold text-center mb-5"
         >
           Learning Beyond Your Batch
         </motion.h2>
@@ -325,7 +325,7 @@ const Welcome = () => {
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true }}
-          className="text-center text-muted-foreground mb-16 max-w-xl mx-auto"
+          className="text-center text-lg text-muted-foreground mb-20 max-w-xl mx-auto"
         >
           Connect with seniors, alumni, and peers across batches.
         </motion.p>
@@ -334,7 +334,7 @@ const Welcome = () => {
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true }}
-          className="max-w-5xl mx-auto grid md:grid-cols-3 gap-8"
+          className="max-w-6xl mx-auto grid md:grid-cols-3 gap-10"
         >
           {[
             { icon: UserCheck, title: "Seniors Helping Juniors", desc: "Seniors share exam tips, important questions, and proven study strategies." },
@@ -349,21 +349,21 @@ const Welcome = () => {
               <div className={iconBox} style={{ background: iconBoxSubtle }}>
                 <item.icon className="w-7 h-7 text-primary" />
               </div>
-              <h3 className="text-xl font-semibold mb-3">{item.title}</h3>
-              <p className="text-muted-foreground leading-relaxed">{item.desc}</p>
+              <h3 className="text-2xl font-semibold mb-3">{item.title}</h3>
+              <p className="text-base text-muted-foreground leading-relaxed">{item.desc}</p>
             </motion.div>
           ))}
         </motion.div>
       </section>
 
       {/* ── Stats Section ── */}
-      <section id="stats" className="relative z-10 py-24 md:py-36 px-4">
+      <section id="stats" className="relative z-10 py-28 md:py-40 px-4">
         <motion.h2
           variants={fadeUp}
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true }}
-          className="text-2xl md:text-4xl font-bold text-center mb-4"
+          className="text-3xl md:text-5xl font-bold text-center mb-5"
         >
           NoteHall in <span style={gradientText}>Numbers</span>
         </motion.h2>
@@ -372,7 +372,7 @@ const Welcome = () => {
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true }}
-          className="text-center text-muted-foreground mb-16 max-w-md mx-auto"
+          className="text-center text-lg text-muted-foreground mb-20 max-w-md mx-auto"
         >
           Real impact, real community.
         </motion.p>
@@ -382,7 +382,7 @@ const Welcome = () => {
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true }}
-          className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8 text-center"
+          className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-10 text-center"
         >
           {[
             { end: realStats.notes, label: "Notes Shared", icon: FileText },
@@ -397,10 +397,10 @@ const Welcome = () => {
               <div className={iconBox + " mx-auto"} style={{ background: iconBoxSubtle }}>
                 <stat.icon className="w-7 h-7 text-primary" />
               </div>
-              <div className="text-4xl md:text-5xl font-bold mb-2" style={gradientText}>
+              <div className="text-5xl md:text-6xl font-bold mb-3" style={gradientText}>
                 <CountUp end={stat.end} suffix="+" />
               </div>
-              <p className="text-muted-foreground font-medium">{stat.label}</p>
+              <p className="text-lg text-muted-foreground font-medium">{stat.label}</p>
             </motion.div>
           ))}
         </motion.div>
@@ -413,10 +413,10 @@ const Welcome = () => {
           viewport={{ once: true }}
           className="mt-24 max-w-4xl mx-auto text-center"
         >
-          <h3 className="text-xl md:text-2xl font-bold mb-3">
+          <h3 className="text-2xl md:text-4xl font-bold mb-4">
             Part of the <span style={gradientText}>Campus Community</span> Ecosystem
           </h3>
-          <p className="text-muted-foreground mb-12 max-w-lg mx-auto">
+          <p className="text-lg text-muted-foreground mb-14 max-w-lg mx-auto">
             NoteHall is one of four interconnected platforms built for students, by students.
           </p>
           <motion.div
@@ -424,7 +424,7 @@ const Welcome = () => {
             initial="hidden"
             whileInView="visible"
             viewport={{ once: true }}
-            className="grid grid-cols-2 md:grid-cols-4 gap-5 md:gap-6"
+            className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8"
           >
             {[
               { name: "CampusVoice", desc: "Share your campus experiences & feedback anonymously", url: "https://campusvoice-chi.vercel.app/", icon: MessageCircle },
@@ -448,8 +448,8 @@ const Welcome = () => {
                 >
                   <app.icon className="w-7 h-7 text-white" />
                 </div>
-                <span className="font-semibold text-sm md:text-base">{app.name}</span>
-                <span className="text-xs text-muted-foreground leading-tight text-center">{app.desc}</span>
+                <span className="font-semibold text-base md:text-lg">{app.name}</span>
+                <span className="text-sm text-muted-foreground leading-tight text-center">{app.desc}</span>
                 {app.url && (
                   <span className="text-[11px] text-primary font-medium flex items-center gap-1 mt-1">
                     Visit <ArrowRight className="w-3 h-3" />
@@ -471,7 +471,7 @@ const Welcome = () => {
       </section>
 
       {/* ── CTA Section ── */}
-      <section className="relative z-10 py-24 md:py-36 px-4 text-center">
+      <section className="relative z-10 py-28 md:py-40 px-4 text-center">
         {/* Warm radial glow */}
         <div
           className="absolute inset-0 pointer-events-none"
@@ -484,7 +484,7 @@ const Welcome = () => {
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true }}
-          className="text-2xl md:text-4xl font-bold mb-4 relative z-10"
+          className="text-3xl md:text-5xl font-bold mb-6 relative z-10"
         >
           Ready to Learn Smarter Together?
         </motion.h2>
@@ -493,7 +493,7 @@ const Welcome = () => {
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true }}
-          className="text-muted-foreground mb-10 max-w-lg mx-auto relative z-10"
+          className="text-lg text-muted-foreground mb-12 max-w-lg mx-auto relative z-10"
         >
           Join a campus network where students help students succeed.
         </motion.p>
@@ -521,14 +521,14 @@ const Welcome = () => {
       </section>
 
       {/* ── Footer ── */}
-      <footer className="relative z-10 py-12 px-4">
+      <footer className="relative z-10 py-16 px-4">
         <div
           className="h-px max-w-4xl mx-auto mb-12"
           style={{ background: "linear-gradient(90deg, transparent, hsl(37 92% 50% / 0.4), hsl(45 96% 64% / 0.4), transparent)" }}
         />
         <div className="max-w-4xl mx-auto text-center">
           <img src={logo} alt="NoteHall" className="w-12 h-12 rounded-xl mx-auto mb-4" />
-          <p className="text-muted-foreground mb-8">
+          <p className="text-lg text-muted-foreground mb-10">
             Built for students, powered by shared knowledge.
           </p>
 
