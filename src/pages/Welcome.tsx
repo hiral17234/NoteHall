@@ -533,32 +533,35 @@ const Welcome = () => {
           </p>
 
           <motion.div
-            className="w-full max-w-4xl mx-auto rounded-3xl border border-border/60 bg-card/80 backdrop-blur-sm px-8 md:px-16 py-12 md:py-16 mb-8 text-center"
+            className="w-full max-w-5xl mx-auto rounded-3xl p-[2px] mb-10"
+            style={{ background: "linear-gradient(135deg, hsl(37 92% 50%), hsl(45 96% 64%), hsl(330 70% 50% / 0.4), hsl(37 92% 50%))" }}
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.6 }}
           >
-            <div className="flex items-center justify-center gap-2 mb-6">
-              <span className="text-2xl">{"</>"}</span>
-              <p className="text-sm font-semibold tracking-[0.25em] uppercase text-muted-foreground">DEVELOPER</p>
+            <div className="rounded-3xl bg-card px-10 md:px-20 py-14 md:py-20 text-center">
+              <div className="flex items-center justify-center gap-3 mb-8">
+                <span className="text-2xl">{"</>"}</span>
+                <p className="text-sm font-semibold tracking-[0.3em] uppercase text-muted-foreground">DEVELOPER</p>
+              </div>
+              <h3
+                className="text-5xl md:text-6xl font-bold mb-8 tracking-wide"
+                style={{
+                  background: "linear-gradient(135deg, hsl(37 92% 50%), hsl(45 96% 64%))",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                }}
+              >
+                HIRAL GOYAL
+              </h3>
+              <p className="text-xl text-muted-foreground flex items-center justify-center gap-3 mb-4">
+                <span>🎓</span> Mathematics and Computing
+              </p>
+              <p className="text-xl text-muted-foreground flex items-center justify-center gap-3">
+                <span>📍</span> Madhav Institute of Technology and Science, Gwalior
+              </p>
             </div>
-            <h3
-              className="text-4xl md:text-5xl font-bold mb-6 tracking-wide"
-              style={{
-                background: "linear-gradient(135deg, hsl(37 92% 50%), hsl(45 96% 64%))",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-              }}
-            >
-              HIRAL GOYAL
-            </h3>
-            <p className="text-lg text-muted-foreground flex items-center justify-center gap-2 mb-3">
-              <span>🎓</span> Mathematics and Computing
-            </p>
-            <p className="text-lg text-muted-foreground flex items-center justify-center gap-2">
-              <span>📍</span> Madhav Institute of Technology and Science, Gwalior
-            </p>
           </motion.div>
 
           <p className="text-sm text-muted-foreground/60">
