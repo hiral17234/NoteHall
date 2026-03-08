@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -153,6 +154,7 @@ export interface Achievement {
 interface AchievementsSectionProps {
   achievements: Achievement[];
   isOwner: boolean;
+  topContributorHistory?: any[];
 }
 
 const achievementIcons: Record<string, any> = {
@@ -168,13 +170,55 @@ const mockAchievements: Achievement[] = [
   { id: "verified", title: "Verified Contributor", description: "Maintain quality standards", icon: "Award", color: "bg-chart-1/20 text-chart-1" },
 ];
 
-export function AchievementsSection({ achievements = mockAchievements, isOwner }: AchievementsSectionProps) {
+export function AchievementsSection({ achievements = mockAchievements, isOwner, topContributorHistory = [] }: AchievementsSectionProps) {
   const activeAchievement = achievements.find(a => a.isActive);
   const pastAchievements = achievements.filter(a => a.earnedAt && !a.isActive);
   const inProgressAchievements = achievements.filter(a => a.progress !== undefined && a.progress < (a.target || 100));
 
+  // Get unique top contributor entries
+  const topContributorEntries = topContributorHistory.length > 0
+    ? [...new Map(topContributorHistory.map(e => [e.week, e])).values()]
+        .sort((a, b) => (b.week || "").localeCompare(a.week || ""))
+        .slice(0, 5)
+    : [];
+
   return (
     <div className="space-y-6">
+      {/* Top Contributor Achievement Banner */}
+      {topContributorEntries.length > 0 && (
+        <div>
+          <h4 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
+            <Trophy className="w-4 h-4 text-primary" />
+            Top Contributor History
+          </h4>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {topContributorEntries.map((entry, i) => (
+              <Card key={i} className={cn(
+                "border hover:border-primary/30 transition-colors",
+                entry.rank === 1 ? "bg-yellow-400/5 border-yellow-400/20" :
+                entry.rank === 2 ? "bg-gray-300/5 border-gray-300/20" :
+                "bg-orange-500/5 border-orange-500/20"
+              )}>
+                <CardContent className="pt-3 pb-3 text-center">
+                  <div className={cn(
+                    "w-10 h-10 mx-auto rounded-xl flex items-center justify-center mb-1.5",
+                    entry.rank === 1 ? "bg-yellow-400/20 text-yellow-500" :
+                    entry.rank === 2 ? "bg-gray-300/20 text-gray-500" :
+                    "bg-orange-500/20 text-orange-600"
+                  )}>
+                    <Crown className="w-5 h-5" />
+                  </div>
+                  <p className="text-xs font-bold text-foreground">{entry.label}</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                    {entry.week ? new Date(entry.week).toLocaleDateString() : "This week"}
+                  </p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Active Achievement */}
       {activeAchievement && (
         <div>

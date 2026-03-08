@@ -54,6 +54,7 @@ export default function Profile() {
   const [contributions, setContributions] = useState<Contribution[]>([]);
   const [activeTab, setActiveTab] = useState("uploads");
   const [totalUploadCount, setTotalUploadCount] = useState(0);
+  const [topContributorHistory, setTopContributorHistory] = useState<any[]>([]);
   
   // Dialog/Modal States
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -139,7 +140,15 @@ export default function Profile() {
     };
     checkOnlineStatus();
 
-    // 7. User-Specific Private Data
+    // 7. Fetch top contributor history
+    const unsubTopHistory = onSnapshot(
+      collection(db, 'users', targetUserId, 'topContributorHistory'),
+      (snap) => {
+        setTopContributorHistory(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      }
+    );
+
+    // 8. User-Specific Private Data
     let unsubSaved = () => {};
     let unsubDownloads = () => {};
 
@@ -164,6 +173,7 @@ export default function Profile() {
       unsubHelped();
       unsubNotes();
       unsubContribs();
+      unsubTopHistory();
       unsubSaved();
       unsubDownloads();
     };
@@ -319,7 +329,7 @@ const earnedAchievements = profileData
         </div>
 
         {/* Achievements Component */}
-        <AchievementsSection achievements={earnedAchievements as any} isOwner={isOwnProfile} />
+        <AchievementsSection achievements={earnedAchievements as any} isOwner={isOwnProfile} topContributorHistory={topContributorHistory} />
 
         {/* Main Content Tabs */}
         <Tabs defaultValue="uploads" onValueChange={setActiveTab} className="mt-12">
