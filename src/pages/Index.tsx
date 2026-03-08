@@ -70,6 +70,26 @@ export default function Index() {
   };
 
 
+  return (
+    <MainLayout>
+      <div className="max-w-6xl mx-auto">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Notes Feed</h1>
+            <p className="text-muted-foreground">Discover and share study materials</p>
+          </div>
+          <Link to="/upload">
+            <Button className="bg-primary hover:bg-primary/90 text-primary-foreground gap-2">
+              <Plus className="w-4 h-4" />
+              Upload Note
+            </Button>
+          </Link>
+        </div>
+
+        {/* Top Contributors Podium */}
+        <TopContributorsPodium />
+
         {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-4 mb-6">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1">
