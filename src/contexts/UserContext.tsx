@@ -1,6 +1,8 @@
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from "react";
 import { notificationService, Notification } from "@/services/notificationService";
 import { useAuth, UserProfile } from "@/contexts/AuthContext";
+import { doc, updateDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 export type { UserProfile } from "@/contexts/AuthContext";
 
@@ -173,11 +175,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
       localStorage.setItem(STORAGE_KEYS.PRIVACY, JSON.stringify(updated));
       // Sync privacy settings to Firestore so other users can see them
       if (userProfile?.id) {
-        import('firebase/firestore').then(({ doc, updateDoc }) => {
-          import('@/lib/firebase').then(({ db }) => {
-            updateDoc(doc(db, 'users', userProfile.id), { privacy: updated }).catch(console.error);
-          });
-        });
+        updateDoc(doc(db, 'users', userProfile.id), { privacy: updated }).catch(console.error);
       }
       return updated;
     });
