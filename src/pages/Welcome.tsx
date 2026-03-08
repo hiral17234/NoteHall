@@ -395,22 +395,32 @@ const Welcome = () => {
                 href={app.url || undefined}
                 target={app.url ? "_blank" : undefined}
                 rel="noopener noreferrer"
-                variants={fadeUp}
-                initial="hidden"
-                whileInView="visible"
+                initial={{ opacity: 0, y: 30, scale: 0.9 }}
+                whileInView={{ opacity: 1, y: 0, scale: 1 }}
                 viewport={{ once: true }}
-                transition={{ delay: i * 0.1 }}
-                className={`rounded-2xl border border-border bg-card p-6 shadow-md hover:shadow-lg hover:-translate-y-1 transition-all duration-300 flex flex-col items-center gap-3 ${app.url ? "cursor-pointer" : "cursor-default opacity-80"}`}
+                transition={{ delay: i * 0.12, type: "spring", stiffness: 200, damping: 15 }}
+                whileHover={{ scale: 1.08, y: -8, boxShadow: "0 20px 40px -10px hsla(37, 92%, 50%, 0.3)" }}
+                whileTap={{ scale: 0.95 }}
+                className={`rounded-2xl border border-border bg-card p-6 shadow-md flex flex-col items-center gap-3 ${app.url ? "cursor-pointer" : "cursor-default"}`}
               >
-                <div
+                <motion.div
                   className="w-12 h-12 rounded-xl flex items-center justify-center"
                   style={{ background: "linear-gradient(135deg, hsl(37 92% 50%), hsl(45 96% 64%))" }}
+                  whileHover={{ rotate: [0, -10, 10, 0], transition: { duration: 0.5 } }}
                 >
                   <app.icon className="w-6 h-6 text-primary-foreground" />
-                </div>
+                </motion.div>
                 <span className="font-semibold text-sm md:text-base">{app.name}</span>
-                <span className="text-xs text-muted-foreground leading-tight">{app.desc}</span>
-                {!app.url && <span className="text-[10px] text-muted-foreground/60 italic">Coming Soon</span>}
+                <span className="text-xs text-muted-foreground leading-tight text-center">{app.desc}</span>
+                {!app.url && (
+                  <motion.span
+                    animate={{ opacity: [0.4, 1, 0.4] }}
+                    transition={{ repeat: Infinity, duration: 2 }}
+                    className="text-[10px] text-primary/60 font-medium italic"
+                  >
+                    Coming Soon
+                  </motion.span>
+                )}
               </motion.a>
             ))}
           </div>
