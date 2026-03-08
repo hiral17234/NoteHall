@@ -9,6 +9,7 @@ import { collection, getDocs, query, orderBy, limit } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
+import { recordTopContributorAchievement } from "@/services/firestoreService";
 
 interface Contributor {
   id: string;

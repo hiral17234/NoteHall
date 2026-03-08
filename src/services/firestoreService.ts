@@ -691,6 +691,29 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: '3', title: 'Helper', description: 'Help 1 student with their request', icon: 'HandHelping', requirement: { type: 'helped', count: 1 }, points: 20 },
 ];
 
+// Save top contributor achievement to user's Firestore profile
+export async function recordTopContributorAchievement(userId: string, rank: number) {
+  try {
+    const rankLabel = rank === 1 ? "🥇 #1" : rank === 2 ? "🥈 #2" : "🥉 #3";
+    const achievementData = {
+      type: "top_contributor",
+      rank,
+      label: rankLabel,
+      earnedAt: getServerTimestamp(),
+      week: new Date().toISOString().slice(0, 10),
+    };
+    // Store as a subcollection entry so history is preserved
+    await addDoc(collection(db, "users", userId, "topContributorHistory"), achievementData);
+    // Also update the user doc with a flag
+    await updateDoc(doc(db, "users", userId), {
+      wasTopContributor: true,
+      lastTopContributorRank: rank,
+    });
+  } catch (error) {
+    console.error("Error recording top contributor achievement:", error);
+  }
+}
+
 export type AchievementBadge = Achievement & { label: string; tier: 'bronze' | 'silver' | 'gold'; color: string; };
 
 const getTier = (points: number): AchievementBadge['tier'] => {
