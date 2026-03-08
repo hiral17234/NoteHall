@@ -166,8 +166,14 @@ export function TopContributorsPodium() {
           })
           .filter((u): u is NonNullable<typeof u> => u !== null);
 
-        setTopContributors(users.slice(0, 3));
+        const top3 = users.slice(0, 3);
+        setTopContributors(top3);
         setAllContributors(users);
+
+        // Record top contributor achievements for top 3
+        top3.forEach((contributor) => {
+          recordTopContributorAchievement(contributor.id, contributor.rank);
+        });
       } catch (error) {
         console.error("Error fetching contributors:", error);
       } finally {
