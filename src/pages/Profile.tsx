@@ -54,6 +54,7 @@ export default function Profile() {
   const [contributions, setContributions] = useState<Contribution[]>([]);
   const [activeTab, setActiveTab] = useState("uploads");
   const [totalUploadCount, setTotalUploadCount] = useState(0);
+  const [topContributorHistory, setTopContributorHistory] = useState<any[]>([]);
   
   // Dialog/Modal States
   const [editDialogOpen, setEditDialogOpen] = useState(false);
