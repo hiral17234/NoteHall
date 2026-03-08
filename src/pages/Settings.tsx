@@ -6,16 +6,34 @@ import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SelectWithOther } from "@/components/ui/select-with-other";
 import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
-import { User, Bell, Shield, Palette, LogOut, AlertTriangle, Key, Loader2 } from "lucide-react";
+import { User, Bell, Shield, Palette, LogOut, AlertTriangle, Key, Loader2, Info } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "@/contexts/UserContext";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { sendPasswordResetEmail } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
+import { doc, getDoc, updateDoc, collection, query, where, getDocs } from "firebase/firestore";
+
+const branchOptions = [
+  { value: "Computer Science", label: "CSE" },
+  { value: "ECE", label: "ECE" },
+  { value: "EEE", label: "EEE" },
+  { value: "ME", label: "ME" },
+  { value: "CE", label: "CE" },
+  { value: "Electrical", label: "Electrical" },
+];
+
+const yearOptions = [
+  { value: "1st Year", label: "1st Year" },
+  { value: "2nd Year", label: "2nd Year" },
+  { value: "3rd Year", label: "3rd Year" },
+  { value: "4th Year", label: "4th Year" },
+];
 
 export default function Settings() {
   const { toast } = useToast();
@@ -24,10 +42,12 @@ export default function Settings() {
   const { userProfile } = useAuth();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [passwordResetLoading, setPasswordResetLoading] = useState(false);
+  const [usernameLoading, setUsernameLoading] = useState(false);
+  const [usernameChangesThisMonth, setUsernameChangesThisMonth] = useState(0);
   
-  // Form state
   const [formData, setFormData] = useState({
     name: user?.name || "",
+    username: user?.username || "",
     email: user?.email || "",
     phone: user?.phone || "",
     college: user?.college || "MITS Gwalior",
@@ -40,10 +60,77 @@ export default function Settings() {
     twitter: user?.twitter || "",
   });
 
+  // Track username changes this month
+  useEffect(() => {
+    if (!userProfile?.id) return;
+    const fetchUsernameChanges = async () => {
+      try {
+        const userDoc = await getDoc(doc(db, "users", userProfile.id));
+        const data = userDoc.data();
+        const changes: string[] = data?.usernameChanges || [];
+        const now = new Date();
+        const thisMonth = changes.filter((d) => {
+          const date = new Date(d);
+          return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+        });
+        setUsernameChangesThisMonth(thisMonth.length);
+      } catch {}
+    };
+    fetchUsernameChanges();
+  }, [userProfile?.id]);
+
+  const canChangeUsername = usernameChangesThisMonth < 2;
+
+  const handleChangeUsername = async () => {
+    const newUsername = formData.username.trim().toLowerCase();
+    if (!newUsername) {
+      toast({ title: "Username cannot be empty", variant: "destructive" });
+      return;
+    }
+    if (newUsername === user?.username) return;
+    if (!canChangeUsername) {
+      toast({ title: "Limit reached", description: "You can only change your username twice per month.", variant: "destructive" });
+      return;
+    }
+    if (!/^[a-z0-9_]{3,20}$/.test(newUsername)) {
+      toast({ title: "Invalid username", description: "Use 3-20 lowercase letters, numbers, or underscores.", variant: "destructive" });
+      return;
+    }
+
+    setUsernameLoading(true);
+    try {
+      // Check uniqueness
+      const usersRef = collection(db, "users");
+      const q = query(usersRef, where("username", "==", newUsername));
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        toast({ title: "Username taken", description: "This username is already in use.", variant: "destructive" });
+        setUsernameLoading(false);
+        return;
+      }
+
+      // Update
+      const userDocRef = doc(db, "users", userProfile!.id);
+      const userDoc = await getDoc(userDocRef);
+      const existingChanges: string[] = userDoc.data()?.usernameChanges || [];
+      await updateDoc(userDocRef, {
+        username: newUsername,
+        usernameChanges: [...existingChanges, new Date().toISOString()],
+      });
+
+      updateUser({ username: newUsername } as any);
+      setUsernameChangesThisMonth(prev => prev + 1);
+      toast({ title: "Username updated", description: `Your username is now @${newUsername}` });
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to update username.", variant: "destructive" });
+    } finally {
+      setUsernameLoading(false);
+    }
+  };
+
   const handleSaveAccount = () => {
     updateUser({
       name: formData.name,
-      email: formData.email,
       phone: formData.phone,
       college: formData.college,
       branch: formData.branch,
@@ -167,17 +254,52 @@ export default function Settings() {
                     />
                   </div>
                 </div>
+
+                {/* Username */}
+                <div className="space-y-2">
+                  <Label htmlFor="username">Username</Label>
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">@</span>
+                      <Input
+                        id="username"
+                        value={formData.username}
+                        onChange={(e) => setFormData({ ...formData, username: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "") })}
+                        className="bg-background pl-7"
+                        placeholder="username"
+                        disabled={!canChangeUsername}
+                        maxLength={20}
+                      />
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={handleChangeUsername}
+                      disabled={!canChangeUsername || usernameLoading || formData.username === user?.username}
+                      className="bg-primary hover:bg-primary/90 text-primary-foreground h-10"
+                    >
+                      {usernameLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Update"}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Info className="w-3 h-3" />
+                    {canChangeUsername
+                      ? `You can change your username ${2 - usernameChangesThisMonth} more time(s) this month.`
+                      : "You've reached the limit of 2 username changes this month."}
+                  </p>
+                </div>
                 
+                {/* Email - read only */}
                 <div className="space-y-2">
                   <Label htmlFor="email">Email (Private)</Label>
                   <Input 
                     id="email" 
                     type="email" 
                     value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="bg-background" 
+                    className="bg-muted cursor-not-allowed" 
+                    disabled
+                    readOnly
                   />
-                  <p className="text-xs text-muted-foreground">Your email is private and not visible to others</p>
+                  <p className="text-xs text-muted-foreground">Your email cannot be changed</p>
                 </div>
 
                 <div className="space-y-2">
@@ -193,32 +315,23 @@ export default function Settings() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Branch</Label>
-                    <Select value={formData.branch} onValueChange={(v) => setFormData({ ...formData, branch: v })}>
-                      <SelectTrigger className="bg-background">
-                        <SelectValue placeholder="Select branch" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Computer Science">CSE</SelectItem>
-                        <SelectItem value="ECE">ECE</SelectItem>
-                        <SelectItem value="EEE">EEE</SelectItem>
-                        <SelectItem value="ME">ME</SelectItem>
-                        <SelectItem value="CE">CE</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <SelectWithOther
+                      value={formData.branch}
+                      onValueChange={(v) => setFormData({ ...formData, branch: v })}
+                      placeholder="Select branch"
+                      options={branchOptions}
+                      inputPlaceholder="Enter your branch..."
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label>Year</Label>
-                    <Select value={formData.year} onValueChange={(v) => setFormData({ ...formData, year: v })}>
-                      <SelectTrigger className="bg-background">
-                        <SelectValue placeholder="Select year" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="1st Year">1st Year</SelectItem>
-                        <SelectItem value="2nd Year">2nd Year</SelectItem>
-                        <SelectItem value="3rd Year">3rd Year</SelectItem>
-                        <SelectItem value="4th Year">4th Year</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <SelectWithOther
+                      value={formData.year}
+                      onValueChange={(v) => setFormData({ ...formData, year: v })}
+                      placeholder="Select year"
+                      options={yearOptions}
+                      inputPlaceholder="Enter your year..."
+                    />
                   </div>
                 </div>
 
@@ -380,7 +493,6 @@ export default function Settings() {
                     Account Actions
                   </h4>
                   
-                  {/* Logout Button */}
                   <Button 
                     variant="outline" 
                     className="w-full gap-2"
