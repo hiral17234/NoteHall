@@ -221,9 +221,54 @@ export function GeminiChat({ className, noteContext, onClearContext }: GeminiCha
     onClearContext?.();
   };
 
+  // Helper: convert PDF selected pages to base64 images at higher quality
+  const getPdfPagesAsBase64 = useCallback(async (): Promise<{ base64: string; mimeType: string }[]> => {
+    if (!attachedContext?.fileUrl || attachedContext.fileType !== 'pdf' || selectedPages.length === 0) return [];
+    try {
+      const loadingTask = pdfjsLib.getDocument(attachedContext.fileUrl);
+      const pdf = await loadingTask.promise;
+      const results: { base64: string; mimeType: string }[] = [];
+      for (const pageNum of selectedPages) {
+        const page = await pdf.getPage(pageNum);
+        const scale = 1.5; // Higher quality for AI reading
+        const viewport = page.getViewport({ scale });
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
+        await page.render({ canvasContext: context!, viewport }).promise;
+        const dataUrl = canvas.toDataURL('image/png');
+        results.push({ base64: dataUrl.split(',')[1], mimeType: 'image/png' });
+      }
+      return results;
+    } catch (err) {
+      console.error('Error converting PDF pages to base64:', err);
+      return [];
+    }
+  }, [attachedContext, selectedPages]);
+
+  // Helper: fetch an image URL and convert to base64
+  const fetchImageAsBase64 = useCallback(async (url: string): Promise<{ base64: string; mimeType: string } | null> => {
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const dataUrl = reader.result as string;
+          resolve({ base64: dataUrl.split(',')[1], mimeType: blob.type || 'image/png' });
+        };
+        reader.onerror = () => resolve(null);
+        reader.readAsDataURL(blob);
+      });
+    } catch {
+      return null;
+    }
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if ((!input.trim() && images.length === 0) || isLoading) return;
+    if ((!input.trim() && images.length === 0 && !attachedContext) || isLoading) return;
     
     setError(null);
     setIsLoading(true);
@@ -231,34 +276,52 @@ export function GeminiChat({ className, noteContext, onClearContext }: GeminiCha
     // Build user display message with attachment metadata
     const userDisplayMsg: DisplayMessage = {
       role: 'user',
-      content: input.trim() || 'Sent image(s) for analysis',
+      content: input.trim() || 'Sent file for analysis',
       attachments: attachedContext ? [{ type: attachedContext.fileType || 'file', url: attachedContext.fileUrl || '', title: attachedContext.title }] : undefined,
       images: images.length > 0 ? images.map(img => img.preview) : undefined,
     };
     setMessages(prev => [...prev, userDisplayMsg]);
 
-    // Build full message with context for API
-    let fullMessage = input;
-    if (attachedContext?.fileUrl) {
-      fullMessage = getContextDescription() + '\n\n' + input;
+    // Build text prompt with context info (but NOT the URL for AI to fetch)
+    let fullMessage = input.trim();
+    if (attachedContext) {
+      const title = attachedContext.title || 'File';
+      const subject = attachedContext.subject || '';
+      const contextPrefix = `[Note: ${title}${subject ? ` | Subject: ${subject}` : ''}]`;
+      fullMessage = contextPrefix + (fullMessage ? '\n\n' + fullMessage : '\n\nPlease analyze the attached content.');
     }
     
-    const imageData = images.map(img => ({ base64: img.base64, mimeType: img.mimeType }));
+    // Collect all images to send as base64 (user-uploaded + PDF pages + image attachments)
+    const allImageData: { base64: string; mimeType: string }[] = [
+      ...images.map(img => ({ base64: img.base64, mimeType: img.mimeType })),
+    ];
+
+    // Convert PDF pages to base64 images
+    if (attachedContext?.fileType === 'pdf') {
+      const pdfImages = await getPdfPagesAsBase64();
+      allImageData.push(...pdfImages);
+    }
+    
+    // Convert image attachment to base64
+    if (attachedContext?.fileType === 'image' && attachedContext.fileUrl) {
+      const imgData = await fetchImageAsBase64(attachedContext.fileUrl);
+      if (imgData) allImageData.push(imgData);
+    }
 
     try {
-      const response = await geminiService.sendMessage(fullMessage, imageData.length > 0 ? imageData : undefined);
+      const response = await geminiService.sendMessage(fullMessage, allImageData.length > 0 ? allImageData : undefined);
       const assistantMsg: DisplayMessage = { role: 'assistant', content: response };
       setMessages(prev => [...prev, assistantMsg]);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to get response');
-      setMessages(prev => prev.slice(0, -1)); // Remove user message on error
+      setMessages(prev => prev.slice(0, -1));
     } finally {
       setIsLoading(false);
     }
 
     setInput("");
     setImages([]);
-    setAttachedContext(null); // Clear after sending
+    setAttachedContext(null);
     setPdfPages([]);
     setSelectedPages([]);
     setTotalPdfPages(0);
