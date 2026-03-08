@@ -163,7 +163,7 @@ export function TopContributorsPodium() {
               rank: index + 1,
             };
           })
-          .filter((u): u is Contributor => u !== null);
+          .filter((u): u is NonNullable<typeof u> => u !== null);
 
         setTopContributors(users.slice(0, 3));
         setAllContributors(users);
