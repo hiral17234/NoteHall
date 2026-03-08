@@ -329,7 +329,7 @@ const earnedAchievements = profileData
         </div>
 
         {/* Achievements Component */}
-        <AchievementsSection achievements={earnedAchievements as any} isOwner={isOwnProfile} />
+        <AchievementsSection achievements={earnedAchievements as any} isOwner={isOwnProfile} topContributorHistory={topContributorHistory} />
 
         {/* Main Content Tabs */}
         <Tabs defaultValue="uploads" onValueChange={setActiveTab} className="mt-12">

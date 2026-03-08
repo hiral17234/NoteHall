@@ -153,6 +153,7 @@ export interface Achievement {
 interface AchievementsSectionProps {
   achievements: Achievement[];
   isOwner: boolean;
+  topContributorHistory?: any[];
 }
 
 const achievementIcons: Record<string, any> = {
