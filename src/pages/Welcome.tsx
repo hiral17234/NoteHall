@@ -533,32 +533,28 @@ const Welcome = () => {
           </p>
 
           <motion.div
-            className="w-full max-w-5xl mx-auto rounded-3xl p-[2px] mb-10"
-            style={{ background: "linear-gradient(135deg, hsl(37 92% 50%), hsl(45 96% 64%), hsl(330 70% 50% / 0.4), hsl(37 92% 50%))" }}
+            className="w-full max-w-3xl mx-auto rounded-2xl mb-10 overflow-hidden"
+            style={{ background: "linear-gradient(135deg, hsl(45 96% 64%), hsl(37 92% 50%), hsl(43 96% 56%))" }}
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.6 }}
           >
-            <div className="rounded-3xl bg-card px-10 md:px-20 py-14 md:py-20 text-center">
-              <div className="flex items-center justify-center gap-3 mb-8">
-                <span className="text-2xl">{"</>"}</span>
-                <p className="text-sm font-semibold tracking-[0.3em] uppercase text-muted-foreground">DEVELOPER</p>
+            <div className="px-10 md:px-16 py-10 md:py-14 text-center">
+              <div className="flex items-center justify-center gap-3 mb-5">
+                <span className="text-xl" style={{ color: "hsl(24 9% 10%)" }}>{"</>"}</span>
+                <p className="text-xs font-bold tracking-[0.3em] uppercase" style={{ color: "hsl(24 9% 10% / 0.7)" }}>DEVELOPER</p>
               </div>
               <h3
-                className="text-5xl md:text-6xl font-bold mb-8 tracking-wide"
-                style={{
-                  background: "linear-gradient(135deg, hsl(37 92% 50%), hsl(45 96% 64%))",
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                }}
+                className="text-3xl md:text-4xl font-bold mb-6 tracking-wide"
+                style={{ color: "hsl(24 9% 10%)" }}
               >
                 HIRAL GOYAL
               </h3>
-              <p className="text-xl text-muted-foreground flex items-center justify-center gap-3 mb-4">
+              <p className="text-base flex items-center justify-center gap-3 mb-3" style={{ color: "hsl(24 9% 10% / 0.8)" }}>
                 <span>🎓</span> Mathematics and Computing
               </p>
-              <p className="text-xl text-muted-foreground flex items-center justify-center gap-3">
+              <p className="text-base flex items-center justify-center gap-3" style={{ color: "hsl(24 9% 10% / 0.8)" }}>
                 <span>📍</span> Madhav Institute of Technology and Science, Gwalior
               </p>
             </div>
