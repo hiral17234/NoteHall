@@ -185,12 +185,13 @@ function PodiumProfile({ contributor, onClick }: { contributor: Contributor; onC
               <span className="text-xs font-bold">{contributor.contributionScore} pts</span>
             </div>
 
-            {/* Podium base block */}
+            {/* Podium base */}
             <div
-              className={cn("w-full rounded-lg mt-2", config.podiumHeight)}
+              className="rounded-t-lg mt-2"
               style={{
                 background: config.podiumColor,
-                border: `1px solid ${config.podiumBorder}`,
+                height: `${config.podiumHeight}px`,
+                width: "72px",
               }}
             />
           </div>
