@@ -409,7 +409,7 @@ const Welcome = () => {
                 >
                 >
                   <app.icon className="w-6 h-6 text-primary-foreground" />
-                </motion.div>
+                </div>
                 <span className="font-semibold text-sm md:text-base">{app.name}</span>
                 <span className="text-xs text-muted-foreground leading-tight text-center">{app.desc}</span>
                 {!app.url && (
