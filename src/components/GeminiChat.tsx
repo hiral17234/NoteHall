@@ -4,16 +4,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { useGemini } from "@/hooks/useGemini";
 import { useAuth } from "@/contexts/AuthContext";
+import { geminiService } from "@/services/geminiService";
 import ReactMarkdown from "react-markdown";
-import { Send, Loader2, Sparkles, User, Image as ImageIcon, X, AlertCircle, Trash2, FileText, Link as LinkIcon, Video, ChevronLeft, ChevronRight, BookOpen, HelpCircle, ListChecks, Maximize2 } from "lucide-react";
+import { Send, Loader2, Sparkles, User, Image as ImageIcon, X, AlertCircle, Trash2, FileText, Link as LinkIcon, Video, ChevronLeft, ChevronRight, BookOpen, HelpCircle, ListChecks, Maximize2, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import * as pdfjsLib from "pdfjs-dist";
 import { PdfViewerModal } from "./pdf/PdfViewerModal";
 
-// Set PDF.js worker path
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+// Fix PDF.js worker - use .mjs for Vite compatibility
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
 
 interface GeminiChatProps {
   className?: string;
@@ -26,20 +26,57 @@ interface PdfPageInfo {
   thumbnail: string;
 }
 
+interface DisplayMessage {
+  role: "user" | "assistant";
+  content: string;
+  attachments?: { type: string; url: string; title?: string }[];
+  images?: string[]; // preview URLs for uploaded images
+}
+
+const STORAGE_KEY = "notehall_gemini_messages";
+const CONTEXT_KEY = "notehall_gemini_context";
+
 const QUICK_ACTIONS = [
   { id: 'summarize', label: 'Summarize', icon: BookOpen, prompt: 'Please summarize the key points from this note in a clear and concise manner.' },
   { id: 'explain', label: 'Explain', icon: HelpCircle, prompt: 'Please explain the main concepts from this note in simple terms, as if explaining to a beginner.' },
   { id: 'mcqs', label: 'Generate MCQs', icon: ListChecks, prompt: 'Generate 5 multiple choice questions (MCQs) based on the content of this note. Include correct answers and brief explanations.' },
 ];
 
+function loadMessages(): DisplayMessage[] {
+  try {
+    const data = localStorage.getItem(STORAGE_KEY);
+    return data ? JSON.parse(data) : [];
+  } catch { return []; }
+}
+
+function saveMessages(messages: DisplayMessage[]) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(messages)); } catch {}
+}
+
+function loadContext(): GeminiChatProps["noteContext"] | null {
+  try {
+    const data = localStorage.getItem(CONTEXT_KEY);
+    return data ? JSON.parse(data) : null;
+  } catch { return null; }
+}
+
+function saveContext(ctx: GeminiChatProps["noteContext"] | null) {
+  try {
+    if (ctx) localStorage.setItem(CONTEXT_KEY, JSON.stringify(ctx));
+    else localStorage.removeItem(CONTEXT_KEY);
+  } catch {}
+}
+
 export function GeminiChat({ className, noteContext, onClearContext }: GeminiChatProps) {
   const { userProfile } = useAuth();
-  const { messages, isLoading, error, sendMessage, clearChat, setContext, isConfigured } = useGemini();
+  const [messages, setMessages] = useState<DisplayMessage[]>(() => loadMessages());
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [input, setInput] = useState("");
   const [images, setImages] = useState<{ base64: string; mimeType: string; preview: string }[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [attachedContext, setAttachedContext] = useState<typeof noteContext>(null);
+  const [attachedContext, setAttachedContext] = useState<typeof noteContext>(() => loadContext());
   
   // PDF page selection state
   const [pdfPages, setPdfPages] = useState<PdfPageInfo[]>([]);
@@ -49,6 +86,23 @@ export function GeminiChat({ className, noteContext, onClearContext }: GeminiCha
   const [totalPdfPages, setTotalPdfPages] = useState(0);
   const [pdfViewerOpen, setPdfViewerOpen] = useState(false);
 
+  // Persist messages
+  useEffect(() => { saveMessages(messages); }, [messages]);
+  
+  // Persist context
+  useEffect(() => { saveContext(attachedContext || null); }, [attachedContext]);
+
+  // Sync geminiService history with persisted messages on mount
+  useEffect(() => {
+    geminiService.clearHistory();
+    messages.forEach(msg => {
+      if (msg.role === 'user' || msg.role === 'assistant') {
+        // Re-populate service history for continuity
+        (geminiService as any).conversationHistory.push({ role: msg.role, content: msg.content });
+      }
+    });
+  }, []); // Only on mount
+
   // Load PDF pages when a PDF is attached
   const loadPdfPages = useCallback(async (url: string) => {
     setPdfLoading(true);
@@ -56,32 +110,23 @@ export function GeminiChat({ className, noteContext, onClearContext }: GeminiCha
       const loadingTask = pdfjsLib.getDocument(url);
       const pdf = await loadingTask.promise;
       const pages: PdfPageInfo[] = [];
-      
       setTotalPdfPages(pdf.numPages);
-      
-      // Load first 10 pages max for thumbnails
-      const maxPages = Math.min(pdf.numPages, 10);
+      const maxPages = Math.min(pdf.numPages, 20); // Load up to 20 pages
       
       for (let i = 1; i <= maxPages; i++) {
         const page = await pdf.getPage(i);
         const scale = 0.3;
         const viewport = page.getViewport({ scale });
-        
         const canvas = document.createElement('canvas');
         const context = canvas.getContext('2d');
         canvas.height = viewport.height;
         canvas.width = viewport.width;
-        
         await page.render({ canvasContext: context!, viewport }).promise;
-        
-        pages.push({
-          pageNum: i,
-          thumbnail: canvas.toDataURL('image/jpeg', 0.6),
-        });
+        pages.push({ pageNum: i, thumbnail: canvas.toDataURL('image/jpeg', 0.6) });
       }
       
       setPdfPages(pages);
-      setSelectedPages([1]); // Select first page by default
+      setSelectedPages([1]);
     } catch (err) {
       console.error('Error loading PDF:', err);
       setPdfPages([]);
@@ -91,12 +136,10 @@ export function GeminiChat({ className, noteContext, onClearContext }: GeminiCha
     }
   }, []);
 
-  // Set attached context from noteContext prop (don't auto-send)
+  // Set attached context from noteContext prop
   useEffect(() => {
     if (noteContext?.fileUrl) {
       setAttachedContext(noteContext);
-      
-      // Load PDF pages if it's a PDF
       if (noteContext.fileType === 'pdf') {
         loadPdfPages(noteContext.fileUrl);
       } else {
@@ -107,12 +150,12 @@ export function GeminiChat({ className, noteContext, onClearContext }: GeminiCha
   }, [noteContext, loadPdfPages]);
 
   useEffect(() => {
-    if (noteContext) setContext({ noteTitle: noteContext.title, selectedSubject: noteContext.subject });
-  }, [noteContext, setContext]);
+    if (noteContext) geminiService.setContext({ noteTitle: noteContext.title, selectedSubject: noteContext.subject });
+  }, [noteContext]);
 
   useEffect(() => {
-    if (userProfile) setContext({ userBranch: userProfile.branch, userYear: userProfile.year });
-  }, [userProfile, setContext]);
+    if (userProfile) geminiService.setContext({ userBranch: userProfile.branch, userYear: userProfile.year });
+  }, [userProfile]);
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -140,29 +183,22 @@ export function GeminiChat({ className, noteContext, onClearContext }: GeminiCha
 
   const getContextDescription = () => {
     if (!attachedContext) return '';
-    
     const type = attachedContext.fileType || 'file';
     const title = attachedContext.title || 'File';
     
     if (type === 'pdf' && selectedPages.length > 0) {
-      const pagesText = selectedPages.length === totalPdfPages 
-        ? 'all pages' 
-        : `pages ${selectedPages.join(', ')}`;
+      const pagesText = selectedPages.length === totalPdfPages ? 'all pages' : `pages ${selectedPages.join(', ')}`;
       return `[Attached PDF: ${title} - ${pagesText}]\nURL: ${attachedContext.fileUrl}`;
     }
-    
     if (type === 'video') {
       return `[Attached Video Note: ${title}]\nSubject: ${attachedContext.subject || 'N/A'}\nVideo URL: ${attachedContext.fileUrl}\n\nNote: This is a video file. Please help with questions about the topic, but I cannot directly view the video content.`;
     }
-    
     if (type === 'link') {
       return `[Attached Link: ${title}]\nSubject: ${attachedContext.subject || 'N/A'}\nURL: ${attachedContext.fileUrl}`;
     }
-    
     if (type === 'image') {
       return `[Attached Image: ${title}]\nSubject: ${attachedContext.subject || 'N/A'}\nImage URL: ${attachedContext.fileUrl}`;
     }
-    
     return `[Attached ${type}: ${title}]\nURL: ${attachedContext.fileUrl}`;
   };
 
@@ -170,19 +206,56 @@ export function GeminiChat({ className, noteContext, onClearContext }: GeminiCha
     setInput(prompt);
   };
 
+  const handleNewChat = () => {
+    setMessages([]);
+    setError(null);
+    setInput("");
+    setImages([]);
+    setAttachedContext(null);
+    setPdfPages([]);
+    setSelectedPages([]);
+    setTotalPdfPages(0);
+    geminiService.clearHistory();
+    saveMessages([]);
+    saveContext(null);
+    onClearContext?.();
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if ((!input.trim() && images.length === 0) || isLoading) return;
     
-    // Include attached context in the message
+    setError(null);
+    setIsLoading(true);
+
+    // Build user display message with attachment metadata
+    const userDisplayMsg: DisplayMessage = {
+      role: 'user',
+      content: input.trim() || 'Sent image(s) for analysis',
+      attachments: attachedContext ? [{ type: attachedContext.fileType || 'file', url: attachedContext.fileUrl || '', title: attachedContext.title }] : undefined,
+      images: images.length > 0 ? images.map(img => img.preview) : undefined,
+    };
+    setMessages(prev => [...prev, userDisplayMsg]);
+
+    // Build full message with context for API
     let fullMessage = input;
     if (attachedContext?.fileUrl) {
-      const contextInfo = getContextDescription() + '\n\n';
-      fullMessage = contextInfo + input;
+      fullMessage = getContextDescription() + '\n\n' + input;
     }
     
     const imageData = images.map(img => ({ base64: img.base64, mimeType: img.mimeType }));
-    await sendMessage(fullMessage, imageData.length > 0 ? imageData : undefined);
+
+    try {
+      const response = await geminiService.sendMessage(fullMessage, imageData.length > 0 ? imageData : undefined);
+      const assistantMsg: DisplayMessage = { role: 'assistant', content: response };
+      setMessages(prev => [...prev, assistantMsg]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to get response');
+      setMessages(prev => prev.slice(0, -1)); // Remove user message on error
+    } finally {
+      setIsLoading(false);
+    }
+
     setInput("");
     setImages([]);
     setAttachedContext(null); // Clear after sending
@@ -213,13 +286,53 @@ export function GeminiChat({ className, noteContext, onClearContext }: GeminiCha
 
   const getFileIcon = (fileType?: string) => {
     switch (fileType) {
-      case 'pdf': return <FileText className="w-6 h-6 text-destructive" />;
-      case 'image': return <ImageIcon className="w-6 h-6 text-primary" />;
-      case 'video': return <Video className="w-6 h-6 text-purple-500" />;
-      case 'link': return <LinkIcon className="w-6 h-6 text-blue-500" />;
-      default: return <FileText className="w-6 h-6 text-muted-foreground" />;
+      case 'pdf': return <FileText className="w-5 h-5 text-destructive" />;
+      case 'image': return <ImageIcon className="w-5 h-5 text-primary" />;
+      case 'video': return <Video className="w-5 h-5 text-purple-500" />;
+      case 'link': return <LinkIcon className="w-5 h-5 text-blue-500" />;
+      default: return <FileText className="w-5 h-5 text-muted-foreground" />;
     }
   };
+
+  // Render attachment preview inside a message bubble
+  const renderMessageAttachments = (msg: DisplayMessage) => {
+    return (
+      <>
+        {msg.attachments && msg.attachments.length > 0 && (
+          <div className="mb-2 space-y-1.5">
+            {msg.attachments.map((att, i) => (
+              <div key={i} className="flex items-center gap-2 p-2 rounded-lg bg-background/50 border border-border/50">
+                {att.type === 'image' && att.url ? (
+                  <img src={att.url} alt={att.title || 'Image'} className="w-16 h-16 object-cover rounded-md" />
+                ) : att.type === 'pdf' ? (
+                  <div className="w-10 h-10 bg-destructive/10 rounded-md flex items-center justify-center">
+                    <FileText className="w-5 h-5 text-destructive" />
+                  </div>
+                ) : (
+                  <div className="w-10 h-10 bg-muted rounded-md flex items-center justify-center">
+                    {getFileIcon(att.type)}
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium truncate">{att.title || 'Attachment'}</p>
+                  <p className="text-[10px] text-muted-foreground capitalize">{att.type}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        {msg.images && msg.images.length > 0 && (
+          <div className="mb-2 flex gap-1.5 flex-wrap">
+            {msg.images.map((imgUrl, i) => (
+              <img key={i} src={imgUrl} alt="Uploaded" className="w-20 h-20 object-cover rounded-lg border border-border/50" />
+            ))}
+          </div>
+        )}
+      </>
+    );
+  };
+
+  const isConfigured = geminiService.isConfigured();
 
   if (!isConfigured) {
     return (
@@ -236,8 +349,22 @@ export function GeminiChat({ className, noteContext, onClearContext }: GeminiCha
     <Card className={cn("bg-card border-border flex flex-col", className)}>
       <CardHeader className="pb-3 shrink-0">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-lg flex items-center gap-2"><Sparkles className="w-5 h-5 text-primary" />Gemini Chat</CardTitle>
-          {messages.length > 0 && <Button variant="ghost" size="sm" onClick={clearChat}><Trash2 className="w-4 h-4 mr-1" />Clear</Button>}
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-primary" />
+            Gemini Chat
+          </CardTitle>
+          <div className="flex items-center gap-1">
+            <Button variant="outline" size="sm" onClick={handleNewChat} className="gap-1.5 h-8">
+              <Plus className="w-3.5 h-3.5" />
+              New Chat
+            </Button>
+            {messages.length > 0 && (
+              <Button variant="ghost" size="sm" onClick={handleNewChat} className="gap-1.5 h-8 text-destructive hover:text-destructive">
+                <Trash2 className="w-3.5 h-3.5" />
+                Clear
+              </Button>
+            )}
+          </div>
         </div>
       </CardHeader>
       <CardContent className="flex-1 flex flex-col overflow-hidden p-0">
@@ -245,10 +372,10 @@ export function GeminiChat({ className, noteContext, onClearContext }: GeminiCha
           {messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full py-12 text-center">
               <Sparkles className="w-12 h-12 text-primary/50 mb-4" />
-              <p className="text-muted-foreground">Ask me anything about your studies</p>
+              <p className="text-muted-foreground font-medium">Ask me anything about your studies</p>
               {attachedContext && (
                 <p className="text-sm text-muted-foreground mt-2">
-                  Note attached below - type your question and send!
+                  Note attached below — type your question and send!
                 </p>
               )}
             </div>
@@ -256,73 +383,95 @@ export function GeminiChat({ className, noteContext, onClearContext }: GeminiCha
             <div className="space-y-4 py-4">
               {messages.map((msg, i) => (
                 <div key={i} className={cn("flex gap-3", msg.role === "user" ? "justify-end" : "justify-start")}>
-                  {msg.role === "assistant" && <Avatar className="w-8 h-8"><AvatarFallback className="bg-primary/20"><Sparkles className="w-4 h-4 text-primary" /></AvatarFallback></Avatar>}
-                  <div className={cn("max-w-[80%] rounded-2xl px-4 py-3", msg.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted")}>
-                    {msg.role === "assistant" ? <div className="prose prose-sm dark:prose-invert max-w-none"><ReactMarkdown>{msg.content}</ReactMarkdown></div> : <p className="text-sm whitespace-pre-wrap">{msg.content}</p>}
+                  {msg.role === "assistant" && (
+                    <Avatar className="w-8 h-8 shrink-0">
+                      <AvatarFallback className="bg-primary/20">
+                        <Sparkles className="w-4 h-4 text-primary" />
+                      </AvatarFallback>
+                    </Avatar>
+                  )}
+                  <div className={cn(
+                    "max-w-[80%] rounded-2xl px-4 py-3",
+                    msg.role === "user" 
+                      ? "bg-primary text-primary-foreground" 
+                      : "bg-muted"
+                  )}>
+                    {msg.role === "user" && renderMessageAttachments(msg)}
+                    {msg.role === "assistant" ? (
+                      <div className="prose prose-sm dark:prose-invert max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_ul]:space-y-1 [&_ol]:space-y-1 [&_li]:leading-relaxed [&_p]:leading-relaxed [&_p+p]:mt-3 [&_h1]:text-lg [&_h2]:text-base [&_h3]:text-sm [&_h1]:font-bold [&_h2]:font-semibold [&_h3]:font-medium [&_code]:bg-background/50 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-xs [&_pre]:bg-background/50 [&_pre]:rounded-lg [&_pre]:p-3 [&_blockquote]:border-l-primary [&_blockquote]:bg-primary/5 [&_blockquote]:py-1 [&_blockquote]:px-3 [&_hr]:border-border">
+                        <ReactMarkdown>{msg.content}</ReactMarkdown>
+                      </div>
+                    ) : (
+                      <p className="text-sm whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                    )}
                   </div>
-                  {msg.role === "user" && <Avatar className="w-8 h-8"><AvatarFallback className="bg-secondary"><User className="w-4 h-4" /></AvatarFallback></Avatar>}
+                  {msg.role === "user" && (
+                    <Avatar className="w-8 h-8 shrink-0">
+                      <AvatarFallback className="bg-secondary">
+                        <User className="w-4 h-4" />
+                      </AvatarFallback>
+                    </Avatar>
+                  )}
                 </div>
               ))}
-              {isLoading && <div className="flex gap-3"><Avatar className="w-8 h-8"><AvatarFallback className="bg-primary/20"><Sparkles className="w-4 h-4 text-primary" /></AvatarFallback></Avatar><div className="bg-muted rounded-2xl px-4 py-3"><Loader2 className="w-4 h-4 animate-spin" /></div></div>}
+              {isLoading && (
+                <div className="flex gap-3">
+                  <Avatar className="w-8 h-8 shrink-0">
+                    <AvatarFallback className="bg-primary/20">
+                      <Sparkles className="w-4 h-4 text-primary" />
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="bg-muted rounded-2xl px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span className="text-sm text-muted-foreground">Thinking...</span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </ScrollArea>
-        {error && <div className="mx-4 mb-2 p-3 bg-destructive/10 text-destructive text-sm rounded-lg flex items-center gap-2"><AlertCircle className="w-4 h-4" />{error}</div>}
+        
+        {error && (
+          <div className="mx-4 mb-2 p-3 bg-destructive/10 text-destructive text-sm rounded-lg flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            {error}
+          </div>
+        )}
         
         {/* Attached Note Context Preview */}
         {attachedContext && (
           <div className="mx-4 mb-2 space-y-2">
             <div className="flex items-center gap-3 p-3 bg-muted/50 border border-border rounded-lg">
-              {/* Thumbnail/Icon */}
               <div className="shrink-0">
                 {attachedContext.fileType === 'image' && attachedContext.fileUrl ? (
-                  <img 
-                    src={attachedContext.fileUrl} 
-                    alt={attachedContext.title || 'Image'} 
-                    className="w-12 h-12 object-cover rounded-lg border border-border"
-                  />
+                  <img src={attachedContext.fileUrl} alt={attachedContext.title || 'Image'} className="w-12 h-12 object-cover rounded-lg border border-border" />
                 ) : attachedContext.fileType === 'pdf' && pdfPages.length > 0 ? (
-                  <img 
-                    src={pdfPages[0].thumbnail} 
-                    alt="PDF preview" 
-                    className="w-12 h-12 object-cover rounded-lg border border-border"
-                  />
+                  <img src={pdfPages[0].thumbnail} alt="PDF preview" className="w-12 h-12 object-cover rounded-lg border border-border" />
                 ) : (
                   <div className="w-12 h-12 bg-muted rounded-lg flex items-center justify-center border border-border">
                     {getFileIcon(attachedContext.fileType)}
                   </div>
                 )}
               </div>
-              
-              {/* Info */}
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate">{attachedContext.title || 'Attached File'}</p>
                 <p className="text-xs text-muted-foreground capitalize">
                   {attachedContext.fileType || 'File'}
                   {attachedContext.subject ? ` • ${attachedContext.subject}` : ''}
-                  {attachedContext.fileType === 'pdf' && totalPdfPages > 0 && (
-                    <span> • {totalPdfPages} pages</span>
-                  )}
+                  {attachedContext.fileType === 'pdf' && totalPdfPages > 0 && <span> • {totalPdfPages} pages</span>}
                   {selectedPages.length > 0 && attachedContext.fileType === 'pdf' && (
                     <span className="text-primary"> • {selectedPages.length} selected</span>
                   )}
                 </p>
               </div>
-              
-              {/* View Full PDF Button */}
               {attachedContext.fileType === 'pdf' && totalPdfPages > 0 && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="shrink-0 h-8 gap-1.5"
-                  onClick={() => setPdfViewerOpen(true)}
-                >
+                <Button variant="ghost" size="sm" className="shrink-0 h-8 gap-1.5" onClick={() => setPdfViewerOpen(true)}>
                   <Maximize2 className="w-4 h-4" />
                   View
                 </Button>
               )}
-              
-              {/* Remove Button */}
               <button 
                 onClick={handleRemoveContext}
                 className="shrink-0 w-6 h-6 bg-muted hover:bg-destructive/20 text-muted-foreground hover:text-destructive rounded-full flex items-center justify-center transition-colors"
@@ -344,31 +493,21 @@ export function GeminiChat({ className, noteContext, onClearContext }: GeminiCha
                   <>
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-xs font-medium text-muted-foreground">Select pages to include</span>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="h-6 text-xs px-2"
-                        onClick={selectAllPages}
-                      >
+                      <Button variant="ghost" size="sm" className="h-6 text-xs px-2" onClick={selectAllPages}>
                         Select All
                       </Button>
                     </div>
                     <div className="relative">
                       <div className="flex items-center gap-2">
                         <Button
-                          variant="ghost"
-                          size="icon"
-                          className="shrink-0 h-8 w-8"
+                          variant="ghost" size="icon" className="shrink-0 h-8 w-8"
                           onClick={() => setCurrentPdfPage(Math.max(0, currentPdfPage - 4))}
                           disabled={currentPdfPage === 0}
                         >
                           <ChevronLeft className="w-4 h-4" />
                         </Button>
                         <div className="flex-1 overflow-hidden">
-                          <div 
-                            className="flex gap-2 transition-transform duration-200"
-                            style={{ transform: `translateX(-${currentPdfPage * 68}px)` }}
-                          >
+                          <div className="flex gap-2 transition-transform duration-200" style={{ transform: `translateX(-${currentPdfPage * 68}px)` }}>
                             {pdfPages.map((page) => (
                               <button
                                 key={page.pageNum}
@@ -380,11 +519,7 @@ export function GeminiChat({ className, noteContext, onClearContext }: GeminiCha
                                     : "border-border hover:border-primary/50"
                                 )}
                               >
-                                <img 
-                                  src={page.thumbnail} 
-                                  alt={`Page ${page.pageNum}`}
-                                  className="w-full h-20 object-cover"
-                                />
+                                <img src={page.thumbnail} alt={`Page ${page.pageNum}`} className="w-full h-20 object-cover" />
                                 <div className={cn(
                                   "absolute bottom-0 inset-x-0 text-[10px] font-medium py-0.5 text-center",
                                   selectedPages.includes(page.pageNum) 
@@ -398,9 +533,7 @@ export function GeminiChat({ className, noteContext, onClearContext }: GeminiCha
                           </div>
                         </div>
                         <Button
-                          variant="ghost"
-                          size="icon"
-                          className="shrink-0 h-8 w-8"
+                          variant="ghost" size="icon" className="shrink-0 h-8 w-8"
                           onClick={() => setCurrentPdfPage(Math.min(pdfPages.length - 4, currentPdfPage + 4))}
                           disabled={currentPdfPage >= pdfPages.length - 4}
                         >
@@ -420,13 +553,7 @@ export function GeminiChat({ className, noteContext, onClearContext }: GeminiCha
             {/* Quick Action Buttons */}
             <div className="flex gap-2 flex-wrap">
               {QUICK_ACTIONS.map((action) => (
-                <Button
-                  key={action.id}
-                  variant="outline"
-                  size="sm"
-                  className="h-7 text-xs gap-1.5"
-                  onClick={() => handleQuickAction(action.prompt)}
-                >
+                <Button key={action.id} variant="outline" size="sm" className="h-7 text-xs gap-1.5" onClick={() => handleQuickAction(action.prompt)}>
                   <action.icon className="w-3.5 h-3.5" />
                   {action.label}
                 </Button>
@@ -435,13 +562,36 @@ export function GeminiChat({ className, noteContext, onClearContext }: GeminiCha
           </div>
         )}
         
-        {images.length > 0 && <div className="px-4 pb-2 flex gap-2">{images.map((img, i) => <div key={i} className="relative"><img src={img.preview} className="w-16 h-16 object-cover rounded-lg" /><button onClick={() => removeImage(i)} className="absolute -top-1 -right-1 w-5 h-5 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center"><X className="w-3 h-3" /></button></div>)}</div>}
+        {images.length > 0 && (
+          <div className="px-4 pb-2 flex gap-2 flex-wrap">
+            {images.map((img, i) => (
+              <div key={i} className="relative">
+                <img src={img.preview} className="w-16 h-16 object-cover rounded-lg" />
+                <button onClick={() => removeImage(i)} className="absolute -top-1 -right-1 w-5 h-5 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center">
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        
         <form onSubmit={handleSubmit} className="p-4 pt-2 shrink-0">
           <div className="flex gap-2">
             <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleImageUpload} />
-            <Button type="button" variant="outline" size="icon" onClick={() => fileInputRef.current?.click()} disabled={isLoading}><ImageIcon className="w-4 h-4" /></Button>
-            <Textarea value={input} onChange={(e) => setInput(e.target.value)} placeholder={attachedContext ? `Ask about "${attachedContext.title}"...` : "Ask me anything..."} className="flex-1 min-h-[44px] max-h-[120px] resize-none bg-background" disabled={isLoading} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSubmit(e); } }} />
-            <Button type="submit" disabled={isLoading || (!input.trim() && images.length === 0)}>{isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}</Button>
+            <Button type="button" variant="outline" size="icon" onClick={() => fileInputRef.current?.click()} disabled={isLoading}>
+              <ImageIcon className="w-4 h-4" />
+            </Button>
+            <Textarea 
+              value={input} 
+              onChange={(e) => setInput(e.target.value)} 
+              placeholder={attachedContext ? `Ask about "${attachedContext.title}"...` : "Ask me anything..."} 
+              className="flex-1 min-h-[44px] max-h-[120px] resize-none bg-background" 
+              disabled={isLoading} 
+              onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSubmit(e); } }} 
+            />
+            <Button type="submit" disabled={isLoading || (!input.trim() && images.length === 0)}>
+              {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+            </Button>
           </div>
         </form>
       </CardContent>

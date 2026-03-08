@@ -32,6 +32,8 @@ export function NotePreviewModal({ note, open, onClose }: NotePreviewModalProps)
   const [rating, setRating] = useState(0);
   const [difficulty, setDifficulty] = useState<"easy" | "medium" | "hard" | null>(null);
   const [isRating, setIsRating] = useState(false);
+  const [hasRated, setHasRated] = useState(false);
+  const [checkingRated, setCheckingRated] = useState(false);
 
   useEffect(() => {
     if (note) {
@@ -43,9 +45,20 @@ export function NotePreviewModal({ note, open, onClose }: NotePreviewModalProps)
       setActiveTab("preview");
       setRating(0);
       setDifficulty(null);
+      
+      // Increment views (session-based - handled inside the service)
       notesService.incrementViews(note.id).catch(() => {});
+      
+      // Check if user already rated
+      if (userProfile) {
+        setCheckingRated(true);
+        notesService.hasUserRated(note.id, userProfile.id)
+          .then(rated => { setHasRated(rated); })
+          .catch(() => {})
+          .finally(() => setCheckingRated(false));
+      }
     }
-  }, [note, userProfile]);
+  }, [note?.id, userProfile?.id]);
 
   if (!note) return null;
   const FileIcon = fileTypeIcons[note.fileType] || FileText;
@@ -111,8 +124,15 @@ export function NotePreviewModal({ note, open, onClose }: NotePreviewModalProps)
   const handleSubmitRating = async () => {
     if (!userProfile || rating === 0 || !difficulty) { toast({ title: "Select rating and difficulty", variant: "destructive" }); return; }
     setIsRating(true);
-    try { await notesService.rateNote(note.id, userProfile.id, rating, difficulty); toast({ title: "Rating submitted" }); }
-    catch { toast({ title: "Error", variant: "destructive" }); }
+    try { 
+      await notesService.rateNote(note.id, userProfile.id, rating, difficulty); 
+      toast({ title: "Rating submitted" }); 
+      setHasRated(true);
+    }
+    catch (err) { 
+      const message = err instanceof Error ? err.message : 'Error submitting rating';
+      toast({ title: message, variant: "destructive" }); 
+    }
     finally { setIsRating(false); }
   };
 
@@ -141,9 +161,23 @@ export function NotePreviewModal({ note, open, onClose }: NotePreviewModalProps)
             <TabsContent value="comments" className="mt-0"><NoteCommentsSection noteId={note.id} ownerId={note.authorId} noteTitle={note.title} /></TabsContent>
             <TabsContent value="rate" className="mt-0">
               <div className="space-y-6 max-w-md">
-                <div><h4 className="font-medium mb-3">Quality Rating</h4><div className="flex gap-1">{[1,2,3,4,5].map(s => <button key={s} onClick={() => setRating(s)} className="p-1 hover:scale-110 transition-transform"><Star className={cn("w-8 h-8", rating >= s ? "text-yellow-500 fill-yellow-500" : "text-muted-foreground")} /></button>)}</div></div>
-                <div><h4 className="font-medium mb-3">Difficulty</h4><div className="flex gap-2">{(["easy","medium","hard"] as const).map(l => <Button key={l} variant={difficulty === l ? "default" : "outline"} onClick={() => setDifficulty(l)} className="capitalize">{l}</Button>)}</div></div>
-                <Button onClick={handleSubmitRating} disabled={rating === 0 || !difficulty || isRating} className="w-full">{isRating ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Submitting...</> : "Submit Rating"}</Button>
+                {hasRated ? (
+                  <div className="text-center py-8">
+                    <Star className="w-12 h-12 text-yellow-500 fill-yellow-500 mx-auto mb-3" />
+                    <h4 className="font-medium text-foreground mb-1">Already Rated</h4>
+                    <p className="text-sm text-muted-foreground">You have already rated this note. Ratings cannot be changed.</p>
+                  </div>
+                ) : checkingRated ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                  </div>
+                ) : (
+                  <>
+                    <div><h4 className="font-medium mb-3">Quality Rating</h4><div className="flex gap-1">{[1,2,3,4,5].map(s => <button key={s} onClick={() => setRating(s)} className="p-1 hover:scale-110 transition-transform"><Star className={cn("w-8 h-8", rating >= s ? "text-yellow-500 fill-yellow-500" : "text-muted-foreground")} /></button>)}</div></div>
+                    <div><h4 className="font-medium mb-3">Difficulty</h4><div className="flex gap-2">{(["easy","medium","hard"] as const).map(l => <Button key={l} variant={difficulty === l ? "default" : "outline"} onClick={() => setDifficulty(l)} className="capitalize">{l}</Button>)}</div></div>
+                    <Button onClick={handleSubmitRating} disabled={rating === 0 || !difficulty || isRating} className="w-full">{isRating ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Submitting...</> : "Submit Rating"}</Button>
+                  </>
+                )}
               </div>
             </TabsContent>
           </ScrollArea>

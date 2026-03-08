@@ -41,7 +41,8 @@ export default function Index() {
     fetchNotes();
   }, []);
 
-  const toCardNote = (note: Note) => mapFirestoreNoteToCardNote(note);
+  // Memoize note conversion to avoid creating new objects on every render
+  const toCardNote = useCallback((note: Note) => mapFirestoreNoteToCardNote(note), []);
 
   const filteredNotes = notes.filter((note) => {
     if (selectedBranch !== "all" && selectedBranch !== "other") {
