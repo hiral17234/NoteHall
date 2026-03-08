@@ -21,7 +21,6 @@ const FloatingNav = () => {
   useEffect(() => {
     const heroEl = document.getElementById("hero");
     if (!heroEl) return;
-
     const observer = new IntersectionObserver(
       ([entry]) => setVisible(!entry.isIntersecting),
       { threshold: 0.1 }
@@ -52,6 +51,10 @@ const FloatingNav = () => {
     setMenuOpen(false);
   };
 
+  const activePillStyle: React.CSSProperties = {
+    background: "linear-gradient(135deg, hsl(37 92% 50%), hsl(45 96% 64%))",
+  };
+
   return (
     <AnimatePresence>
       {visible && (
@@ -60,8 +63,8 @@ const FloatingNav = () => {
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: -60, opacity: 0 }}
           transition={{ duration: 0.3 }}
-          className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-2 py-2 rounded-full backdrop-blur-xl border border-border/30"
-          style={{ background: "hsla(60, 4%, 95%, 0.75)" }}
+          className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-2 py-2 rounded-full backdrop-blur-2xl border border-primary/10"
+          style={{ background: "hsla(60, 4%, 95%, 0.8)" }}
         >
           {isMobile ? (
             <div className="relative">
@@ -77,20 +80,18 @@ const FloatingNav = () => {
                     initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.9 }}
-                    className="absolute top-12 left-1/2 -translate-x-1/2 rounded-2xl border border-border/30 backdrop-blur-xl p-3 flex flex-col gap-1 min-w-[160px]"
-                    style={{ background: "hsla(60, 4%, 95%, 0.9)" }}
+                    className="absolute top-12 left-1/2 -translate-x-1/2 rounded-2xl border border-primary/10 backdrop-blur-2xl p-3 flex flex-col gap-1 min-w-[160px]"
+                    style={{ background: "hsla(60, 4%, 95%, 0.92)" }}
                   >
                     {sections.map(({ id, label }) => (
                       <button
                         key={id}
                         onClick={() => scrollTo(id)}
-                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors text-left ${
-                          active === id
-                            ? "bg-primary text-primary-foreground"
-                            : "text-foreground hover:bg-accent"
-                        }`}
+                        className="px-4 py-2 rounded-lg text-sm font-medium transition-colors text-left"
+                        style={active === id ? { ...activePillStyle, color: "white" } : undefined}
                       >
-                        {label}
+                        {active !== id && <span className="text-foreground hover:text-foreground">{label}</span>}
+                        {active === id && label}
                       </button>
                     ))}
                   </motion.div>
@@ -105,9 +106,10 @@ const FloatingNav = () => {
                   onClick={() => scrollTo(id)}
                   className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-200 ${
                     active === id
-                      ? "bg-primary text-primary-foreground shadow-md"
+                      ? "text-white shadow-md"
                       : "text-foreground/70 hover:text-foreground hover:bg-accent"
                   }`}
+                  style={active === id ? activePillStyle : undefined}
                 >
                   {label}
                 </button>

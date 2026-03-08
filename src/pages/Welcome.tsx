@@ -18,24 +18,27 @@ import { db } from "@/lib/firebase";
 
 const fadeUp = {
   hidden: { opacity: 0, y: 40 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: "easeOut" } },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.7, ease: [0.25, 0.4, 0.25, 1] } },
 };
 
 const slideLeft = {
   hidden: { opacity: 0, x: -60 },
-  visible: { opacity: 1, x: 0, transition: { duration: 0.6 } },
+  visible: { opacity: 1, x: 0, transition: { duration: 0.7, ease: [0.25, 0.4, 0.25, 1] } },
 };
 
 const slideRight = {
   hidden: { opacity: 0, x: 60 },
-  visible: { opacity: 1, x: 0, transition: { duration: 0.6 } },
+  visible: { opacity: 1, x: 0, transition: { duration: 0.7, ease: [0.25, 0.4, 0.25, 1] } },
+};
+
+const staggerContainer = {
+  hidden: {},
+  visible: { transition: { staggerChildren: 0.12 } },
 };
 
 const Welcome = () => {
   const navigate = useNavigate();
   const [realStats, setRealStats] = useState({ notes: 0, users: 0, subjects: 0 });
-
-  // No redirect needed — App.tsx handles auth-based routing
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -66,82 +69,102 @@ const Welcome = () => {
     navigate("/signup");
   };
 
+  const glassCard = "rounded-3xl border border-primary/10 bg-card/70 backdrop-blur-sm p-8 transition-all duration-400 hover:shadow-[0_12px_30px_hsla(37,92%,50%,0.12)] hover:-translate-y-1";
+  const iconBox = "w-14 h-14 rounded-2xl flex items-center justify-center mb-5";
+  const iconBoxGradient = "linear-gradient(135deg, hsl(37 92% 50%), hsl(45 96% 64%))";
+  const iconBoxSubtle = "linear-gradient(135deg, hsl(37 92% 50% / 0.12), hsl(45 96% 64% / 0.12))";
+  const gradientText: React.CSSProperties = {
+    background: "linear-gradient(135deg, hsl(37 92% 50%), hsl(45 96% 64%), hsl(37 92% 50%))",
+    WebkitBackgroundClip: "text",
+    WebkitTextFillColor: "transparent",
+    backgroundClip: "text",
+  };
+
   return (
     <div className="relative min-h-screen bg-background text-foreground overflow-x-hidden">
       <FloatingParticles />
       <ScrollProgress />
       <FloatingNav />
 
-      {/* Hero Section */}
+      {/* ── Hero Section ── */}
       <section id="hero" className="relative z-10 min-h-screen flex flex-col items-center justify-center px-4 text-center">
+        {/* Golden glow behind logo */}
+        <div
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full pointer-events-none"
+          style={{
+            background: "radial-gradient(circle, hsla(37, 92%, 50%, 0.12) 0%, hsla(45, 96%, 64%, 0.06) 40%, transparent 70%)",
+          }}
+        />
+
         <motion.div
-          initial={{ scale: 0.8, opacity: 0 }}
+          initial={{ scale: 0.7, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          transition={{ duration: 0.8 }}
-          className="mb-8"
+          transition={{ duration: 0.9, ease: [0.25, 0.4, 0.25, 1] }}
+          className="mb-10 relative"
         >
-          <div className="relative inline-block">
-            <img src={logo} alt="NoteHall Logo" className="w-24 h-24 md:w-32 md:h-32 rounded-2xl" />
-            <div
-              className="absolute inset-0 rounded-2xl animate-pulse"
-              style={{ boxShadow: "0 0 40px hsla(37, 92%, 50%, 0.4), 0 0 80px hsla(45, 96%, 64%, 0.2)" }}
-            />
-          </div>
+          <img src={logo} alt="NoteHall Logo" className="w-28 h-28 md:w-36 md:h-36 rounded-3xl relative z-10" />
+          <div
+            className="absolute -inset-4 rounded-3xl animate-pulse opacity-60"
+            style={{ boxShadow: "0 0 50px hsla(37, 92%, 50%, 0.35), 0 0 100px hsla(45, 96%, 64%, 0.15)" }}
+          />
         </motion.div>
 
         <AnimatedText
-          text="Your Notes. Your Network. Your Success."
-          className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold leading-tight max-w-4xl"
+          text="Your Notes. Your Network."
+          className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold leading-[1.1] max-w-5xl tracking-tight"
           delay={0.3}
         />
+        <motion.h2
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 1, duration: 0.7 }}
+          className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold leading-[1.1] max-w-5xl tracking-tight mt-2"
+          style={gradientText}
+        >
+          Your Success.
+        </motion.h2>
 
         <motion.p
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 1.2, duration: 0.6 }}
-          className="mt-6 text-lg md:text-xl text-muted-foreground max-w-2xl"
+          transition={{ delay: 1.4, duration: 0.6 }}
+          className="mt-8 text-lg md:text-xl text-muted-foreground max-w-2xl leading-relaxed"
         >
           Where students, seniors, and alumni come together to share knowledge and help each other succeed.
-        </motion.p>
-
-        <motion.p
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 1.5, duration: 0.6 }}
-          className="mt-3 text-sm md:text-base text-muted-foreground/70 max-w-xl"
-        >
-          A peer-to-peer learning space where notes, experience, and guidance flow freely across campus.
         </motion.p>
 
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 1.8, duration: 0.5 }}
-          className="mt-10"
+          className="mt-12"
         >
           <Button
             onClick={handleGetStarted}
             size="lg"
-            className="text-lg px-10 py-6 rounded-full relative overflow-hidden group"
-            style={{ boxShadow: "0 0 30px hsla(37, 92%, 50%, 0.4)" }}
+            className="text-lg px-12 py-7 rounded-full relative overflow-hidden group"
+            style={{
+              background: "linear-gradient(135deg, hsl(37 92% 50%), hsl(45 96% 64%))",
+              boxShadow: "0 8px 30px hsla(37, 92%, 50%, 0.35), 0 0 60px hsla(45, 96%, 64%, 0.15)",
+            }}
           >
-            <span className="relative z-10 flex items-center gap-2">
+            <span className="relative z-10 flex items-center gap-2 text-white font-semibold">
               Get Started <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </span>
           </Button>
         </motion.div>
 
         <motion.div
-          animate={{ y: [0, 10, 0] }}
-          transition={{ repeat: Infinity, duration: 2 }}
+          animate={{ y: [0, 12, 0] }}
+          transition={{ repeat: Infinity, duration: 2.5, ease: "easeInOut" }}
           className="absolute bottom-10"
         >
-          <ChevronDown className="w-8 h-8 text-muted-foreground/50" />
+          <ChevronDown className="w-8 h-8 text-muted-foreground/40" />
         </motion.div>
       </section>
 
-      {/* Problem Section */}
-      <section id="problem" className="relative z-10 py-20 md:py-32 px-4">
+      {/* ── Problem Section ── */}
+      <section id="problem" className="relative z-10 py-24 md:py-36 px-4">
         <motion.h2
           variants={fadeUp}
           initial="hidden"
@@ -151,43 +174,34 @@ const Welcome = () => {
         >
           The Problem Students Face
         </motion.h2>
-        <div className="max-w-5xl mx-auto grid md:grid-cols-2 gap-8">
-          <motion.div
-            variants={slideLeft}
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true }}
-            className="rounded-2xl border border-border bg-card p-8 shadow-md"
-          >
-            <div className="w-14 h-14 rounded-xl flex items-center justify-center mb-5" style={{ background: "linear-gradient(135deg, hsl(37 92% 50% / 0.15), hsl(45 96% 64% / 0.15))" }}>
-              <FolderOpen className="w-7 h-7 text-primary" />
-            </div>
-            <h3 className="text-xl font-semibold mb-3">Scattered Study Resources</h3>
-            <p className="text-muted-foreground leading-relaxed">
-              Important notes are scattered across WhatsApp groups, Google Drives, Telegram channels, and random folders. Students waste hours just trying to find reliable study material.
-            </p>
-          </motion.div>
-
-          <motion.div
-            variants={slideRight}
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true }}
-            className="rounded-2xl border border-border bg-card p-8 shadow-md"
-          >
-            <div className="w-14 h-14 rounded-xl flex items-center justify-center mb-5" style={{ background: "linear-gradient(135deg, hsl(37 92% 50% / 0.15), hsl(45 96% 64% / 0.15))" }}>
-              <GraduationCap className="w-7 h-7 text-primary" />
-            </div>
-            <h3 className="text-xl font-semibold mb-3">Disconnected Student Knowledge</h3>
-            <p className="text-muted-foreground leading-relaxed">
-              Every year seniors graduate with valuable insights, notes, and exam strategies. But juniors rarely get access to that knowledge.
-            </p>
-          </motion.div>
-        </div>
+        <motion.div
+          variants={staggerContainer}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true }}
+          className="max-w-5xl mx-auto grid md:grid-cols-2 gap-8"
+        >
+          {[
+            { icon: FolderOpen, title: "Scattered Study Resources", desc: "Important notes are scattered across WhatsApp groups, Google Drives, Telegram channels, and random folders. Students waste hours just trying to find reliable study material.", variant: slideLeft },
+            { icon: GraduationCap, title: "Disconnected Student Knowledge", desc: "Every year seniors graduate with valuable insights, notes, and exam strategies. But juniors rarely get access to that knowledge.", variant: slideRight },
+          ].map((item, i) => (
+            <motion.div
+              key={i}
+              variants={item.variant}
+              className={glassCard}
+            >
+              <div className={iconBox} style={{ background: iconBoxSubtle }}>
+                <item.icon className="w-7 h-7 text-primary" />
+              </div>
+              <h3 className="text-xl font-semibold mb-3">{item.title}</h3>
+              <p className="text-muted-foreground leading-relaxed">{item.desc}</p>
+            </motion.div>
+          ))}
+        </motion.div>
       </section>
 
-      {/* Solution Section */}
-      <section id="solution" className="relative z-10 py-20 md:py-32 px-4">
+      {/* ── Solution Section ── */}
+      <section id="solution" className="relative z-10 py-24 md:py-36 px-4">
         <motion.h2
           variants={fadeUp}
           initial="hidden"
@@ -195,7 +209,9 @@ const Welcome = () => {
           viewport={{ once: true }}
           className="text-2xl md:text-4xl font-bold text-center mb-4"
         >
-          The NoteHall Solution
+          The{" "}
+          <span style={gradientText}>NoteHall</span>{" "}
+          Solution
         </motion.h2>
         <motion.p
           variants={fadeUp}
@@ -206,7 +222,13 @@ const Welcome = () => {
         >
           Everything students need to learn smarter, in one place.
         </motion.p>
-        <div className="max-w-5xl mx-auto grid md:grid-cols-3 gap-8">
+        <motion.div
+          variants={staggerContainer}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true }}
+          className="max-w-5xl mx-auto grid md:grid-cols-3 gap-8"
+        >
           {[
             { icon: BookOpen, title: "Centralized Knowledge Library", desc: "All notes organized by branch, year, and subject so students can easily discover the best study material." },
             { icon: Users, title: "Peer-to-Peer Learning Community", desc: "Students upload notes, rate resources, recommend the best materials, and help each other learn faster." },
@@ -215,24 +237,20 @@ const Welcome = () => {
             <motion.div
               key={i}
               variants={fadeUp}
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true }}
-              transition={{ delay: i * 0.15 }}
-              className="rounded-2xl border border-border bg-card p-8 shadow-md hover:shadow-lg hover:-translate-y-1 transition-all duration-300"
+              className={glassCard}
             >
-              <div className="w-14 h-14 rounded-xl flex items-center justify-center mb-5" style={{ background: "linear-gradient(135deg, hsl(37 92% 50%), hsl(45 96% 64%))" }}>
+              <div className={iconBox} style={{ background: iconBoxGradient }}>
                 <item.icon className="w-7 h-7 text-primary-foreground" />
               </div>
               <h3 className="text-xl font-semibold mb-3">{item.title}</h3>
               <p className="text-muted-foreground leading-relaxed">{item.desc}</p>
             </motion.div>
           ))}
-        </div>
+        </motion.div>
       </section>
 
-      {/* How It Works Section */}
-      <section id="how-it-works" className="relative z-10 py-20 md:py-32 px-4">
+      {/* ── How It Works Section ── */}
+      <section id="how-it-works" className="relative z-10 py-24 md:py-36 px-4">
         <motion.h2
           variants={fadeUp}
           initial="hidden"
@@ -244,8 +262,11 @@ const Welcome = () => {
         </motion.h2>
         <div className="max-w-5xl mx-auto">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8 md:gap-4 relative">
-            {/* Connector line (desktop) */}
-            <div className="hidden md:block absolute top-10 left-[12.5%] right-[12.5%] h-0.5 bg-border" />
+            {/* Gradient connector line (desktop) */}
+            <div
+              className="hidden md:block absolute top-10 left-[12.5%] right-[12.5%] h-0.5"
+              style={{ background: "linear-gradient(90deg, hsl(37 92% 50%), hsl(45 96% 64%))" }}
+            />
 
             {[
               { icon: Upload, title: "Upload", desc: "Share your notes and help other students learn.", step: 1 },
@@ -262,8 +283,20 @@ const Welcome = () => {
                 transition={{ delay: i * 0.15 }}
                 className="flex flex-col items-center text-center relative"
               >
-                <div className="w-20 h-20 rounded-full border-2 border-primary bg-card flex items-center justify-center mb-4 relative z-10">
-                  <span className="absolute -top-2 -right-2 w-7 h-7 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center">
+                <div
+                  className="w-20 h-20 rounded-full bg-card flex items-center justify-center mb-4 relative z-10"
+                  style={{
+                    border: "2px solid transparent",
+                    backgroundImage: "linear-gradient(hsl(60 9% 97%), hsl(60 9% 97%)), linear-gradient(135deg, hsl(37 92% 50%), hsl(45 96% 64%))",
+                    backgroundOrigin: "border-box",
+                    backgroundClip: "padding-box, border-box",
+                    boxShadow: "0 0 20px hsla(37, 92%, 50%, 0.12)",
+                  }}
+                >
+                  <span
+                    className="absolute -top-2 -right-2 w-7 h-7 rounded-full text-xs font-bold flex items-center justify-center text-white"
+                    style={{ background: "linear-gradient(135deg, hsl(37 92% 50%), hsl(45 96% 64%))" }}
+                  >
                     {item.step}
                   </span>
                   <item.icon className="w-8 h-8 text-primary" />
@@ -276,8 +309,8 @@ const Welcome = () => {
         </div>
       </section>
 
-      {/* Community Section */}
-      <section id="community" className="relative z-10 py-20 md:py-32 px-4">
+      {/* ── Community Section ── */}
+      <section id="community" className="relative z-10 py-24 md:py-36 px-4">
         <motion.h2
           variants={fadeUp}
           initial="hidden"
@@ -296,7 +329,13 @@ const Welcome = () => {
         >
           Connect with seniors, alumni, and peers across batches.
         </motion.p>
-        <div className="max-w-5xl mx-auto grid md:grid-cols-3 gap-8">
+        <motion.div
+          variants={staggerContainer}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true }}
+          className="max-w-5xl mx-auto grid md:grid-cols-3 gap-8"
+        >
           {[
             { icon: UserCheck, title: "Seniors Helping Juniors", desc: "Seniors share exam tips, important questions, and proven study strategies." },
             { icon: Award, title: "Alumni Guidance", desc: "Pass-outs and alumni contribute their notes and experiences to guide future students." },
@@ -305,24 +344,20 @@ const Welcome = () => {
             <motion.div
               key={i}
               variants={fadeUp}
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true }}
-              transition={{ delay: i * 0.15 }}
-              className="rounded-2xl border border-border bg-card p-8 shadow-md hover:shadow-lg hover:-translate-y-1 transition-all duration-300"
+              className={glassCard}
             >
-              <div className="w-14 h-14 rounded-xl flex items-center justify-center mb-5" style={{ background: "linear-gradient(135deg, hsl(37 92% 50% / 0.15), hsl(45 96% 64% / 0.15))" }}>
+              <div className={iconBox} style={{ background: iconBoxSubtle }}>
                 <item.icon className="w-7 h-7 text-primary" />
               </div>
               <h3 className="text-xl font-semibold mb-3">{item.title}</h3>
               <p className="text-muted-foreground leading-relaxed">{item.desc}</p>
             </motion.div>
           ))}
-        </div>
+        </motion.div>
       </section>
 
-      {/* Stats Section */}
-      <section id="stats" className="relative z-10 py-20 md:py-32 px-4">
+      {/* ── Stats Section ── */}
+      <section id="stats" className="relative z-10 py-24 md:py-36 px-4">
         <motion.h2
           variants={fadeUp}
           initial="hidden"
@@ -330,7 +365,7 @@ const Welcome = () => {
           viewport={{ once: true }}
           className="text-2xl md:text-4xl font-bold text-center mb-4"
         >
-          NoteHall in Numbers
+          NoteHall in <span style={gradientText}>Numbers</span>
         </motion.h2>
         <motion.p
           variants={fadeUp}
@@ -342,7 +377,13 @@ const Welcome = () => {
           Real impact, real community.
         </motion.p>
 
-        <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
+        <motion.div
+          variants={staggerContainer}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true }}
+          className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8 text-center"
+        >
           {[
             { end: realStats.notes, label: "Notes Shared", icon: FileText },
             { end: realStats.users, label: "Students Connected", icon: UserPlus },
@@ -351,25 +392,18 @@ const Welcome = () => {
             <motion.div
               key={i}
               variants={fadeUp}
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true }}
-              transition={{ delay: i * 0.15 }}
-              className="rounded-2xl border border-border bg-card p-8 shadow-md hover:shadow-lg hover:-translate-y-1 transition-all duration-300"
+              className={glassCard + " flex flex-col items-center"}
             >
-              <div
-                className="w-14 h-14 rounded-xl flex items-center justify-center mx-auto mb-5"
-                style={{ background: "linear-gradient(135deg, hsl(37 92% 50% / 0.15), hsl(45 96% 64% / 0.15))" }}
-              >
+              <div className={iconBox + " mx-auto"} style={{ background: iconBoxSubtle }}>
                 <stat.icon className="w-7 h-7 text-primary" />
               </div>
-              <div className="text-4xl md:text-5xl font-bold text-primary mb-2">
+              <div className="text-4xl md:text-5xl font-bold mb-2" style={gradientText}>
                 <CountUp end={stat.end} suffix="+" />
               </div>
               <p className="text-muted-foreground font-medium">{stat.label}</p>
             </motion.div>
           ))}
-        </div>
+        </motion.div>
 
         {/* Campus Community Ecosystem */}
         <motion.div
@@ -377,63 +411,80 @@ const Welcome = () => {
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true }}
-          className="mt-20 max-w-4xl mx-auto text-center"
+          className="mt-24 max-w-4xl mx-auto text-center"
         >
-          <h3 className="text-xl md:text-2xl font-bold mb-3">Part of the Campus Community Ecosystem</h3>
-          <p className="text-muted-foreground mb-10 max-w-lg mx-auto">
+          <h3 className="text-xl md:text-2xl font-bold mb-3">
+            Part of the <span style={gradientText}>Campus Community</span> Ecosystem
+          </h3>
+          <p className="text-muted-foreground mb-12 max-w-lg mx-auto">
             NoteHall is one of four interconnected platforms built for students, by students.
           </p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+          <motion.div
+            variants={staggerContainer}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true }}
+            className="grid grid-cols-2 md:grid-cols-4 gap-5 md:gap-6"
+          >
             {[
-              { name: "CampusVoice", desc: "Share your campus experiences & feedback", url: "https://campusvoice-chi.vercel.app/", icon: MessageCircle },
-              { name: "NoteHall", desc: "Your centralized knowledge library", url: "https://notehall.vercel.app", icon: BookOpen },
-              { name: "CampusAssist", desc: "Get help from peers and seniors", url: "https://campusassist-five.vercel.app/", icon: Users },
-              { name: "CampusBuzz", desc: "Latest campus news & events", url: "", icon: Sparkles },
+              { name: "CampusVoice", desc: "Share your campus experiences & feedback anonymously", url: "https://campusvoice-chi.vercel.app/", icon: MessageCircle },
+              { name: "NoteHall", desc: "Your centralized knowledge library for notes & resources", url: "https://notehall.vercel.app", icon: BookOpen },
+              { name: "CampusAssist", desc: "Get help from peers and seniors when you need it", url: "https://campusassist-five.vercel.app/", icon: Users },
+              { name: "CampusBuzz", desc: "Latest campus news, events & announcements", url: "", icon: Sparkles },
             ].map((app, i) => (
               <motion.a
                 key={i}
                 href={app.url || undefined}
                 target={app.url ? "_blank" : undefined}
                 rel="noopener noreferrer"
-                initial={{ opacity: 0, y: 30, scale: 0.9 }}
-                whileInView={{ opacity: 1, y: 0, scale: 1 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.12, type: "spring", stiffness: 200, damping: 15 }}
-                whileHover={{ scale: 1.08, y: -8, boxShadow: "0 20px 40px -10px hsla(37, 92%, 50%, 0.3)" }}
-                whileTap={{ scale: 0.95 }}
-                className={`rounded-2xl border border-border bg-card p-6 shadow-md flex flex-col items-center gap-3 ${app.url ? "cursor-pointer" : "cursor-default"}`}
+                variants={fadeUp}
+                whileHover={{ scale: 1.05, y: -6 }}
+                whileTap={{ scale: 0.97 }}
+                className={`rounded-3xl border border-primary/10 bg-card/70 backdrop-blur-sm p-6 flex flex-col items-center gap-3 transition-all duration-300 ${app.url ? "cursor-pointer hover:shadow-[0_16px_40px_hsla(37,92%,50%,0.18)]" : "cursor-default"}`}
               >
                 <div
-                  className="w-12 h-12 rounded-xl flex items-center justify-center"
-                  style={{ background: "linear-gradient(135deg, hsl(37 92% 50%), hsl(45 96% 64%))" }}
+                  className="w-14 h-14 rounded-2xl flex items-center justify-center"
+                  style={{ background: iconBoxGradient }}
                 >
-                  <app.icon className="w-6 h-6 text-primary-foreground" />
+                  <app.icon className="w-7 h-7 text-white" />
                 </div>
                 <span className="font-semibold text-sm md:text-base">{app.name}</span>
                 <span className="text-xs text-muted-foreground leading-tight text-center">{app.desc}</span>
+                {app.url && (
+                  <span className="text-[11px] text-primary font-medium flex items-center gap-1 mt-1">
+                    Visit <ArrowRight className="w-3 h-3" />
+                  </span>
+                )}
                 {!app.url && (
                   <motion.span
                     animate={{ opacity: [0.4, 1, 0.4] }}
                     transition={{ repeat: Infinity, duration: 2 }}
-                    className="text-[10px] text-primary/60 font-medium italic"
+                    className="text-[11px] text-primary/60 font-medium italic"
                   >
                     Coming Soon
                   </motion.span>
                 )}
               </motion.a>
             ))}
-          </div>
+          </motion.div>
         </motion.div>
       </section>
 
-      {/* CTA Section */}
-      <section className="relative z-10 py-20 md:py-32 px-4 text-center">
+      {/* ── CTA Section ── */}
+      <section className="relative z-10 py-24 md:py-36 px-4 text-center">
+        {/* Warm radial glow */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background: "radial-gradient(ellipse at center, hsla(37, 92%, 50%, 0.06) 0%, transparent 60%)",
+          }}
+        />
         <motion.h2
           variants={fadeUp}
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true }}
-          className="text-2xl md:text-4xl font-bold mb-4"
+          className="text-2xl md:text-4xl font-bold mb-4 relative z-10"
         >
           Ready to Learn Smarter Together?
         </motion.h2>
@@ -442,7 +493,7 @@ const Welcome = () => {
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true }}
-          className="text-muted-foreground mb-10 max-w-lg mx-auto"
+          className="text-muted-foreground mb-10 max-w-lg mx-auto relative z-10"
         >
           Join a campus network where students help students succeed.
         </motion.p>
@@ -451,22 +502,30 @@ const Welcome = () => {
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true }}
+          className="relative z-10"
         >
           <Button
             onClick={handleGetStarted}
             size="lg"
-            className="text-lg px-10 py-6 rounded-full relative group animate-pulse"
-            style={{ boxShadow: "0 0 40px hsla(37, 92%, 50%, 0.5)" }}
+            className="text-lg px-12 py-7 rounded-full relative group"
+            style={{
+              background: "linear-gradient(135deg, hsl(37 92% 50%), hsl(45 96% 64%))",
+              boxShadow: "0 8px 40px hsla(37, 92%, 50%, 0.4)",
+            }}
           >
-            <span className="flex items-center gap-2">
+            <span className="flex items-center gap-2 text-white font-semibold">
               Get Started Now <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </span>
           </Button>
         </motion.div>
       </section>
 
-      {/* Footer */}
-      <footer className="relative z-10 border-t border-border py-12 px-4">
+      {/* ── Footer ── */}
+      <footer className="relative z-10 py-12 px-4">
+        <div
+          className="h-px max-w-4xl mx-auto mb-12"
+          style={{ background: "linear-gradient(90deg, transparent, hsl(37 92% 50% / 0.4), hsl(45 96% 64% / 0.4), transparent)" }}
+        />
         <div className="max-w-4xl mx-auto text-center">
           <img src={logo} alt="NoteHall" className="w-12 h-12 rounded-xl mx-auto mb-4" />
           <p className="text-muted-foreground mb-8">
