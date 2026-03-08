@@ -532,17 +532,37 @@ const Welcome = () => {
             Built for students, powered by shared knowledge.
           </p>
 
-          <div
-            className="inline-block rounded-2xl p-[2px] mb-8"
-            style={{ background: "linear-gradient(135deg, hsl(37 92% 50%), hsl(45 96% 64%), hsl(37 92% 50%))" }}
+          <motion.div
+            className="max-w-2xl mx-auto rounded-3xl p-[2px] mb-8"
+            style={{ background: "linear-gradient(135deg, hsl(37 92% 50%), hsl(45 96% 64%), hsl(330 70% 50% / 0.5), hsl(37 92% 50%))" }}
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
           >
-            <div className="rounded-2xl bg-card px-8 py-5">
-              <p className="text-sm text-muted-foreground mb-1">Developer</p>
-              <p className="text-lg font-bold">HIRAL GOYAL</p>
-              <p className="text-sm text-muted-foreground">Mathematics and Computing</p>
-              <p className="text-sm text-muted-foreground">Madhav Institute of Technology and Science, Gwalior</p>
+            <div className="rounded-3xl bg-foreground/95 px-12 py-10 text-center">
+              <div className="flex items-center justify-center gap-2 mb-4">
+                <span className="text-lg">{"</>"}</span>
+                <p className="text-xs font-semibold tracking-[0.25em] uppercase text-muted">DEVELOPER</p>
+              </div>
+              <h3
+                className="text-3xl md:text-4xl font-bold mb-4 tracking-wide"
+                style={{
+                  background: "linear-gradient(135deg, hsl(37 92% 50%), hsl(45 96% 64%))",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                }}
+              >
+                HIRAL GOYAL
+              </h3>
+              <p className="text-muted flex items-center justify-center gap-2 mb-2">
+                <span>🎓</span> Mathematics and Computing
+              </p>
+              <p className="text-muted flex items-center justify-center gap-2">
+                <span>📍</span> Madhav Institute of Technology and Science, Gwalior
+              </p>
             </div>
-          </div>
+          </motion.div>
 
           <p className="text-sm text-muted-foreground/60">
             © {new Date().getFullYear()} NoteHall. All rights reserved.
