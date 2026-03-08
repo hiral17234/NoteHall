@@ -107,7 +107,7 @@ function PodiumProfile({ contributor, onClick }: { contributor: Contributor; onC
         <TooltipTrigger asChild>
           <div
             className={cn(
-              "flex flex-col items-center cursor-pointer group transition-all duration-300 hover:-translate-y-1.5 flex-1 max-w-[160px]",
+              "flex flex-col items-center cursor-pointer group transition-all duration-300 hover:-translate-y-1.5 flex-1",
               isFirst ? "order-2" : contributor.rank === 2 ? "order-1" : "order-3"
             )}
             onClick={onClick}
@@ -139,11 +139,11 @@ function PodiumProfile({ contributor, onClick }: { contributor: Contributor; onC
             <div className="relative">
               {isFirst && (
                 <div
-                  className="absolute inset-0 -m-4 rounded-full pointer-events-none"
+                  className="absolute rounded-full pointer-events-none"
                   style={{
-                    background: "radial-gradient(circle, rgba(255,215,0,0.15) 0%, transparent 70%)",
-                    width: "120px",
-                    height: "120px",
+                    background: "radial-gradient(circle, rgba(255,215,0,0.18) 0%, transparent 70%)",
+                    width: "140px",
+                    height: "140px",
                     top: "50%",
                     left: "50%",
                     transform: "translate(-50%, -50%)",
@@ -158,40 +158,41 @@ function PodiumProfile({ contributor, onClick }: { contributor: Contributor; onC
               >
                 <Avatar className={cn(config.avatarSize, "ring-2 ring-background")}>
                   <AvatarImage src={contributor.avatar} className="object-cover" />
-                  <AvatarFallback className="bg-primary/10 text-primary font-bold text-base">
+                  <AvatarFallback className="bg-primary/10 text-primary font-bold text-lg">
                     {contributor.name.split(" ").map(n => n[0]).join("")}
                   </AvatarFallback>
                 </Avatar>
               </div>
             </div>
 
-            {/* Name & Score */}
+            {/* Rank badge */}
             <Badge
               variant="outline"
-              className={cn("mt-2 text-[10px] px-2 py-0 font-extrabold tracking-wide", config.badgeBg)}
+              className={cn("mt-2 text-[10px] px-2.5 py-0 font-extrabold tracking-wide", config.badgeBg)}
             >
               #{contributor.rank}
             </Badge>
 
+            {/* Name */}
             <p className={cn(
-              "mt-1 text-foreground text-center max-w-[120px] truncate group-hover:text-primary transition-colors",
+              "mt-1 text-foreground text-center max-w-[130px] truncate group-hover:text-primary transition-colors",
               config.nameSize
             )}>
               {contributor.name}
             </p>
 
+            {/* Score */}
             <div className={cn("flex items-center gap-1 mt-0.5", config.scoreColor)}>
-              <Star className="w-3 h-3 fill-current" />
+              <Star className="w-3.5 h-3.5 fill-current" />
               <span className="text-xs font-bold">{contributor.contributionScore} pts</span>
             </div>
 
             {/* Podium base */}
             <div
-              className="rounded-t-lg mt-2"
+              className="w-full max-w-[100px] rounded-t-xl mt-3"
               style={{
                 background: config.podiumColor,
                 height: `${config.podiumHeight}px`,
-                width: "72px",
               }}
             />
           </div>
