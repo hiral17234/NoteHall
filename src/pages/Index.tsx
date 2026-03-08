@@ -63,77 +63,12 @@ export default function Index() {
     return 0;
   });
 
-  // Get recommended notes based on user's subject interests (top 2)
-  const recommendedNotes = (() => {
-    const userInterests = userProfile?.interests || [];
-    
-    if (userInterests.length > 0) {
-      // Filter notes that match user's interests
-      const interestMatches = notes.filter(note => 
-        userInterests.some(interest => 
-          note.subject.toLowerCase().includes(interest.toLowerCase()) ||
-          interest.toLowerCase().includes(note.subject.toLowerCase())
-        )
-      );
-      
-      // Sort by engagement and return top 2
-      if (interestMatches.length > 0) {
-        return [...interestMatches]
-          .sort((a, b) => (b.likes + b.views) - (a.likes + a.views))
-          .slice(0, 2);
-      }
-    }
-    
-    // Fallback to most liked if no interests or no matches
-    return [...notes]
-      .sort((a, b) => b.likes - a.likes)
-      .slice(0, 2);
-  })();
 
   const handleExpand = (note: any) => {
     setSelectedNote(note);
     setPreviewOpen(true);
   };
 
-  return (
-    <MainLayout>
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Notes Feed</h1>
-            <p className="text-muted-foreground">Discover and share study materials</p>
-          </div>
-          <Link to="/upload">
-            <Button className="bg-primary hover:bg-primary/90 text-primary-foreground gap-2">
-              <Plus className="w-4 h-4" />
-              Upload Note
-            </Button>
-          </Link>
-        </div>
-
-        {/* Recommended Section */}
-        {!loading && recommendedNotes.length > 0 && (
-          <Card className="bg-gradient-to-r from-primary/5 to-primary/10 border-primary/20 mb-6">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-primary" />
-                Recommended for You
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-4 md:grid-cols-2">
-                {recommendedNotes.map((note) => (
-                  <NoteCard 
-                    key={note.id} 
-                    note={toCardNote(note)} 
-                    onExpand={() => handleExpand(toCardNote(note))}
-                  />
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
 
         {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-4 mb-6">
