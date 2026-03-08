@@ -4,6 +4,7 @@
 export interface GeminiMessage {
   role: "user" | "assistant";
   content: string;
+  images?: { base64: string; mimeType: string }[];
 }
 
 export interface GeminiContext {
@@ -30,6 +31,10 @@ class GeminiService {
     this.context = { ...this.context, ...context };
   }
 
+  setHistory(history: GeminiMessage[]) {
+    this.conversationHistory = [...history];
+  }
+
   clearHistory() {
     this.conversationHistory = [];
   }
@@ -45,11 +50,13 @@ class GeminiService {
       mimeType: string;
     }[]
   ): Promise<string> {
-this.conversationHistory.push({
-  role: "user",
-  content:
-    userMessage?.trim() || "User sent image(s) for analysis.",
-});
+    const trimmedMessage = userMessage?.trim();
+
+    this.conversationHistory.push({
+      role: "user",
+      content: trimmedMessage || "User sent image(s) for analysis.",
+      images: images?.length ? images : undefined,
+    });
 
     try {
       const response = await fetch(API_ENDPOINT, {
@@ -58,8 +65,8 @@ this.conversationHistory.push({
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          prompt: userMessage?.trim() || "Please analyze the provided image(s).",
-          images, // ✅ FIX
+          prompt: trimmedMessage || "Please analyze the provided image(s).",
+          images,
           context: {
             subject: this.context.selectedSubject,
             noteTitle: this.context.noteTitle,
@@ -80,9 +87,9 @@ this.conversationHistory.push({
       const assistantMessage = data.text;
 
       this.conversationHistory.push({
-  role: "assistant",
-  content: assistantMessage,
-});
+        role: "assistant",
+        content: assistantMessage,
+      });
 
       return assistantMessage;
     } catch (error) {

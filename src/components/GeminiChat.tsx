@@ -35,6 +35,7 @@ interface DisplayMessage {
 
 const STORAGE_KEY = "notehall_gemini_messages";
 const CONTEXT_KEY = "notehall_gemini_context";
+const ATTACHMENT_IMAGES_KEY = "notehall_gemini_attachment_images";
 
 const QUICK_ACTIONS = [
   { id: 'summarize', label: 'Summarize', icon: BookOpen, prompt: 'Please summarize the key points from this note in a clear and concise manner.' },
@@ -67,6 +68,23 @@ function saveContext(ctx: GeminiChatProps["noteContext"] | null) {
   } catch {}
 }
 
+function loadAttachmentImages(): { base64: string; mimeType: string }[] {
+  try {
+    const data = localStorage.getItem(ATTACHMENT_IMAGES_KEY);
+    return data ? JSON.parse(data) : [];
+  } catch { return []; }
+}
+
+function saveAttachmentImages(images: { base64: string; mimeType: string }[]) {
+  try {
+    if (images.length > 0) {
+      localStorage.setItem(ATTACHMENT_IMAGES_KEY, JSON.stringify(images));
+    } else {
+      localStorage.removeItem(ATTACHMENT_IMAGES_KEY);
+    }
+  } catch {}
+}
+
 export function GeminiChat({ className, noteContext, onClearContext }: GeminiChatProps) {
   const { userProfile } = useAuth();
   const [messages, setMessages] = useState<DisplayMessage[]>(() => loadMessages());
@@ -77,6 +95,7 @@ export function GeminiChat({ className, noteContext, onClearContext }: GeminiCha
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [attachedContext, setAttachedContext] = useState<typeof noteContext>(() => loadContext());
+  const [persistentAttachmentImages, setPersistentAttachmentImages] = useState<{ base64: string; mimeType: string }[]>(() => loadAttachmentImages());
   
   // PDF page selection state
   const [pdfPages, setPdfPages] = useState<PdfPageInfo[]>([]);
@@ -89,18 +108,17 @@ export function GeminiChat({ className, noteContext, onClearContext }: GeminiCha
   // Persist messages
   useEffect(() => { saveMessages(messages); }, [messages]);
   
-  // Persist context
+  // Persist context and reusable attachment images
   useEffect(() => { saveContext(attachedContext || null); }, [attachedContext]);
+  useEffect(() => { saveAttachmentImages(persistentAttachmentImages); }, [persistentAttachmentImages]);
 
   // Sync geminiService history with persisted messages on mount
   useEffect(() => {
-    geminiService.clearHistory();
-    messages.forEach(msg => {
-      if (msg.role === 'user' || msg.role === 'assistant') {
-        // Re-populate service history for continuity
-        (geminiService as any).conversationHistory.push({ role: msg.role, content: msg.content });
-      }
-    });
+    const history = messages
+      .filter((msg) => msg.role === 'user' || msg.role === 'assistant')
+      .map((msg) => ({ role: msg.role, content: msg.content }));
+
+    geminiService.setHistory(history);
   }, []); // Only on mount
 
   // Load PDF pages when a PDF is attached
@@ -149,9 +167,24 @@ export function GeminiChat({ className, noteContext, onClearContext }: GeminiCha
     }
   }, [noteContext, loadPdfPages]);
 
+  // Rehydrate persisted PDF context after refresh/navigation
   useEffect(() => {
-    if (noteContext) geminiService.setContext({ noteTitle: noteContext.title, selectedSubject: noteContext.subject });
-  }, [noteContext]);
+    if (
+      attachedContext?.fileType === 'pdf' &&
+      attachedContext.fileUrl &&
+      pdfPages.length === 0 &&
+      !pdfLoading
+    ) {
+      loadPdfPages(attachedContext.fileUrl);
+    }
+  }, [attachedContext, pdfPages.length, pdfLoading, loadPdfPages]);
+
+  useEffect(() => {
+    const contextSource = attachedContext ?? noteContext;
+    if (contextSource) {
+      geminiService.setContext({ noteTitle: contextSource.title, selectedSubject: contextSource.subject });
+    }
+  }, [attachedContext, noteContext]);
 
   useEffect(() => {
     if (userProfile) geminiService.setContext({ userBranch: userProfile.branch, userYear: userProfile.year });
@@ -163,6 +196,7 @@ export function GeminiChat({ className, noteContext, onClearContext }: GeminiCha
 
   const handleRemoveContext = () => {
     setAttachedContext(null);
+    setPersistentAttachmentImages([]);
     setPdfPages([]);
     setSelectedPages([]);
     setTotalPdfPages(0);
@@ -212,12 +246,14 @@ export function GeminiChat({ className, noteContext, onClearContext }: GeminiCha
     setInput("");
     setImages([]);
     setAttachedContext(null);
+    setPersistentAttachmentImages([]);
     setPdfPages([]);
     setSelectedPages([]);
     setTotalPdfPages(0);
     geminiService.clearHistory();
     saveMessages([]);
     saveContext(null);
+    saveAttachmentImages([]);
     onClearContext?.();
   };
 
@@ -308,8 +344,16 @@ export function GeminiChat({ className, noteContext, onClearContext }: GeminiCha
       if (imgData) allImageData.push(imgData);
     }
 
+    const effectiveImages = allImageData.length > 0 ? allImageData : persistentAttachmentImages;
+    if (allImageData.length > 0) {
+      setPersistentAttachmentImages(allImageData);
+    }
+
     try {
-      const response = await geminiService.sendMessage(fullMessage, allImageData.length > 0 ? allImageData : undefined);
+      const response = await geminiService.sendMessage(
+        fullMessage,
+        effectiveImages.length > 0 ? effectiveImages : undefined
+      );
       const assistantMsg: DisplayMessage = { role: 'assistant', content: response };
       setMessages(prev => [...prev, assistantMsg]);
     } catch (err) {
