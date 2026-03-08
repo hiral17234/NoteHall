@@ -35,11 +35,7 @@ const Welcome = () => {
   const navigate = useNavigate();
   const [realStats, setRealStats] = useState({ notes: 0, users: 0, subjects: 0 });
 
-  useEffect(() => {
-    if (localStorage.getItem("notehall_intro_done")) {
-      navigate("/login", { replace: true });
-    }
-  }, [navigate]);
+  // No redirect needed — App.tsx handles auth-based routing
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -374,6 +370,51 @@ const Welcome = () => {
             </motion.div>
           ))}
         </div>
+
+        {/* Campus Community Ecosystem */}
+        <motion.div
+          variants={fadeUp}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true }}
+          className="mt-20 max-w-4xl mx-auto text-center"
+        >
+          <h3 className="text-xl md:text-2xl font-bold mb-3">Part of the Campus Community Ecosystem</h3>
+          <p className="text-muted-foreground mb-10 max-w-lg mx-auto">
+            NoteHall is one of four interconnected platforms built for students, by students.
+          </p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+            {[
+              { name: "CampusVoice", desc: "Share your campus experiences & feedback", url: "https://campusvoice-chi.vercel.app/", icon: MessageCircle },
+              { name: "NoteHall", desc: "Your centralized knowledge library", url: "https://notehall.vercel.app", icon: BookOpen },
+              { name: "CampusAssist", desc: "Get help from peers and seniors", url: "https://campusassist-five.vercel.app/", icon: Users },
+              { name: "CampusBuzz", desc: "Latest campus news & events", url: "", icon: Sparkles },
+            ].map((app, i) => (
+              <motion.a
+                key={i}
+                href={app.url || undefined}
+                target={app.url ? "_blank" : undefined}
+                rel="noopener noreferrer"
+                variants={fadeUp}
+                initial="hidden"
+                whileInView="visible"
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.1 }}
+                className={`rounded-2xl border border-border bg-card p-6 shadow-md hover:shadow-lg hover:-translate-y-1 transition-all duration-300 flex flex-col items-center gap-3 ${app.url ? "cursor-pointer" : "cursor-default opacity-80"}`}
+              >
+                <div
+                  className="w-12 h-12 rounded-xl flex items-center justify-center"
+                  style={{ background: "linear-gradient(135deg, hsl(37 92% 50%), hsl(45 96% 64%))" }}
+                >
+                  <app.icon className="w-6 h-6 text-primary-foreground" />
+                </div>
+                <span className="font-semibold text-sm md:text-base">{app.name}</span>
+                <span className="text-xs text-muted-foreground leading-tight">{app.desc}</span>
+                {!app.url && <span className="text-[10px] text-muted-foreground/60 italic">Coming Soon</span>}
+              </motion.a>
+            ))}
+          </div>
+        </motion.div>
       </section>
 
       {/* CTA Section */}
