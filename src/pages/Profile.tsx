@@ -140,7 +140,15 @@ export default function Profile() {
     };
     checkOnlineStatus();
 
-    // 7. User-Specific Private Data
+    // 7. Fetch top contributor history
+    const unsubTopHistory = onSnapshot(
+      collection(db, 'users', targetUserId, 'topContributorHistory'),
+      (snap) => {
+        setTopContributorHistory(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      }
+    );
+
+    // 8. User-Specific Private Data
     let unsubSaved = () => {};
     let unsubDownloads = () => {};
 
@@ -165,6 +173,7 @@ export default function Profile() {
       unsubHelped();
       unsubNotes();
       unsubContribs();
+      unsubTopHistory();
       unsubSaved();
       unsubDownloads();
     };
