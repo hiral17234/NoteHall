@@ -1,6 +1,8 @@
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from "react";
 import { notificationService, Notification } from "@/services/notificationService";
 import { useAuth, UserProfile } from "@/contexts/AuthContext";
+import { doc, updateDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 export type { UserProfile } from "@/contexts/AuthContext";
 
@@ -171,9 +173,13 @@ export function UserProvider({ children }: { children: ReactNode }) {
     setPrivacy(prev => {
       const updated = { ...prev, ...updates };
       localStorage.setItem(STORAGE_KEYS.PRIVACY, JSON.stringify(updated));
+      // Sync privacy settings to Firestore so other users can see them
+      if (userProfile?.id) {
+        updateDoc(doc(db, 'users', userProfile.id), { privacy: updated }).catch(console.error);
+      }
       return updated;
     });
-  }, []);
+  }, [userProfile?.id]);
 
   const isOwner = useCallback((profileId: string) => {
     return profileId === userProfile?.id;
