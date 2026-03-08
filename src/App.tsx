@@ -124,9 +124,6 @@ const App = () => {
           <Toaster />
           <Sonner />
           <BrowserRouter>
-            <Routes>
-              <Route path="/welcome" element={<Welcome />} />
-            </Routes>
             <AuthProvider>
               <AuthenticatedApp />
             </AuthProvider>
