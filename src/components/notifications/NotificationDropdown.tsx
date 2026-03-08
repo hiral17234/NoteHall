@@ -90,7 +90,16 @@ export function NotificationDropdown() {
                         {notification.message}
                       </p>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        {formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true })}
+                        {(() => {
+                          try {
+                            const date = notification.createdAt?.toDate
+                              ? notification.createdAt.toDate()
+                              : new Date(notification.createdAt);
+                            return isNaN(date.getTime()) ? 'Recently' : formatDistanceToNow(date, { addSuffix: true });
+                          } catch {
+                            return 'Recently';
+                          }
+                        })()}
                       </p>
                     </div>
                     {!notification.read && (
