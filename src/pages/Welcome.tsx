@@ -1,10 +1,10 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   BookOpen, Users, Sparkles, Upload, Search, BookMarked, Trophy,
   FolderOpen, GraduationCap, MessageCircle, ChevronDown, ArrowRight,
-  UserCheck, Award
+  UserCheck, Award, FileText, UserPlus, Layers
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import FloatingParticles from "@/components/welcome/FloatingParticles";
@@ -13,6 +13,8 @@ import FloatingNav from "@/components/welcome/FloatingNav";
 import AnimatedText from "@/components/welcome/AnimatedText";
 import CountUp from "@/components/welcome/CountUp";
 import logo from "@/assets/logo.png";
+import { collection, getDocs } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 const fadeUp = {
   hidden: { opacity: 0, y: 40 },
@@ -31,12 +33,37 @@ const slideRight = {
 
 const Welcome = () => {
   const navigate = useNavigate();
+  const [realStats, setRealStats] = useState({ notes: 0, users: 0, subjects: 0 });
 
   useEffect(() => {
     if (localStorage.getItem("notehall_intro_done")) {
       navigate("/login", { replace: true });
     }
   }, [navigate]);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const [notesSnap, usersSnap] = await Promise.all([
+          getDocs(collection(db, "notes")),
+          getDocs(collection(db, "users")),
+        ]);
+        const subjects = new Set<string>();
+        notesSnap.docs.forEach((d) => {
+          const s = d.data().subject;
+          if (s) subjects.add(s);
+        });
+        setRealStats({
+          notes: notesSnap.size,
+          users: usersSnap.size,
+          subjects: subjects.size,
+        });
+      } catch {
+        setRealStats({ notes: 0, users: 0, subjects: 0 });
+      }
+    };
+    fetchStats();
+  }, []);
 
   const handleGetStarted = () => {
     localStorage.setItem("notehall_intro_done", "true");
@@ -299,12 +326,64 @@ const Welcome = () => {
       </section>
 
       {/* Stats Section */}
-      <section id="stats" className="relative z-10 py-20 md:py-32 px-4">
-        <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
+      <section id="stats" className="relative z-10 py-20 md:py-32 px-4 overflow-hidden">
+        {/* Decorative background */}
+        <div className="absolute inset-0 pointer-events-none">
+          <div
+            className="absolute inset-0 opacity-[0.07]"
+            style={{
+              backgroundImage: `radial-gradient(circle at 20% 50%, hsl(37 92% 50%) 0%, transparent 50%), radial-gradient(circle at 80% 50%, hsl(45 96% 64%) 0%, transparent 50%), radial-gradient(circle at 50% 20%, hsl(37 92% 50% / 0.5) 0%, transparent 40%)`,
+            }}
+          />
+          {/* Floating decorative shapes */}
+          <motion.div
+            animate={{ y: [-20, 20, -20], rotate: [0, 10, 0] }}
+            transition={{ repeat: Infinity, duration: 8, ease: "easeInOut" }}
+            className="absolute top-10 left-[10%] w-32 h-32 rounded-full border border-primary/10"
+          />
+          <motion.div
+            animate={{ y: [20, -20, 20], rotate: [0, -15, 0] }}
+            transition={{ repeat: Infinity, duration: 10, ease: "easeInOut" }}
+            className="absolute bottom-10 right-[15%] w-24 h-24 rounded-2xl border border-primary/10 rotate-45"
+          />
+          <motion.div
+            animate={{ y: [10, -10, 10], x: [-10, 10, -10] }}
+            transition={{ repeat: Infinity, duration: 6, ease: "easeInOut" }}
+            className="absolute top-1/2 left-[5%] w-16 h-16 rounded-full"
+            style={{ background: "linear-gradient(135deg, hsl(37 92% 50% / 0.08), hsl(45 96% 64% / 0.08))" }}
+          />
+          <motion.div
+            animate={{ y: [-15, 15, -15], x: [5, -5, 5] }}
+            transition={{ repeat: Infinity, duration: 7, ease: "easeInOut" }}
+            className="absolute top-[20%] right-[8%] w-20 h-20 rounded-xl"
+            style={{ background: "linear-gradient(135deg, hsl(45 96% 64% / 0.06), hsl(37 92% 50% / 0.06))" }}
+          />
+        </div>
+
+        <motion.h2
+          variants={fadeUp}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true }}
+          className="text-2xl md:text-4xl font-bold text-center mb-4 relative z-10"
+        >
+          NoteHall in Numbers
+        </motion.h2>
+        <motion.p
+          variants={fadeUp}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true }}
+          className="text-center text-muted-foreground mb-16 max-w-md mx-auto relative z-10"
+        >
+          Real impact, real community.
+        </motion.p>
+
+        <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8 text-center relative z-10">
           {[
-            { end: 10000, suffix: "+", label: "Notes Shared" },
-            { end: 5000, suffix: "+", label: "Students Connected" },
-            { end: 50, suffix: "+", label: "Subjects Covered" },
+            { end: realStats.notes, label: "Notes Shared", icon: FileText, gradient: "linear-gradient(135deg, hsl(37 92% 50%), hsl(45 96% 64%))" },
+            { end: realStats.users, label: "Students Connected", icon: UserPlus, gradient: "linear-gradient(135deg, hsl(25 95% 53%), hsl(37 92% 50%))" },
+            { end: realStats.subjects, label: "Subjects Covered", icon: Layers, gradient: "linear-gradient(135deg, hsl(45 96% 64%), hsl(50 90% 55%))" },
           ].map((stat, i) => (
             <motion.div
               key={i}
@@ -313,12 +392,25 @@ const Welcome = () => {
               whileInView="visible"
               viewport={{ once: true }}
               transition={{ delay: i * 0.15 }}
-              className="p-8"
+              className="relative group"
             >
-              <div className="text-4xl md:text-5xl font-bold text-primary mb-2">
-                <CountUp end={stat.end} suffix={stat.suffix} />
+              <div className="rounded-2xl border border-border bg-card/80 backdrop-blur-sm p-8 shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+                {/* Glow effect on hover */}
+                <div
+                  className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 -z-10 blur-xl"
+                  style={{ background: stat.gradient, transform: "scale(0.9)" }}
+                />
+                <div
+                  className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-5"
+                  style={{ background: stat.gradient }}
+                >
+                  <stat.icon className="w-8 h-8 text-primary-foreground" />
+                </div>
+                <div className="text-4xl md:text-5xl font-bold text-primary mb-2">
+                  <CountUp end={stat.end} suffix="+" />
+                </div>
+                <p className="text-muted-foreground font-medium">{stat.label}</p>
               </div>
-              <p className="text-muted-foreground font-medium">{stat.label}</p>
             </motion.div>
           ))}
         </div>
