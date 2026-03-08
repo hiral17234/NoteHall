@@ -407,7 +407,6 @@ const Welcome = () => {
                   className="w-12 h-12 rounded-xl flex items-center justify-center"
                   style={{ background: "linear-gradient(135deg, hsl(37 92% 50%), hsl(45 96% 64%))" }}
                 >
-                >
                   <app.icon className="w-6 h-6 text-primary-foreground" />
                 </div>
                 <span className="font-semibold text-sm md:text-base">{app.name}</span>
