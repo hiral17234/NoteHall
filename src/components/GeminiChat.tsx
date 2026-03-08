@@ -167,6 +167,18 @@ export function GeminiChat({ className, noteContext, onClearContext }: GeminiCha
     }
   }, [noteContext, loadPdfPages]);
 
+  // Rehydrate persisted PDF context after refresh/navigation
+  useEffect(() => {
+    if (
+      attachedContext?.fileType === 'pdf' &&
+      attachedContext.fileUrl &&
+      pdfPages.length === 0 &&
+      !pdfLoading
+    ) {
+      loadPdfPages(attachedContext.fileUrl);
+    }
+  }, [attachedContext, pdfPages.length, pdfLoading, loadPdfPages]);
+
   useEffect(() => {
     if (noteContext) geminiService.setContext({ noteTitle: noteContext.title, selectedSubject: noteContext.subject });
   }, [noteContext]);
@@ -181,6 +193,7 @@ export function GeminiChat({ className, noteContext, onClearContext }: GeminiCha
 
   const handleRemoveContext = () => {
     setAttachedContext(null);
+    setPersistentAttachmentImages([]);
     setPdfPages([]);
     setSelectedPages([]);
     setTotalPdfPages(0);
