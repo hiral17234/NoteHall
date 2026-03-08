@@ -95,6 +95,7 @@ export function GeminiChat({ className, noteContext, onClearContext }: GeminiCha
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [attachedContext, setAttachedContext] = useState<typeof noteContext>(() => loadContext());
+  const [persistentAttachmentImages, setPersistentAttachmentImages] = useState<{ base64: string; mimeType: string }[]>(() => loadAttachmentImages());
   
   // PDF page selection state
   const [pdfPages, setPdfPages] = useState<PdfPageInfo[]>([]);
