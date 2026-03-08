@@ -92,8 +92,27 @@ export const ContributionCard = forwardRef<HTMLDivElement, ContributionCardProps
     }
   };
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
+    if (!contribution.link) {
+      toast({ title: "No file available", variant: "destructive" });
+      return;
+    }
     toast({ title: "Downloading...", description: contribution.fileName || "File" });
+    try {
+      const response = await fetch(contribution.link);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = contribution.fileName || "download";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    } catch {
+      // Fallback: open in new tab
+      window.open(contribution.link, "_blank");
+    }
   };
 
   const handleOpenLink = () => {
