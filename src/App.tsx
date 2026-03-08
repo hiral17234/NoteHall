@@ -86,6 +86,7 @@ function AuthenticatedApp() {
         <HelpRequestsProvider>
           <SearchProvider>
             <Routes>
+              <Route path="/welcome" element={<Welcome />} />
               <Route path="/login" element={<AuthRoute><Login /></AuthRoute>} />
               <Route path="/signup" element={<AuthRoute><Signup /></AuthRoute>} />
               <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
