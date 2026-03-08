@@ -180,8 +180,11 @@ export function GeminiChat({ className, noteContext, onClearContext }: GeminiCha
   }, [attachedContext, pdfPages.length, pdfLoading, loadPdfPages]);
 
   useEffect(() => {
-    if (noteContext) geminiService.setContext({ noteTitle: noteContext.title, selectedSubject: noteContext.subject });
-  }, [noteContext]);
+    const contextSource = attachedContext ?? noteContext;
+    if (contextSource) {
+      geminiService.setContext({ noteTitle: contextSource.title, selectedSubject: contextSource.subject });
+    }
+  }, [attachedContext, noteContext]);
 
   useEffect(() => {
     if (userProfile) geminiService.setContext({ userBranch: userProfile.branch, userYear: userProfile.year });
