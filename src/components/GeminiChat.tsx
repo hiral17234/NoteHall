@@ -108,18 +108,17 @@ export function GeminiChat({ className, noteContext, onClearContext }: GeminiCha
   // Persist messages
   useEffect(() => { saveMessages(messages); }, [messages]);
   
-  // Persist context
+  // Persist context and reusable attachment images
   useEffect(() => { saveContext(attachedContext || null); }, [attachedContext]);
+  useEffect(() => { saveAttachmentImages(persistentAttachmentImages); }, [persistentAttachmentImages]);
 
   // Sync geminiService history with persisted messages on mount
   useEffect(() => {
-    geminiService.clearHistory();
-    messages.forEach(msg => {
-      if (msg.role === 'user' || msg.role === 'assistant') {
-        // Re-populate service history for continuity
-        (geminiService as any).conversationHistory.push({ role: msg.role, content: msg.content });
-      }
-    });
+    const history = messages
+      .filter((msg) => msg.role === 'user' || msg.role === 'assistant')
+      .map((msg) => ({ role: msg.role, content: msg.content }));
+
+    geminiService.setHistory(history);
   }, []); // Only on mount
 
   // Load PDF pages when a PDF is attached
