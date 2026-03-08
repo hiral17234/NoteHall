@@ -55,7 +55,7 @@ const podiumStyles = `
 
 const rankConfig = {
   1: {
-    avatarSize: "w-20 h-20",
+    avatarSize: "w-[88px] h-[88px]",
     borderStyle: "border-[3px]" as const,
     borderColor: "border-[#FFD700]",
     crownSize: "w-8 h-8",
@@ -64,12 +64,11 @@ const rankConfig = {
     badgeBg: "bg-[#FFD700]/20 text-[#B8860B] border-[#FFD700]/40",
     nameSize: "text-sm font-bold",
     scoreColor: "text-[#B8860B]",
-    podiumColor: "rgba(255, 215, 0, 0.12)",
-    podiumBorder: "rgba(255, 215, 0, 0.25)",
-    podiumHeight: "h-16",
+    podiumColor: "rgba(253, 230, 138, 0.4)",
+    podiumHeight: 56,
   },
   2: {
-    avatarSize: "w-16 h-16",
+    avatarSize: "w-[70px] h-[70px]",
     borderStyle: "border-[2.5px]" as const,
     borderColor: "border-[#C0C0C0]",
     crownSize: "w-6 h-6",
@@ -78,12 +77,11 @@ const rankConfig = {
     badgeBg: "bg-[#C0C0C0]/20 text-[#6B6B6B] border-[#C0C0C0]/40",
     nameSize: "text-xs font-semibold",
     scoreColor: "text-[#6B6B6B]",
-    podiumColor: "rgba(192, 192, 192, 0.12)",
-    podiumBorder: "rgba(192, 192, 192, 0.25)",
-    podiumHeight: "h-10",
+    podiumColor: "#E5E7EB",
+    podiumHeight: 40,
   },
   3: {
-    avatarSize: "w-16 h-16",
+    avatarSize: "w-[70px] h-[70px]",
     borderStyle: "border-[2.5px]" as const,
     borderColor: "border-[#CD7F32]",
     crownSize: "w-6 h-6",
@@ -92,9 +90,8 @@ const rankConfig = {
     badgeBg: "bg-[#CD7F32]/20 text-[#8B5E3C] border-[#CD7F32]/40",
     nameSize: "text-xs font-semibold",
     scoreColor: "text-[#8B5E3C]",
-    podiumColor: "rgba(205, 127, 50, 0.12)",
-    podiumBorder: "rgba(205, 127, 50, 0.25)",
-    podiumHeight: "h-8",
+    podiumColor: "#FED7AA",
+    podiumHeight: 32,
   },
 };
 
@@ -188,12 +185,13 @@ function PodiumProfile({ contributor, onClick }: { contributor: Contributor; onC
               <span className="text-xs font-bold">{contributor.contributionScore} pts</span>
             </div>
 
-            {/* Podium base block */}
+            {/* Podium base */}
             <div
-              className={cn("w-full rounded-lg mt-2", config.podiumHeight)}
+              className="rounded-t-lg mt-2"
               style={{
                 background: config.podiumColor,
-                border: `1px solid ${config.podiumBorder}`,
+                height: `${config.podiumHeight}px`,
+                width: "72px",
               }}
             />
           </div>
