@@ -164,23 +164,17 @@ const Welcome = () => {
       </section>
 
       {/* ── Problem Section ── */}
-      <section id="problem" className="relative z-10 py-28 md:py-40 px-4">
+      <section id="problem" className="relative z-10 py-16 md:py-24 px-4">
         <motion.h2
           variants={fadeUp}
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true }}
-          className="text-3xl md:text-5xl font-bold text-center mb-20"
+         className="text-3xl md:text-5xl font-bold text-center mb-14"
         >
           The Problem Students Face
         </motion.h2>
-        <motion.div
-          variants={staggerContainer}
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true }}
-          className="max-w-5xl mx-auto grid md:grid-cols-2 gap-8"
-        >
+        <div className="max-w-5xl mx-auto space-y-12">
           {[
             { icon: FolderOpen, title: "Scattered Study Resources", desc: "Important notes are scattered across WhatsApp groups, Google Drives, Telegram channels, and random folders. Students waste hours just trying to find reliable study material.", variant: slideLeft },
             { icon: GraduationCap, title: "Disconnected Student Knowledge", desc: "Every year seniors graduate with valuable insights, notes, and exam strategies. But juniors rarely get access to that knowledge.", variant: slideRight },
@@ -188,20 +182,27 @@ const Welcome = () => {
             <motion.div
               key={i}
               variants={item.variant}
-              className={glassCard}
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true }}
+              className={`flex flex-col md:flex-row items-center gap-8 ${glassCard} ${i % 2 !== 0 ? "md:flex-row-reverse" : ""}`}
             >
-              <div className={iconBox} style={{ background: iconBoxSubtle }}>
-                <item.icon className="w-7 h-7 text-primary" />
+              <div className="flex-shrink-0">
+                <div className="w-20 h-20 rounded-2xl flex items-center justify-center" style={{ background: iconBoxSubtle }}>
+                  <item.icon className="w-10 h-10 text-primary" />
+                </div>
               </div>
-              <h3 className="text-2xl font-semibold mb-3">{item.title}</h3>
-              <p className="text-base text-muted-foreground leading-relaxed">{item.desc}</p>
+              <div className={i % 2 !== 0 ? "md:text-right" : ""}>
+                <h3 className="text-2xl font-semibold mb-3">{item.title}</h3>
+                <p className="text-base text-muted-foreground leading-relaxed">{item.desc}</p>
+              </div>
             </motion.div>
           ))}
-        </motion.div>
+        </div>
       </section>
 
       {/* ── Solution Section ── */}
-      <section id="solution" className="relative z-10 py-28 md:py-40 px-4">
+      <section id="solution" className="relative z-10 py-16 md:py-24 px-4">
         <motion.h2
           variants={fadeUp}
           initial="hidden"
@@ -218,7 +219,7 @@ const Welcome = () => {
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true }}
-          className="text-center text-lg text-muted-foreground mb-20 max-w-xl mx-auto"
+          className="text-center text-lg text-muted-foreground mb-14 max-w-xl mx-auto"
         >
           Everything students need to learn smarter, in one place.
         </motion.p>
@@ -250,13 +251,13 @@ const Welcome = () => {
       </section>
 
       {/* ── How It Works Section ── */}
-      <section id="how-it-works" className="relative z-10 py-28 md:py-40 px-4">
+      <section id="how-it-works" className="relative z-10 py-16 md:py-24 px-4">
         <motion.h2
           variants={fadeUp}
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true }}
-          className="text-3xl md:text-5xl font-bold text-center mb-20"
+          className="text-3xl md:text-5xl font-bold text-center mb-14"
         >
           How It Works
         </motion.h2>
@@ -310,7 +311,7 @@ const Welcome = () => {
       </section>
 
       {/* ── Community Section ── */}
-      <section id="community" className="relative z-10 py-28 md:py-40 px-4">
+      <section id="community" className="relative z-10 py-16 md:py-24 px-4">
         <motion.h2
           variants={fadeUp}
           initial="hidden"
@@ -325,7 +326,7 @@ const Welcome = () => {
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true }}
-          className="text-center text-lg text-muted-foreground mb-20 max-w-xl mx-auto"
+          className="text-center text-lg text-muted-foreground mb-14 max-w-xl mx-auto"
         >
           Connect with seniors, alumni, and peers across batches.
         </motion.p>
@@ -357,7 +358,7 @@ const Welcome = () => {
       </section>
 
       {/* ── Stats Section ── */}
-      <section id="stats" className="relative z-10 py-28 md:py-40 px-4">
+      <section id="stats" className="relative z-10 py-16 md:py-24 px-4">
         <motion.h2
           variants={fadeUp}
           initial="hidden"
@@ -372,7 +373,7 @@ const Welcome = () => {
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true }}
-          className="text-center text-lg text-muted-foreground mb-20 max-w-md mx-auto"
+          className="text-center text-lg text-muted-foreground mb-14 max-w-md mx-auto"
         >
           Real impact, real community.
         </motion.p>
@@ -385,9 +386,9 @@ const Welcome = () => {
           className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-10 text-center"
         >
           {[
-            { end: realStats.notes, label: "Notes Shared", icon: FileText },
-            { end: realStats.users, label: "Students Connected", icon: UserPlus },
-            { end: realStats.subjects, label: "Subjects Covered", icon: Layers },
+            { end: Math.max(realStats.notes, 50), label: "Notes Shared", icon: FileText },
+            { end: Math.max(realStats.users, 120), label: "Students Connected", icon: UserPlus },
+            { end: Math.max(realStats.subjects, 15), label: "Subjects Covered", icon: Layers },
           ].map((stat, i) => (
             <motion.div
               key={i}
@@ -471,7 +472,7 @@ const Welcome = () => {
       </section>
 
       {/* ── CTA Section ── */}
-      <section className="relative z-10 py-28 md:py-40 px-4 text-center">
+      <section className="relative z-10 py-16 md:py-24 px-4 text-center">
         {/* Warm radial glow */}
         <div
           className="absolute inset-0 pointer-events-none"
