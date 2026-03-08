@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { NoteCard } from "@/components/notes/NoteCard";
 import { NoteCardSkeleton } from "@/components/ui/skeleton-card";
@@ -41,7 +41,8 @@ export default function Index() {
     fetchNotes();
   }, []);
 
-  const toCardNote = (note: Note) => mapFirestoreNoteToCardNote(note);
+  // Memoize note conversion to avoid creating new objects on every render
+  const toCardNote = useCallback((note: Note) => mapFirestoreNoteToCardNote(note), []);
 
   const filteredNotes = notes.filter((note) => {
     if (selectedBranch !== "all" && selectedBranch !== "other") {

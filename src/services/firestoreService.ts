@@ -179,8 +179,16 @@ export const notesService = {
   },
 
   async incrementViews(noteId: string): Promise<void> {
+    // Session-based unique view tracking - only count once per session per note
+    const sessionKey = `viewed_${noteId}`;
+    if (typeof sessionStorage !== 'undefined' && sessionStorage.getItem(sessionKey)) return;
+    
     const docRef = doc(db, 'notes', noteId);
     await updateDoc(docRef, { views: increment(1) });
+    
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.setItem(sessionKey, 'true');
+    }
     
     const note = await this.getById(noteId);
     if (note) {
@@ -289,6 +297,14 @@ export const notesService = {
     const noteSnap = await getDoc(noteRef);
     if (!noteSnap.exists()) return;
 
+    // Check if user already reported
+    const existingReports = await getDocs(
+      query(collection(db, 'notes', noteId, 'reports'), where('userId', '==', userId))
+    );
+    if (!existingReports.empty) {
+      throw new Error('You have already reported this note');
+    }
+
     // Add report to subcollection
     await addDoc(collection(db, 'notes', noteId, 'reports'), {
       userId,
@@ -296,17 +312,34 @@ export const notesService = {
       createdAt: getServerTimestamp(),
     });
 
-    // Increment report count on note
     const note = noteSnap.data();
     const currentReportCount = note.reportCount || 0;
     const newReportCount = currentReportCount + 1;
 
-    await updateDoc(noteRef, { 
-      reportCount: newReportCount,
-      reportedBy: arrayUnion(userId),
-      isHidden: newReportCount >= 15,
-      updatedAt: getServerTimestamp(),
-    });
+    // Notify uploader about each report
+    try {
+      await createNotification.noteReported(note.authorId, note.title, noteId, newReportCount);
+    } catch (err) {
+      console.warn('Report notification failed:', err);
+    }
+
+    if (newReportCount >= 15) {
+      // Auto-delete the note and notify uploader
+      const fileType = note.fileType || 'note';
+      await deleteDoc(noteRef);
+      try {
+        await createNotification.noteDeleted(note.authorId, note.title, fileType);
+      } catch (err) {
+        console.warn('Deletion notification failed:', err);
+      }
+    } else {
+      await updateDoc(noteRef, { 
+        reportCount: newReportCount,
+        reportedBy: arrayUnion(userId),
+        isHidden: newReportCount >= 15,
+        updatedAt: getServerTimestamp(),
+      });
+    }
   },
 
   async saveNote(noteId: string, userId: string): Promise<void> {
@@ -396,7 +429,16 @@ export const notesService = {
   },
 
   async rateNote(noteId: string, userId: string, rating: number, difficulty: string): Promise<void> {
-    await setDoc(doc(db, 'ratings', `${noteId}_${userId}`), { noteId, userId, rating, difficulty, createdAt: getServerTimestamp() });
+    const ratingDocId = `${noteId}_${userId}`;
+    const ratingRef = doc(db, 'ratings', ratingDocId);
+    
+    // Check if user already rated this note
+    const existingRating = await getDoc(ratingRef);
+    if (existingRating.exists()) {
+      throw new Error('You have already rated this note');
+    }
+    
+    await setDoc(ratingRef, { noteId, userId, rating, difficulty, createdAt: getServerTimestamp() });
     const noteRef = doc(db, 'notes', noteId);
     const noteSnap = await getDoc(noteRef);
     if (noteSnap.exists()) {
@@ -412,6 +454,12 @@ export const notesService = {
       });
       await updateDoc(doc(db, 'users', userId), { 'stats.contributionScore': increment(2) });
     }
+  },
+
+  async hasUserRated(noteId: string, userId: string): Promise<boolean> {
+    const ratingRef = doc(db, 'ratings', `${noteId}_${userId}`);
+    const ratingSnap = await getDoc(ratingRef);
+    return ratingSnap.exists();
   },
 
   async search(searchQuery: string): Promise<Note[]> {

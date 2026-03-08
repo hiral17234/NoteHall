@@ -44,6 +44,8 @@ export function NoteCard({ note, onExpand, compact = false, showDelete = false, 
   const [localLikedBy, setLocalLikedBy] = useState<string[]>(note.likedBy || []);
   const [localDislikedBy, setLocalDislikedBy] = useState<string[]>(note.dislikedBy || []);
 
+  // Use note.id as dependency to avoid resetting local state on every render
+  // (parent creates new note object references via toCardNote each render)
   useEffect(() => {
     if (userProfile?.id) {
       setIsLiked(note.likedBy?.includes(userProfile.id) ?? false);
@@ -54,7 +56,7 @@ export function NoteCard({ note, onExpand, compact = false, showDelete = false, 
     }
     setLikeCount(note.likes);
     setDislikeCount(note.dislikes);
-  }, [note, userProfile?.id]);
+  }, [note.id, userProfile?.id]);
 
   useEffect(() => {
     commentsService.getByNote(note.id).then(c => setCommentsCount(c.length)).catch(() => {});
